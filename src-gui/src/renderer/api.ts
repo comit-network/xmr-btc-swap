@@ -5,21 +5,21 @@
 // - and to submit feedback
 // - fetch currency rates from CoinGecko
 
-import { Alert, ExtendedProviderStatus } from "models/apiModel";
+import { Alert, ExtendedMakerStatus } from "models/apiModel";
 import { store } from "./store/storeRenderer";
 import { setBtcPrice, setXmrBtcRate, setXmrPrice } from "store/features/ratesSlice";
 import { FiatCurrency } from "store/features/settingsSlice";
 import { setAlerts } from "store/features/alertsSlice";
-import { registryConnectionFailed, setRegistryProviders } from "store/features/providersSlice";
+import { registryConnectionFailed, setRegistryMakers } from "store/features/makersSlice";
 import logger from "utils/logger";
 
 const PUBLIC_REGISTRY_API_BASE_URL = "https://api.unstoppableswap.net";
 
-async function fetchProvidersViaHttp(): Promise<
-  ExtendedProviderStatus[]
+async function fetchMakersViaHttp(): Promise<
+  ExtendedMakerStatus[]
 > {
   const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/list`);
-  return (await response.json()) as ExtendedProviderStatus[];
+  return (await response.json()) as ExtendedMakerStatus[];
 }
 
 async function fetchAlertsViaHttp(): Promise<Alert[]> {
@@ -114,8 +114,8 @@ export async function updateRates(): Promise<void> {
  */
 export async function updatePublicRegistry(): Promise<void> {
   try {
-    const providers = await fetchProvidersViaHttp();
-    store.dispatch(setRegistryProviders(providers));
+    const providers = await fetchMakersViaHttp();
+    store.dispatch(setRegistryMakers(providers));
   } catch (error) {
     store.dispatch(registryConnectionFailed());
     logger.error(error, "Error fetching providers");

@@ -91,7 +91,7 @@ export default function HistoryRowExpanded({
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Provider Address</TableCell>
+              <TableCell>Maker Address</TableCell>
               <TableCell>
                 <Box className={classes.outerAddressBox}>
                   {swap.seller.addresses.map((addr) => (

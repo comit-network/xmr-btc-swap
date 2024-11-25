@@ -109,7 +109,7 @@ async fn next_state(
                 .estimate_fee(TxCancel::weight(), btc_amount)
                 .await?;
 
-            // Emit an event to tauri that we are negotiating with the swap provider to lock the Bitcoin
+            // Emit an event to tauri that we are negotiating with the maker to lock the Bitcoin
             event_emitter.emit_swap_progress_event(
                 swap_id,
                 TauriSwapProgressEvent::SwapSetupInflight {

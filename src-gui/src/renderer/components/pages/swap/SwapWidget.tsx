@@ -11,15 +11,15 @@ import InputAdornment from "@material-ui/core/InputAdornment";
 import ArrowDownwardIcon from "@material-ui/icons/ArrowDownward";
 import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
 import { Alert } from "@material-ui/lab";
-import { ExtendedProviderStatus } from "models/apiModel";
+import { ExtendedMakerStatus } from "models/apiModel";
 import { ChangeEvent, useEffect, useState } from "react";
 import { useAppSelector } from "store/hooks";
 import { satsToBtc } from "utils/conversionUtils";
 import {
   ListSellersDialogOpenButton,
-  ProviderSubmitDialogOpenButton,
-} from "../../modal/provider/ProviderListDialog";
-import ProviderSelect from "../../modal/provider/ProviderSelect";
+  MakerSubmitDialogOpenButton,
+} from "../../modal/provider/MakerListDialog";
+import MakerSelect from "../../modal/provider/MakerSelect";
 import SwapDialog from "../../modal/swap/SwapDialog";
 
 // After RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN failed reconnection attempts we can assume the public registry is down
@@ -43,7 +43,7 @@ const useStyles = makeStyles((theme) => ({
   headerText: {
     padding: theme.spacing(1),
   },
-  providerInfo: {
+  makerInfo: {
     padding: theme.spacing(1),
   },
   swapIconOuter: {
@@ -53,12 +53,12 @@ const useStyles = makeStyles((theme) => ({
   swapIcon: {
     marginRight: theme.spacing(1),
   },
-  noProvidersAlertOuter: {
+  noMakersAlertOuter: {
     display: "flex",
     flexDirection: "column",
     gap: theme.spacing(1),
   },
-  noProvidersAlertButtonsOuter: {
+  noMakersAlertButtonsOuter: {
     display: "flex",
     gap: theme.spacing(1),
   },
@@ -76,17 +76,17 @@ function Title() {
   );
 }
 
-function HasProviderSwapWidget({
-  selectedProvider,
+function HasMakerSwapWidget({
+  selectedMaker,
 }: {
-  selectedProvider: ExtendedProviderStatus;
+  selectedMaker: ExtendedMakerStatus;
 }) {
   const classes = useStyles();
 
   const forceShowDialog = useAppSelector((state) => state.swap.state !== null);
   const [showDialog, setShowDialog] = useState(false);
   const [btcFieldValue, setBtcFieldValue] = useState<number | string>(
-    satsToBtc(selectedProvider.minSwapAmount),
+    satsToBtc(selectedMaker.minSwapAmount),
   );
   const [xmrFieldValue, setXmrFieldValue] = useState(1);
 
@@ -100,7 +100,7 @@ function HasProviderSwapWidget({
       setXmrFieldValue(0);
     } else {
       const convertedXmrAmount =
-        parsedBtcAmount / satsToBtc(selectedProvider.price);
+        parsedBtcAmount / satsToBtc(selectedMaker.price);
       setXmrFieldValue(convertedXmrAmount);
     }
   }
@@ -110,15 +110,15 @@ function HasProviderSwapWidget({
     if (Number.isNaN(parsedBtcAmount)) {
       return "This is not a valid number";
     }
-    if (parsedBtcAmount < satsToBtc(selectedProvider.minSwapAmount)) {
+    if (parsedBtcAmount < satsToBtc(selectedMaker.minSwapAmount)) {
       return `The minimum swap amount is ${satsToBtc(
-        selectedProvider.minSwapAmount,
-      )} BTC. Switch to a different provider if you want to swap less.`;
+        selectedMaker.minSwapAmount,
+      )} BTC. Switch to a different maker if you want to swap less.`;
     }
-    if (parsedBtcAmount > satsToBtc(selectedProvider.maxSwapAmount)) {
+    if (parsedBtcAmount > satsToBtc(selectedMaker.maxSwapAmount)) {
       return `The maximum swap amount is ${satsToBtc(
-        selectedProvider.maxSwapAmount,
-      )} BTC. Switch to a different provider if you want to swap more.`;
+        selectedMaker.maxSwapAmount,
+      )} BTC. Switch to a different maker if you want to swap more.`;
     }
     return null;
   }
@@ -127,7 +127,7 @@ function HasProviderSwapWidget({
     setShowDialog(true);
   }
 
-  useEffect(updateXmrValue, [btcFieldValue, selectedProvider]);
+  useEffect(updateXmrValue, [btcFieldValue, selectedMaker]);
 
   return (
     // 'elevation' prop can't be passed down (type def issue)
@@ -160,7 +160,7 @@ function HasProviderSwapWidget({
           endAdornment: <InputAdornment position="end">XMR</InputAdornment>,
         }}
       />
-      <ProviderSelect />
+      <MakerSelect />
       <Fab variant="extended" color="primary" onClick={handleGuideDialogOpen}>
         <SwapHorizIcon className={classes.swapIcon} />
         Swap
@@ -173,22 +173,22 @@ function HasProviderSwapWidget({
   );
 }
 
-function HasNoProvidersSwapWidget() {
+function HasNoMakersSwapWidget() {
   const forceShowDialog = useAppSelector((state) => state.swap.state !== null);
   const isPublicRegistryDown = useAppSelector((state) =>
-    isRegistryDown(state.providers.registry.connectionFailsCount),
+    isRegistryDown(state.makers.registry.connectionFailsCount),
   );
   const classes = useStyles();
 
   const alertBox = isPublicRegistryDown ? (
     <Alert severity="info">
-      <Box className={classes.noProvidersAlertOuter}>
+      <Box className={classes.noMakersAlertOuter}>
         <Typography>
-          Currently, the public registry of providers seems to be unreachable.
+          Currently, the public registry of makers seems to be unreachable.
           Here&apos;s what you can do:
           <ul>
             <li>
-              Try discovering a provider by connecting to a rendezvous point
+              Try discovering a maker by connecting to a rendezvous point
             </li>
             <li>
               Try again later when the public registry may be reachable again
@@ -202,20 +202,20 @@ function HasNoProvidersSwapWidget() {
     </Alert>
   ) : (
     <Alert severity="info">
-      <Box className={classes.noProvidersAlertOuter}>
+      <Box className={classes.noMakersAlertOuter}>
         <Typography>
-          Currently, there are no providers (trading partners) available in the
+          Currently, there are no makers (trading partners) available in the
           official registry. Here&apos;s what you can do:
           <ul>
             <li>
-              Try discovering a provider by connecting to a rendezvous point
+              Try discovering a maker by connecting to a rendezvous point
             </li>
-            <li>Add a new provider to the public registry</li>
-            <li>Try again later when more providers may be available</li>
+            <li>Add a new maker to the public registry</li>
+            <li>Try again later when more makers may be available</li>
           </ul>
         </Typography>
         <Box>
-          <ProviderSubmitDialogOpenButton />
+          <MakerSubmitDialogOpenButton />
           <ListSellersDialogOpenButton />
         </Box>
       </Box>
@@ -225,12 +225,12 @@ function HasNoProvidersSwapWidget() {
   return (
     <Box>
       {alertBox}
-      <SwapDialog open={forceShowDialog} onClose={() => {}} />
+      <SwapDialog open={forceShowDialog} onClose={() => { }} />
     </Box>
   );
 }
 
-function ProviderLoadingSwapWidget() {
+function MakerLoadingSwapWidget() {
   const classes = useStyles();
 
   return (
@@ -245,21 +245,21 @@ function ProviderLoadingSwapWidget() {
 }
 
 export default function SwapWidget() {
-  const selectedProvider = useAppSelector(
-    (state) => state.providers.selectedProvider,
+  const selectedMaker = useAppSelector(
+    (state) => state.makers.selectedMaker,
   );
-  // If we fail more than RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN reconnect attempts, we'll show the "no providers" widget. We can assume the public registry is down.
-  const providerLoading = useAppSelector(
+  // If we fail more than RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN reconnect attempts, we'll show the "no makers" widget. We can assume the public registry is down.
+  const makerLoading = useAppSelector(
     (state) =>
-      state.providers.registry.providers === null &&
-      !isRegistryDown(state.providers.registry.connectionFailsCount),
+      state.makers.registry.makers === null &&
+      !isRegistryDown(state.makers.registry.connectionFailsCount),
   );
 
-  if (providerLoading) {
-    return <ProviderLoadingSwapWidget />;
+  if (makerLoading) {
+    return <MakerLoadingSwapWidget />;
   }
-  if (selectedProvider) {
-    return <HasProviderSwapWidget selectedProvider={selectedProvider} />;
+  if (selectedMaker) {
+    return <HasMakerSwapWidget selectedMaker={selectedMaker} />;
   }
-  return <HasNoProvidersSwapWidget />;
+  return <HasNoMakersSwapWidget />;
 }

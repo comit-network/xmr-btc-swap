@@ -16,16 +16,16 @@ import { Steps } from 'nextra/components'
  
 ## Performing the swap
 <Steps>
-### Choose a _Swap Provider_ to swap with
+### Choose a _maker_ to swap with
 
-In the bottom of the screen you can see the currently selected _Swap Provider_. 
+In the bottom of the screen you can see the currently selected _maker_. 
 This is who you'll send your Bitcoin to and who you'll receive the Monero from. 
-You can change the _Swap Provider_ by clicking on the arrow and selecting a different _Swap Provider_ from the list.
+You can change the _maker_ by clicking on the arrow and selecting a different _maker_ from the list.
 
 import { Callout } from 'nextra/components'
 
 <Callout type="info">
-Different _Swap Providers_ offer different exchange rates and differing amounts of liquidity. You may want to choose the _Swap Provider_ that best suits your needs.
+Different _makers_ offer different exchange rates and differing amounts of liquidity. You may want to choose the _maker_ that best suits your needs.
 </Callout>
 
 You can use the input field to calculate the approximate amount of Monero you'll receive for a given amount of Bitcoin.
@@ -39,7 +39,7 @@ This is only used as a reference for you to get a rough idea of how much Monero 
 
 ### Start the Swap
 
-Once you've selected a _Swap Provider_, you can start the swap by clicking the `Swap` button. 
+Once you've selected a _maker_, you can start the swap by clicking the `Swap` button. 
 This will open a new window where you need to enter two addresses:
 
 1. the Monero address you want to receive the Monero to
@@ -54,7 +54,7 @@ After pressing the <img src="/start_swap_button.png" style={{
     display: "inline-block",
     // center vertically
     verticalAlign: "middle",
-}}/> button, you'll be shown an offer by the _Swap Provider_. This includes:
+}}/> button, you'll be shown an offer by the _maker_. This includes:
 
 - the exchange rate (how much Bitcoin they demand for 1 Monero)
 - the minimum and maximum amounts you can swap
@@ -88,10 +88,10 @@ The swap will go through four stages:
 1. **Locking the Bitcoin**:
 Your Bitcoin is locked in a 2-of-2 multisig address.
 
-2. **_Swap Provider_ locks the Monero**:
+2. **_Maker_ locks the Monero**:
 The other party locks their Monero as well.
 
-3. **_Swap Provider_ redeems _Bitcoin_**:
+3. **_Maker_ redeems _Bitcoin_**:
 The other party redeems the Bitcoin.
 
 4. **Redeeming the Monero**:

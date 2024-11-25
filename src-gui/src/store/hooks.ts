@@ -8,7 +8,7 @@ import { isCliLogRelatedToSwap } from "models/cliModel";
 import { SettingsState } from "./features/settingsSlice";
 import { NodesSlice } from "./features/nodesSlice";
 import { RatesState } from "./features/ratesSlice";
-import { sortProviderList } from "utils/sortUtils";
+import { sortMakerList } from "utils/sortUtils";
 
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -70,13 +70,13 @@ export function useActiveSwapLogs() {
   );
 }
 
-export function useAllProviders() {
+export function useAllMakers() {
   return useAppSelector((state) => {
-    const registryProviders = state.providers.registry.providers || [];
-    const listSellersProviders = state.providers.rendezvous.providers || [];
-    const all = [...registryProviders, ...listSellersProviders];
+    const registryMakers = state.makers.registry.makers || [];
+    const listSellersMakers = state.makers.rendezvous.makers || [];
+    const all = [...registryMakers, ...listSellersMakers];
 
-    return sortProviderList(all);
+    return sortMakerList(all);
   });
 }
 

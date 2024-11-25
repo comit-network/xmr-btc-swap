@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Changed terminology from "swap providers" to "makers"
+- GUI: For each maker, we now display a unique deterministically generated avatar derived from the maker's public key
+
 ## [1.0.0-rc.6] - 2024-11-21
 
 - CLI + GUI: Tor is now bundled with the application. All libp2p connections between peers are routed through Tor, if the `--enable-tor` flag is set. The `--tor-socks5-port` argument has been removed. This feature is powered by [arti](https://tpo.pages.torproject.net/core/arti/), an implementation of the Tor protocol in Rust by the Tor Project.

@@ -13,13 +13,13 @@ import {
 } from "@material-ui/core";
 import AddIcon from "@material-ui/icons/Add";
 import SearchIcon from "@material-ui/icons/Search";
-import { ExtendedProviderStatus } from "models/apiModel";
+import { ExtendedMakerStatus } from "models/apiModel";
 import { useState } from "react";
-import { setSelectedProvider } from "store/features/providersSlice";
-import { useAllProviders, useAppDispatch } from "store/hooks";
+import { setSelectedMaker } from "store/features/makersSlice";
+import { useAllMakers, useAppDispatch } from "store/hooks";
 import ListSellersDialog from "../listSellers/ListSellersDialog";
-import ProviderInfo from "./ProviderInfo";
-import ProviderSubmitDialog from "./ProviderSubmitDialog";
+import MakerInfo from "./MakerInfo";
+import MakerSubmitDialog from "./MakerSubmitDialog";
 
 const useStyles = makeStyles({
   dialogContent: {
@@ -27,12 +27,12 @@ const useStyles = makeStyles({
   },
 });
 
-type ProviderSelectDialogProps = {
+type MakerSelectDialogProps = {
   open: boolean;
   onClose: () => void;
 };
 
-export function ProviderSubmitDialogOpenButton() {
+export function MakerSubmitDialogOpenButton() {
   const [open, setOpen] = useState(false);
 
   return (
@@ -46,13 +46,13 @@ export function ProviderSubmitDialogOpenButton() {
         }
       }}
     >
-      <ProviderSubmitDialog open={open} onClose={() => setOpen(false)} />
+      <MakerSubmitDialog open={open} onClose={() => setOpen(false)} />
       <ListItemAvatar>
         <Avatar>
           <AddIcon />
         </Avatar>
       </ListItemAvatar>
-      <ListItemText primary="Add a new provider to public registry" />
+      <ListItemText primary="Add a new maker to public registry" />
     </ListItem>
   );
 }
@@ -77,41 +77,41 @@ export function ListSellersDialogOpenButton() {
           <SearchIcon />
         </Avatar>
       </ListItemAvatar>
-      <ListItemText primary="Discover providers by connecting to a rendezvous point" />
+      <ListItemText primary="Discover makers by connecting to a rendezvous point" />
     </ListItem>
   );
 }
 
-export default function ProviderListDialog({
+export default function MakerListDialog({
   open,
   onClose,
-}: ProviderSelectDialogProps) {
+}: MakerSelectDialogProps) {
   const classes = useStyles();
-  const providers = useAllProviders();
+  const makers = useAllMakers();
   const dispatch = useAppDispatch();
 
-  function handleProviderChange(provider: ExtendedProviderStatus) {
-    dispatch(setSelectedProvider(provider));
+  function handleMakerChange(maker: ExtendedMakerStatus) {
+    dispatch(setSelectedMaker(maker));
     onClose();
   }
 
   return (
     <Dialog onClose={onClose} open={open}>
-      <DialogTitle>Select a swap provider</DialogTitle>
+      <DialogTitle>Select a maker</DialogTitle>
 
       <DialogContent className={classes.dialogContent} dividers>
         <List>
-          {providers.map((provider) => (
+          {makers.map((maker) => (
             <ListItem
               button
-              onClick={() => handleProviderChange(provider)}
-              key={provider.peerId}
+              onClick={() => handleMakerChange(maker)}
+              key={maker.peerId}
             >
-              <ProviderInfo provider={provider} key={provider.peerId} />
+              <MakerInfo maker={maker} key={maker.peerId} />
             </ListItem>
           ))}
           <ListSellersDialogOpenButton />
-          <ProviderSubmitDialogOpenButton />
+          <MakerSubmitDialogOpenButton />
         </List>
       </DialogContent>
 

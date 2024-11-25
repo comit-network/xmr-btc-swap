@@ -26,7 +26,7 @@ You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-p
 
 For more detailed documentation on the CLI, see [this README](./dev-docs/cli/README.md).
 
-## Becoming a Market Maker
+## Becoming a market maker
 
 Swapping of course needs two parties - and the CLI is only one of them: The taker that occasionally starts a swap with a market maker.
 

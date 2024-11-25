@@ -27,7 +27,7 @@ export default function RemainingFundsWillBeUsedAlert() {
             >
                 The remaining funds of <SatsAmount amount={balance} /> in the wallet
                 will be used for the next swap. If the remaining funds exceed the
-                minimum swap amount of the provider, a swap will be initiated
+                minimum swap amount of the maker, a swap will be initiated
                 instantaneously.
             </Alert>
         </Box>

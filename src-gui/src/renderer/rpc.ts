@@ -40,7 +40,7 @@ import {
 } from "store/features/rpcSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import { store } from "./store/storeRenderer";
-import { Provider } from "models/apiModel";
+import { Maker } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
@@ -48,7 +48,7 @@ import logger from "utils/logger";
 import { getNetwork, getNetworkName, isTestnet } from "store/config";
 import { Blockchain, Network } from "store/features/settingsSlice";
 import { setStatus } from "store/features/nodesSlice";
-import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
+import { discoveredMakersByRendezvous } from "store/features/makersSlice";
 
 export const PRESET_RENDEZVOUS_POINTS = [
   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
@@ -57,7 +57,7 @@ export const PRESET_RENDEZVOUS_POINTS = [
 export async function fetchSellersAtPresetRendezvousPoints() {
   await Promise.all(PRESET_RENDEZVOUS_POINTS.map(async (rendezvousPoint) => {
     const response = await listSellersAtRendezvousPoint(rendezvousPoint);
-    store.dispatch(discoveredProvidersByRendezvous(response.sellers));
+    store.dispatch(discoveredMakersByRendezvous(response.sellers));
 
     logger.log(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
   }),
@@ -118,7 +118,7 @@ export async function withdrawBtc(address: string): Promise<string> {
 }
 
 export async function buyXmr(
-  seller: Provider,
+  seller: Maker,
   bitcoin_change_address: string | null,
   monero_receive_address: string,
 ) {

@@ -10,7 +10,7 @@ export default function SwapSetupInflightPage({
     <CircularProgressWithSubtitle
       description={
         <>
-          Starting swap with provider to lock <SatsAmount amount={btc_lock_amount} />
+          Starting swap with maker to lock <SatsAmount amount={btc_lock_amount} />
         </>
       }
     />

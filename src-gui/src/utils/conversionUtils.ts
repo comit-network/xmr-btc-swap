@@ -1,4 +1,4 @@
-import { ProviderStatus } from "models/apiModel";
+import { MakerStatus } from "models/apiModel";
 import { Seller } from "models/tauriModel";
 import { isTestnet } from "store/config";
 import { splitPeerIdFromMultiAddress } from "./parseUtils";
@@ -45,12 +45,12 @@ export function secondsToDays(seconds: number): number {
   return seconds / 86400;
 }
 
-// Convert the "Seller" object returned by the list sellers tauri endpoint to a "ProviderStatus" object
+// Convert the "Seller" object returned by the list sellers tauri endpoint to a "MakerStatus" object
 // which we use internally to represent the status of a provider. This provides consistency between
 // the models returned by the public registry and the models used internally.
-export function rendezvousSellerToProviderStatus(
+export function rendezvousSellerToMakerStatus(
   seller: Seller,
-): ProviderStatus | null {
+): MakerStatus | null {
   if (seller.status.type === "Unreachable") {
     return null;
   }

@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
+import { ExtendedMakerStatus, MakerStatus } from "models/apiModel";
 import {
   TauriLogEvent,
   GetSwapInfoResponse,
@@ -16,7 +16,7 @@ import logger from "utils/logger";
 interface State {
   balance: number | null;
   withdrawTxId: string | null;
-  rendezvous_discovered_sellers: (ExtendedProviderStatus | ProviderStatus)[];
+  rendezvous_discovered_sellers: (ExtendedMakerStatus | MakerStatus)[];
   swapInfos: {
     [swapId: string]: GetSwapInfoResponseExt;
   };
@@ -103,9 +103,9 @@ export const rpcSlice = createSlice({
     rpcSetWithdrawTxId(slice, action: PayloadAction<string>) {
       slice.state.withdrawTxId = action.payload;
     },
-    rpcSetRendezvousDiscoveredProviders(
+    rpcSetRendezvousDiscoveredMakers(
       slice,
-      action: PayloadAction<(ExtendedProviderStatus | ProviderStatus)[]>,
+      action: PayloadAction<(ExtendedMakerStatus | MakerStatus)[]>,
     ) {
       slice.state.rendezvous_discovered_sellers = action.payload;
     },
@@ -146,7 +146,7 @@ export const {
   rpcSetBalance,
   rpcSetWithdrawTxId,
   rpcResetWithdrawTxId,
-  rpcSetRendezvousDiscoveredProviders,
+  rpcSetRendezvousDiscoveredMakers,
   rpcSetSwapInfo,
   rpcSetMoneroRecoveryKeys,
   rpcResetMoneroRecoveryKeys,

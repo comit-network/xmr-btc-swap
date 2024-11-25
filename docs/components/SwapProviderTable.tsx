@@ -1,22 +1,22 @@
 import { useState, useEffect } from "react";
 import { Table, Td, Th, Tr } from 'nextra/components'
 
-export default function SwapProviderTable() {
+export default function SwapMakerTable() {
   function satsToBtc(sats) {
     return sats / 100000000;
   }
 
-  async function getProviders() {
+  async function getMakers() {
     const response = await fetch("https://api.unstoppableswap.net/api/list");
     const data = await response.json();
     return data;
   }
 
-  const [providers, setProviders] = useState([]);
+  const [makers, setMakers] = useState([]);
 
   useEffect(() => {
-    getProviders().then((data) => {
-      setProviders(data);
+    getMakers().then((data) => {
+      setMakers(data);
     });
   }, []);
 
@@ -38,16 +38,16 @@ export default function SwapProviderTable() {
           </Tr>
         </thead>
         <tbody>
-          {providers.map((provider) => (
-            <Tr key={provider.peerId}>
+          {makers.map((maker) => (
+            <Tr key={maker.peerId}>
               <Td>
-                {provider.testnet ? "Testnet" : "Mainnet"}
+                {maker.testnet ? "Testnet" : "Mainnet"}
               </Td>
-              <Td>{provider.multiAddr}</Td>
-              <Td>{provider.peerId}</Td>
-              <Td>{satsToBtc(provider.minSwapAmount)} BTC</Td>
-              <Td>{satsToBtc(provider.maxSwapAmount)} BTC</Td>
-              <Td>{satsToBtc(provider.price)} XMR/BTC</Td>
+              <Td>{maker.multiAddr}</Td>
+              <Td>{maker.peerId}</Td>
+              <Td>{satsToBtc(maker.minSwapAmount)} BTC</Td>
+              <Td>{satsToBtc(maker.maxSwapAmount)} BTC</Td>
+              <Td>{satsToBtc(maker.price)} XMR/BTC</Td>
             </Tr>
           ))}
         </tbody>

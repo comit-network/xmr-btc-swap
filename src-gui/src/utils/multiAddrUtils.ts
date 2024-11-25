@@ -1,23 +1,23 @@
-import { ExtendedProviderStatus, Provider } from "models/apiModel";
+import { ExtendedMakerStatus, Maker } from "models/apiModel";
 import { Multiaddr } from "multiaddr";
 import semver from "semver";
 import { isTestnet } from "store/config";
 
 const MIN_ASB_VERSION = "1.0.0-alpha.1"
 
-export function providerToConcatenatedMultiAddr(provider: Provider) {
+export function providerToConcatenatedMultiAddr(provider: Maker) {
   return new Multiaddr(provider.multiAddr)
     .encapsulate(`/p2p/${provider.peerId}`)
     .toString();
 }
 
-export function isProviderOnCorrectNetwork(
-  provider: ExtendedProviderStatus,
+export function isMakerOnCorrectNetwork(
+  provider: ExtendedMakerStatus,
 ): boolean {
   return provider.testnet === isTestnet();
 }
 
-export function isProviderOutdated(provider: ExtendedProviderStatus): boolean {
+export function isMakerOutdated(provider: ExtendedMakerStatus): boolean {
   if (provider.version != null) {
     if (semver.satisfies(provider.version, `>=${MIN_ASB_VERSION}`))
       return false;

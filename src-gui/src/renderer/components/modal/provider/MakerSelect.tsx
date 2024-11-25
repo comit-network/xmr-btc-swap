@@ -8,8 +8,8 @@ import {
 import ArrowForwardIosIcon from "@material-ui/icons/ArrowForwardIos";
 import { useState } from "react";
 import { useAppSelector } from "store/hooks";
-import ProviderInfo from "./ProviderInfo";
-import ProviderListDialog from "./ProviderListDialog";
+import MakerInfo from "./MakerInfo";
+import MakerListDialog from "./MakerListDialog";
 
 const useStyles = makeStyles({
   inner: {
@@ -17,23 +17,23 @@ const useStyles = makeStyles({
     width: "100%",
     height: "100%",
   },
-  providerCard: {
+  makerCard: {
     width: "100%",
   },
-  providerCardContent: {
+  makerCardContent: {
     display: "flex",
     alignItems: "center",
   },
 });
 
-export default function ProviderSelect() {
+export default function MakerSelect() {
   const classes = useStyles();
   const [selectDialogOpen, setSelectDialogOpen] = useState(false);
-  const selectedProvider = useAppSelector(
-    (state) => state.providers.selectedProvider,
+  const selectedMaker = useAppSelector(
+    (state) => state.makers.selectedMaker,
   );
 
-  if (!selectedProvider) return <>No provider selected</>;
+  if (!selectedMaker) return <>No maker selected</>;
 
   function handleSelectDialogClose() {
     setSelectDialogOpen(false);
@@ -45,13 +45,13 @@ export default function ProviderSelect() {
 
   return (
     <Box>
-      <ProviderListDialog
+      <MakerListDialog
         open={selectDialogOpen}
         onClose={handleSelectDialogClose}
       />
-      <Card variant="outlined" className={classes.providerCard}>
-        <CardContent className={classes.providerCardContent}>
-          <ProviderInfo provider={selectedProvider} />
+      <Card variant="outlined" className={classes.makerCard}>
+        <CardContent className={classes.makerCardContent}>
+          <MakerInfo maker={selectedMaker} />
           <IconButton onClick={handleSelectDialogOpen} size="small">
             <ArrowForwardIosIcon />
           </IconButton>

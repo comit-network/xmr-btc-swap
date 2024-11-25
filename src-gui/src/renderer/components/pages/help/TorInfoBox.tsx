@@ -35,7 +35,7 @@ export default function TorInfoBox() {
             internet. It is a free and open network that is operated by
             volunteers. You can start and stop Tor by clicking the buttons
             below. If Tor is running, all traffic will be routed through it and
-            the swap provider will not be able to see your IP address.
+            the maker will not be able to see your IP address.
           </Typography>
           <CliLogsBox label="Tor Daemon Logs" logs={torStdOut.split("\n")} />
         </Box>

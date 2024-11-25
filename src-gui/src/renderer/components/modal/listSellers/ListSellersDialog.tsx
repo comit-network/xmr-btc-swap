@@ -17,7 +17,7 @@ import { ChangeEvent, useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { listSellersAtRendezvousPoint, PRESET_RENDEZVOUS_POINTS } from "renderer/rpc";
-import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
+import { discoveredMakersByRendezvous } from "store/features/makersSlice";
 import { useAppDispatch } from "store/hooks";
 import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
 
@@ -54,20 +54,20 @@ export default function ListSellersDialog({
   }
 
   function handleSuccess({ sellers }: ListSellersResponse) {
-    dispatch(discoveredProvidersByRendezvous(sellers));
+    dispatch(discoveredMakersByRendezvous(sellers));
 
     const discoveredSellersCount = sellers.length;
     let message: string;
 
     switch (discoveredSellersCount) {
       case 0:
-        message = `No providers were discovered at the rendezvous point`;
+        message = `No makers were discovered at the rendezvous point`;
         break;
       case 1:
-        message = `Discovered one provider at the rendezvous point`;
+        message = `Discovered one maker at the rendezvous point`;
         break;
       default:
-        message = `Discovered ${discoveredSellersCount} providers at the rendezvous point`;
+        message = `Discovered ${discoveredSellersCount} makers at the rendezvous point`;
     }
 
     enqueueSnackbar(message, {
@@ -80,13 +80,13 @@ export default function ListSellersDialog({
 
   return (
     <Dialog onClose={onClose} open={open}>
-      <DialogTitle>Discover swap providers</DialogTitle>
+      <DialogTitle>Discover makers</DialogTitle>
       <DialogContent dividers>
         <DialogContentText>
-          The rendezvous protocol provides a way to discover providers (trading
+          The rendezvous protocol provides a way to discover makers (trading
           partners) without relying on one singular centralized institution. By
           manually connecting to a rendezvous point run by a volunteer, you can
-          discover providers and then connect and swap with them.
+          discover makers and then connect and swap with them.
         </DialogContentText>
         <TextField
           autoFocus

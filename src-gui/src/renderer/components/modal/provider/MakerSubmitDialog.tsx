@@ -10,19 +10,19 @@ import {
 import { Multiaddr } from "multiaddr";
 import { ChangeEvent, useState } from "react";
 
-type ProviderSubmitDialogProps = {
+type MakerSubmitDialogProps = {
   open: boolean;
   onClose: () => void;
 };
 
-export default function ProviderSubmitDialog({
+export default function MakerSubmitDialog({
   open,
   onClose,
-}: ProviderSubmitDialogProps) {
+}: MakerSubmitDialogProps) {
   const [multiAddr, setMultiAddr] = useState("");
   const [peerId, setPeerId] = useState("");
 
-  async function handleProviderSubmit() {
+  async function handleMakerSubmit() {
     if (multiAddr && peerId) {
       await fetch("https://api.unstoppableswap.net/api/submit-provider", {
         method: "post",
@@ -55,7 +55,7 @@ export default function ProviderSubmitDialog({
         return "The multi address should not contain the peer id (/p2p/)";
       }
       if (multiAddress.protoNames().find((name) => name.includes("onion"))) {
-        return "It is currently not possible to add a provider that is only reachable via Tor";
+        return "It is currently not possible to add a maker that is only reachable via Tor";
       }
       return null;
     } catch (e) {
@@ -65,10 +65,10 @@ export default function ProviderSubmitDialog({
 
   return (
     <Dialog onClose={onClose} open={open}>
-      <DialogTitle>Submit a provider to the public registry</DialogTitle>
+      <DialogTitle>Submit a maker to the public registry</DialogTitle>
       <DialogContent dividers>
         <DialogContentText>
-          If the provider is valid and reachable, it will be displayed to all
+          If the maker is valid and reachable, it will be displayed to all
           other users to trade with.
         </DialogContentText>
         <TextField
@@ -78,7 +78,7 @@ export default function ProviderSubmitDialog({
           fullWidth
           helperText={
             getMultiAddressError() ||
-            "Tells the swap client where the provider can be reached"
+            "Tells the swap client where the maker can be reached"
           }
           value={multiAddr}
           onChange={handleMultiAddrChange}
@@ -89,7 +89,7 @@ export default function ProviderSubmitDialog({
           margin="dense"
           label="Peer ID"
           fullWidth
-          helperText="Identifies the provider and allows for secure communication"
+          helperText="Identifies the maker and allows for secure communication"
           value={peerId}
           onChange={handlePeerIdChange}
           placeholder="12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi"
@@ -99,7 +99,7 @@ export default function ProviderSubmitDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
-          onClick={handleProviderSubmit}
+          onClick={handleMakerSubmit}
           disabled={!(multiAddr && peerId && !getMultiAddressError())}
           color="primary"
         >

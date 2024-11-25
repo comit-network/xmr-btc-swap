@@ -1,4 +1,4 @@
-import { ExtendedProviderStatus } from "models/apiModel";
+import { ExtendedMakerStatus } from "models/apiModel";
 import { splitPeerIdFromMultiAddress } from "utils/parseUtils";
 import { getMatches } from '@tauri-apps/plugin-cli';
 import { Network } from "./features/settingsSlice";
@@ -19,14 +19,14 @@ export function isTestnet() {
 
 export const isDevelopment = true;
 
-export function getStubTestnetProvider(): ExtendedProviderStatus | null {
-  const stubProviderAddress = import.meta.env
+export function getStubTestnetMaker(): ExtendedMakerStatus | null {
+  const stubMakerAddress = import.meta.env
     .VITE_TESTNET_STUB_PROVIDER_ADDRESS;
 
-  if (stubProviderAddress != null) {
+  if (stubMakerAddress != null) {
     try {
       const [multiAddr, peerId] =
-        splitPeerIdFromMultiAddress(stubProviderAddress);
+        splitPeerIdFromMultiAddress(stubMakerAddress);
 
       return {
         multiAddr,

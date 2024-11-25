@@ -1,4 +1,4 @@
-export interface ExtendedProviderStatus extends ProviderStatus {
+export interface ExtendedMakerStatus extends MakerStatus {
   uptime?: number;
   age?: number;
   relevancy?: number;
@@ -6,15 +6,15 @@ export interface ExtendedProviderStatus extends ProviderStatus {
   recommended?: boolean;
 }
 
-export interface ProviderStatus extends ProviderQuote, Provider {}
+export interface MakerStatus extends MakerQuote, Maker { }
 
-export interface ProviderQuote {
+export interface MakerQuote {
   price: number;
   minSwapAmount: number;
   maxSwapAmount: number;
 }
 
-export interface Provider {
+export interface Maker {
   multiAddr: string;
   testnet: boolean;
   peerId: string;
