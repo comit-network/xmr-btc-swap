@@ -19,15 +19,15 @@ anyhow = "1"
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 swap = { path = "../swap", features = [ "tauri" ] }
-sysinfo = "=0.32.0"
-tauri = { version = "2.0", features = [ "config-json5" ] }
-tauri-plugin-clipboard-manager = "2.0"
-tauri-plugin-process = "2.0"
-tauri-plugin-shell = "2.0"
-tauri-plugin-store = "2.1.0"
-tauri-plugin-updater = "2.0.2"
+sysinfo = "=0.32.1"
+tauri = { version = "^2.0.0", features = [ "config-json5" ] }
+tauri-plugin-clipboard-manager = "^2.0.0"
+tauri-plugin-process = "^2.0.0"
+tauri-plugin-shell = "^2.0.0"
+tauri-plugin-store = "^2.0.0"
+tauri-plugin-updater = "^2.0.0"
 tracing = "0.1"
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
-tauri-plugin-cli = "2.0"
-tauri-plugin-single-instance = "2.0.0-rc"
+tauri-plugin-cli = "^2.0.0"
+tauri-plugin-single-instance = "^2.0.0"
