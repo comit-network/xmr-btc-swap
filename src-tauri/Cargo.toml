@@ -1,6 +1,6 @@
 [package]
 name = "unstoppableswap-gui-rs"
-version = "1.0.0-rc.6"
+version = "1.0.0-rc.7"
 authors = [ "binarybaron", "einliterflasche", "unstoppableswap" ]
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
