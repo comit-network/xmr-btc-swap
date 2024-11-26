@@ -107,6 +107,11 @@ impl Watcher {
 
             // If the swap has to be refunded, do it in the background
             if let Some(ExpiredTimelocks::Cancel { .. }) = new_timelock_status {
+                // If the swap is already refunded, we can skip the refund
+                if matches!(state, BobState::BtcRefunded(_)) {
+                    continue;
+                }
+
                 // If the swap is already running, we can skip the refund
                 // The refund will be handled by the state machine
                 if let Some(current_swap_id) = self.swap_lock.get_current_swap_id().await {
