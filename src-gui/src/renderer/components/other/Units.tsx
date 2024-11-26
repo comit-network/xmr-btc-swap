@@ -1,6 +1,6 @@
 import { Tooltip } from "@material-ui/core";
 import { useAppSelector } from "store/hooks";
-import { piconerosToXmr, satsToBtc } from "utils/conversionUtils";
+import { getMarkup, piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 
 type Amount = number | null | undefined;
 
@@ -9,11 +9,13 @@ export function AmountWithUnit({
   unit,
   fixedPrecision,
   exchangeRate,
+  parenthesisText = null,
 }: {
   amount: Amount;
   unit: string;
   fixedPrecision: number;
   exchangeRate?: Amount;
+  parenthesisText?: string;
 }) {
   const fetchFiatPrices = useAppSelector((state) => state.settings.fetchFiatPrices);
   const fiatCurrency = useAppSelector((state) => state.settings.fiatCurrency);
@@ -29,6 +31,7 @@ export function AmountWithUnit({
           ? Number.parseFloat(amount.toFixed(fixedPrecision))
           : "?"}{" "}
         {unit}
+        {parenthesisText != null ? ` (${parenthesisText})` : null}
       </span>
     </Tooltip>
   );
@@ -64,25 +67,44 @@ export function MoneroAmount({ amount }: { amount: Amount }) {
   );
 }
 
-export function MoneroBitcoinExchangeRate(
-  state: { rate: Amount } | { satsAmount: number; piconeroAmount: number },
-) {
-  if ("rate" in state) {
-    return (
-      <AmountWithUnit amount={state.rate} unit="BTC/XMR" fixedPrecision={8} />
-    );
-  }
+export function MoneroBitcoinExchangeRate({
+  rate,
+  displayMarkup = false,
+}: {
+  rate: Amount;
+  displayMarkup?: boolean;
+}) {
+  const marketRate = useAppSelector((state) => state.rates?.xmrBtcRate);
+  const markup = (displayMarkup && marketRate != null) ? `${getMarkup(rate, marketRate).toFixed(2)}% markup` : null;
 
-  const rate =
-    satsToBtc(state.satsAmount) / piconerosToXmr(state.piconeroAmount);
-
-  return <AmountWithUnit amount={rate} unit="BTC/XMR" fixedPrecision={8} />;
+  return (
+    <AmountWithUnit
+      amount={rate}
+      unit="BTC/XMR"
+      fixedPrecision={8}
+      parenthesisText={markup}
+    />
+  );
 }
 
-export function MoneroSatsExchangeRate({ rate }: { rate: Amount }) {
+export function MoneroBitcoinExchangeRateFromAmounts({
+  satsAmount,
+  piconeroAmount,
+  displayMarkup = false,
+}: {
+  satsAmount: number;
+  piconeroAmount: number;
+  displayMarkup?: boolean;
+}) {
+  const rate = satsToBtc(satsAmount) / piconerosToXmr(piconeroAmount);
+
+  return <MoneroBitcoinExchangeRate rate={rate} displayMarkup={displayMarkup} />;
+}
+
+export function MoneroSatsExchangeRate({ rate, displayMarkup = false }: { rate: Amount, displayMarkup?: boolean }) {
   const btc = satsToBtc(rate);
 
-  return <AmountWithUnit amount={btc} unit="BTC/XMR" fixedPrecision={6} />;
+  return <MoneroBitcoinExchangeRate rate={btc} displayMarkup={displayMarkup} />;
 }
 
 export function SatsAmount({ amount }: { amount: Amount }) {

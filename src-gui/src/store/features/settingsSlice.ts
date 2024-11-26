@@ -96,7 +96,7 @@ const initialState: SettingsState = {
     }
   },
   theme: Theme.Darker,
-  fetchFiatPrices: false,
+  fetchFiatPrices: true,
   fiatCurrency: FiatCurrency.Usd,
 };
 

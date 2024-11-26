@@ -14,6 +14,7 @@ import ActionableMonospaceTextBox from "renderer/components/other/ActionableMono
 import MonospaceTextBox from "renderer/components/other/MonospaceTextBox";
 import {
   MoneroBitcoinExchangeRate,
+  MoneroBitcoinExchangeRateFromAmounts,
   PiconeroAmount,
   SatsAmount,
 } from "renderer/components/other/Units";
@@ -78,7 +79,7 @@ export default function HistoryRowExpanded({
             <TableRow>
               <TableCell>Exchange Rate</TableCell>
               <TableCell>
-                <MoneroBitcoinExchangeRate
+                <MoneroBitcoinExchangeRateFromAmounts
                   satsAmount={swap.btc_amount}
                   piconeroAmount={swap.xmr_amount}
                 />

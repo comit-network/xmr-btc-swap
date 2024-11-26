@@ -58,7 +58,7 @@ export default function WaitingForBtcDepositPage({
                 <li>
                   All Bitcoin sent to this this address will converted into
                   Monero at an exchance rate of{" "}
-                  <MoneroSatsExchangeRate rate={quote.price} />
+                  <MoneroSatsExchangeRate rate={quote.price} displayMarkup={true} />
                 </li>
                 <li>
                   The network fee of{" "}

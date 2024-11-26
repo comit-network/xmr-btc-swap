@@ -70,3 +70,8 @@ export function rendezvousSellerToMakerStatus(
 export function bytesToMb(bytes: number): number {
   return bytes / (1024 * 1024);
 }
+
+/// Get the markup of a maker's exchange rate compared to the market rate in percent
+export function getMarkup(makerPrice: number, marketPrice: number): number {
+  return (makerPrice - marketPrice) / marketPrice * 100;
+}

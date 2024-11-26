@@ -6,7 +6,7 @@ import {
   MoneroBitcoinExchangeRate,
   SatsAmount,
 } from "renderer/components/other/Units";
-import { satsToBtc, secondsToDays } from "utils/conversionUtils";
+import { getMarkup, satsToBtc, secondsToDays } from "utils/conversionUtils";
 import { isMakerOutdated } from 'utils/multiAddrUtils';
 import WarningIcon from '@material-ui/icons/Warning';
 import { useAppSelector } from "store/hooks";
@@ -43,12 +43,12 @@ const useStyles = makeStyles((theme) => ({
  */
 function MakerMarkupChip({ maker }: { maker: ExtendedMakerStatus }) {
   const marketExchangeRate = useAppSelector(s => s.rates?.xmrBtcRate);
-  if (marketExchangeRate === null)
+  if (marketExchangeRate == null)
     return null;
 
   const makerExchangeRate = satsToBtc(maker.price);
   /** The markup of the exchange rate compared to the market rate in percent */
-  const markup = (makerExchangeRate - marketExchangeRate) / marketExchangeRate * 100;
+  const markup = getMarkup(makerExchangeRate, marketExchangeRate);
 
   return (
     <Tooltip title="The markup this maker charges compared to centralized markets. A lower markup means that you get more Monero for your Bitcoin.">
