@@ -642,10 +642,9 @@ pub mod api_test {
             json: bool,
         ) -> Self {
             let data_dir = data::data_dir_from(data_dir, is_testnet).unwrap();
-
             let seed = Seed::from_file_or_generate(data_dir.as_path()).unwrap();
-
             let env_config = env_config_from(is_testnet);
+
             Self {
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 env_config,

@@ -14,14 +14,9 @@
 use anyhow::Result;
 use std::env;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
-use swap::common::check_latest_version;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
-    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
-        eprintln!("{}", e);
-    }
-
     match parse_args_and_apply_defaults(env::args_os()).await? {
         ParseResult::Success(context) => {
             context.tasks.wait_for_tasks().await?;

@@ -29,7 +29,7 @@ use swap::asb::config::{
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::common::tracing_util::Format;
-use swap::common::{self, check_latest_version, get_logs};
+use swap::common::{self, get_logs, warn_if_outdated};
 use swap::database::{open_db, AccessMode};
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
@@ -63,12 +63,10 @@ pub async fn main() -> Result<()> {
         }
     };
 
-    // warn if we're not on the latest version
-    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
-        eprintln!("{}", e);
-    }
+    // Check in the background if there's a new version available
+    tokio::spawn(async move { warn_if_outdated(env!("CARGO_PKG_VERSION")).await });
 
-    // read config from the specified path
+    // Read config from the specified path
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
         Err(ConfigNotInitialized {}) => {
@@ -77,13 +75,13 @@ pub async fn main() -> Result<()> {
         }
     };
 
-    // initialize tracing
+    // Initialize tracing
     let format = if json { Format::Json } else { Format::Raw };
     let log_dir = config.data.dir.join("logs");
     common::tracing_util::init(LevelFilter::DEBUG, format, log_dir, None)
         .expect("initialize tracing");
 
-    // check for conflicting env / config values
+    // Check for conflicting env / config values
     if config.monero.network != env_config.monero_network {
         bail!(format!(
             "Expected monero network in config file to be {:?} but was {:?}",
@@ -118,12 +116,12 @@ pub async fn main() -> Result<()> {
                 );
             }
 
-            // initialize monero wallet
+            // Initialize Monero wallet
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
             let monero_address = monero_wallet.get_main_address();
             tracing::info!(%monero_address, "Monero wallet address");
 
-            // check monero balance
+            // Check Monero balance
             let monero = monero_wallet.get_balance().await?;
             match (monero.balance, monero.unlocked_balance) {
                 (0, _) => {
@@ -146,14 +144,14 @@ pub async fn main() -> Result<()> {
                 }
             }
 
-            // init bitcoin wallet
+            // Initialize Bitcoin wallet
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             tracing::info!(%bitcoin_balance, "Bitcoin wallet balance");
 
             let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
 
-            // setup Tor hidden services
+            // Setup Tor hidden services
             let tor_client =
                 tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
             let _ac = match tor_client.assert_tor_running().await {
