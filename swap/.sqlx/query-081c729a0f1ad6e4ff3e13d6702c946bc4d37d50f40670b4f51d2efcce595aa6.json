@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT peer_id\n        FROM peers\n        WHERE swap_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "peer_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "081c729a0f1ad6e4ff3e13d6702c946bc4d37d50f40670b4f51d2efcce595aa6"
+}

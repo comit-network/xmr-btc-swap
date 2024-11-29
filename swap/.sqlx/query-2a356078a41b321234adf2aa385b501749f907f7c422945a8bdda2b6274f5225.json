@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        insert into peers (\n            swap_id,\n            peer_id\n            ) values (?, ?);\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2a356078a41b321234adf2aa385b501749f907f7c422945a8bdda2b6274f5225"
+}

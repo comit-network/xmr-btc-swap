@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "state",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e05620f420f8c1022971eeb66a803323a8cf258cbebb2834e3f7cf8f812fa646"
+}

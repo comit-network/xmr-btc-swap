@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT swap_id, state\n            FROM (\n                SELECT max(id), swap_id, state\n                FROM swap_states\n                GROUP BY swap_id\n            )\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "swap_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "state",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "5cc61dd0315571bc198401a354cd9431ee68360941f341386cbacf44ea598de8"
+}

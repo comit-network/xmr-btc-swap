@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT DISTINCT address\n        FROM peer_addresses\n        WHERE peer_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "address",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d78acba5eb8563826dd190e0886aa665aae3c6f1e312ee444e65df1c95afe8b2"
+}
