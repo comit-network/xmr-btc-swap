@@ -14,8 +14,12 @@
     "windows": [
       {
         "title": "UnstoppableSwap",
+        "minWidth": 600,
+        "minHeight": 400,
         "width": 800,
-        "height": 600
+        "height": 700,
+        "maxHeight": 900,
+        "maxWidth": 1200
       }
     ],
     "security": {
