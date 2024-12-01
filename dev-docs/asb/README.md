@@ -37,6 +37,10 @@ The CLI is designed to run one specific swap against an ASB.
 The ASB is designed to run 24/7 as a daemon that responds to CLIs connecting.
 Since the ASB is a long running task we specify the person running an ASB as service provider.
 
+## Connect with other market makers
+
+Consider joining the designated [Matrix chat](https://matrix.to/#/%23unstoppableswap-market-makers:matrix.org) to connect with other individuals running asbs. The core developers are active in this chat and always looking for feedback.
+
 ### ASB discovery
 
 The ASB daemon supports the libp2p [rendezvous-protocol](https://github.com/libp2p/specs/tree/master/rendezvous).
