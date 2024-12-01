@@ -25,6 +25,10 @@ It is possible to plug into public blockchain nodes but be aware that you might 
 Public Monero mainnet nodes can be found [here](https://monero.fail/?chain=monero).
 Public Electrum mainnet nodes can be found [here](https://1209k.com/bitcoin-eye/ele.php?chain=btc).
 
+### Connect with others
+
+Consider joining the designated [Matrix chat](https://matrix.to/#/%23unstoppableswap-market-makers:matrix.org) to connect with other individuals running asbs. The core developers are active in this chat and always looking for feedback.
+
 ## ASB Details
 
 The ASB is a long running daemon that acts as the trading partner to the swap CLI.
@@ -36,10 +40,6 @@ Both the ASB and the CLI can be run by anybody.
 The CLI is designed to run one specific swap against an ASB.
 The ASB is designed to run 24/7 as a daemon that responds to CLIs connecting.
 Since the ASB is a long running task we specify the person running an ASB as service provider.
-
-## Connect with other market makers
-
-Consider joining the designated [Matrix chat](https://matrix.to/#/%23unstoppableswap-market-makers:matrix.org) to connect with other individuals running asbs. The core developers are active in this chat and always looking for feedback.
 
 ### ASB discovery
 
