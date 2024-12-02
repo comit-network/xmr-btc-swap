@@ -26,7 +26,7 @@
     "@tauri-apps/plugin-process": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@tauri-apps/plugin-store": "^2.0.0",
-    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.1.0",
     "@types/react-redux": "^7.1.34",
     "humanize-duration": "^3.32.1",
     "jdenticon": "^3.3.0",

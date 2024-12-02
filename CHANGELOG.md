@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Release .deb installer for Debian-based systems
+
 ## [1.0.0-rc.7] - 2024-11-26
 
 - GUI: Changed terminology from "swap providers" to "makers"
