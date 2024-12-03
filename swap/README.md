@@ -31,7 +31,7 @@ For more detailed documentation on the CLI, see [this README](./dev-docs/cli/REA
 Swapping of course needs two parties - and the CLI is only one of them: The taker that occasionally starts a swap with a market maker.
 
 If you are interested in becoming a market maker you will want to run the second binary provided in this repository: `asb` - the Automated Swap Backend.
-Detailed documentation for the `asb` can be found [in this README](./dev-docs/asb/README.md).
+Detailed documentation for the `asb` can be found [in this README](/dev-docs/asb/README.md).
 
 ## Safety
 
