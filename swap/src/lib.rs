@@ -31,7 +31,6 @@ pub mod network;
 pub mod protocol;
 pub mod rpc;
 pub mod seed;
-pub mod tor;
 pub mod tracing_ext;
 
 #[cfg(test)]

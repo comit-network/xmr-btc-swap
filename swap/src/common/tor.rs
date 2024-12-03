@@ -21,6 +21,8 @@ pub async fn init_tor_client(data_dir: &Path) -> Result<Arc<TorClient<TokioRustl
     // It uses cached information when possible.)
     let runtime = TokioRustlsRuntime::current().expect("We are always running with tokio");
 
+    tracing::debug!("Bootstrapping Tor client");
+
     let tor_client = TorClient::with_runtime(runtime)
         .config(config)
         .create_bootstrapped()

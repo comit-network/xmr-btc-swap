@@ -31,9 +31,19 @@ pub fn init(
     dir: impl AsRef<Path>,
     tauri_handle: Option<TauriHandle>,
 ) -> Result<()> {
-    // file logger will always write in JSON format and with timestamps
+    let ALL_CRATES: Vec<&str> = vec![
+        "swap",
+        "asb",
+        "libp2p_community_tor",
+        "unstoppableswap-gui-rs",
+        "arti",
+    ];
+    let OUR_CRATES: Vec<&str> = vec!["swap", "asb"];
+
+    // General log file for non-verbose logs
     let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
 
+    // Verbose log file, rotated hourly, with a maximum of 24 files
     let tracing_file_appender: RollingFileAppender = RollingFileAppender::builder()
         .rotation(Rotation::HOURLY)
         .filename_prefix("tracing")
@@ -42,24 +52,31 @@ pub fn init(
         .build(&dir)
         .expect("initializing rolling file appender failed");
 
-    // Log to file
+    // Layer for writing to the general log file
+    // Crates: swap, asb
+    // Level: Passed in
     let file_layer = fmt::layer()
         .with_writer(file_appender)
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
         .json()
-        .with_filter(env_filter(level_filter)?);
+        .with_filter(env_filter(level_filter, OUR_CRATES.clone())?);
 
+    // Layer for writing to the verbose log file
+    // Crates: swap, asb, libp2p_community_tor, unstoppableswap-gui-rs, arti (all relevant crates)
+    // Level: TRACE
     let tracing_file_layer = fmt::layer()
         .with_writer(tracing_file_appender)
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
         .json()
-        .with_filter(env_filter(LevelFilter::TRACE)?);
+        .with_filter(env_filter(LevelFilter::TRACE, ALL_CRATES.clone())?);
 
-    // Log to stdout
+    // Layer for writing to the terminal
+    // Crates: swap, asb
+    // Level: Passed in
     let is_terminal = atty::is(atty::Stream::Stderr);
     let terminal_layer = fmt::layer()
         .with_writer(std::io::stdout)
@@ -67,17 +84,23 @@ pub fn init(
         .with_timer(UtcTime::rfc_3339())
         .with_target(false);
 
-    // Forwards logs to the tauri guest
+    // Layer for writing to the Tauri guest. This will be displayed in the GUI.
+    // Crates: swap, asb, libp2p_community_tor, unstoppableswap-gui-rs, arti
+    // Level: Passed in
     let tauri_layer = fmt::layer()
         .with_writer(TauriWriter::new(tauri_handle))
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(true)
         .json()
-        .with_filter(env_filter(level_filter)?);
+        .with_filter(env_filter(level_filter, ALL_CRATES.clone())?);
 
-    let env_filtered = env_filter(level_filter)?;
+    // We only log the bare minimum to the terminal
+    // Crates: swap, asb
+    // Level: Passed in
+    let env_filtered = env_filter(level_filter, OUR_CRATES.clone())?;
 
+    // Apply the environment filter and box the layer for the terminal
     let final_terminal_layer = match format {
         Format::Json => terminal_layer.json().with_filter(env_filtered).boxed(),
         Format::Raw => terminal_layer.with_filter(env_filtered).boxed(),
@@ -97,19 +120,18 @@ pub fn init(
 }
 
 /// This function controls which crate's logs actually get logged and from which level.
-fn env_filter(level_filter: LevelFilter) -> Result<EnvFilter> {
-    Ok(EnvFilter::from_default_env()
-        .add_directive(Directive::from_str(&format!("asb={}", &level_filter))?)
-        .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?)
-        .add_directive(Directive::from_str(&format!("arti={}", &level_filter))?)
-        .add_directive(Directive::from_str(&format!(
-            "libp2p_community_tor={}",
-            &level_filter
-        ))?)
-        .add_directive(Directive::from_str(&format!(
-            "unstoppableswap-gui-rs={}",
-            &level_filter
-        ))?))
+fn env_filter(level_filter: LevelFilter, crates: Vec<&str>) -> Result<EnvFilter> {
+    let mut filter = EnvFilter::from_default_env();
+
+    // Add directives for each crate in the provided list
+    for crate_name in crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    Ok(filter)
 }
 
 /// A writer that forwards tracing log messages to the tauri guest.

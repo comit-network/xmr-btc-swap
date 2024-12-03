@@ -4,7 +4,6 @@ pub mod cancel_and_refund;
 pub mod command;
 mod event_loop;
 mod list_sellers;
-mod tor;
 pub mod transport;
 pub mod watcher;
 

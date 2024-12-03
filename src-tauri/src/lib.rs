@@ -275,8 +275,14 @@ async fn initialize_context(
             .to_string_lossy()
             .starts_with("monero-wallet-rpc")
         {
-            println!("Killing monero-wallet-rpc process with pid: {}", pid);
-            process.kill();
+            #[cfg(not(debug_assertions))]
+            {
+                println!("Killing monero-wallet-rpc process with pid: {}", pid);
+                process.kill();
+            }
+
+            #[cfg(debug_assertions)]
+            println!("Would kill monero-wallet-rpc process with pid: {}", pid);
         }
     }
 

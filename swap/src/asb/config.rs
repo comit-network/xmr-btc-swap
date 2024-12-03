@@ -1,10 +1,9 @@
 use crate::env::{Mainnet, Testnet};
 use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
-use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{bail, Context, Result};
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::Input;
+use dialoguer::{Input, Select};
 use libp2p::core::Multiaddr;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
@@ -200,8 +199,8 @@ pub struct Monero {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TorConf {
-    pub control_port: u16,
-    pub socks5_port: u16,
+    pub register_hidden_service: bool,
+    pub hidden_service_num_intro_points: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -219,8 +218,8 @@ pub struct Maker {
 impl Default for TorConf {
     fn default() -> Self {
         Self {
-            control_port: DEFAULT_CONTROL_PORT,
-            socks5_port: DEFAULT_SOCKS5_PORT,
+            register_hidden_service: true,
+            hidden_service_num_intro_points: 5,
         }
     }
 }
@@ -313,15 +312,12 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
         .default(defaults.monero_wallet_rpc_url)
         .interact_text()?;
 
-    let tor_control_port = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Tor control port or hit enter to use default. If Tor is not running on your machine, no hidden service will be created.")
-        .default(DEFAULT_CONTROL_PORT.to_owned())
-        .interact_text()?;
-
-    let tor_socks5_port = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Tor socks5 port or hit enter to use default")
-        .default(DEFAULT_SOCKS5_PORT.to_owned())
-        .interact_text()?;
+    let register_hidden_service = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Do you want a Tor hidden service to be created? This will allow you to run from behind a firewall without opening ports, and hide your IP address. You do not have to run a Tor daemon yourself. We recommend this for most users. (y/n)")
+        .items(&["yes", "no"])
+        .default(0)
+        .interact()?
+        == 0;
 
     let min_buy = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter minimum Bitcoin amount you are willing to accept per swap or hit enter to use default.")
@@ -387,8 +383,8 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             network: monero_network,
         },
         tor: TorConf {
-            control_port: tor_control_port,
-            socks5_port: tor_socks5_port,
+            register_hidden_service,
+            ..Default::default()
         },
         maker: Maker {
             min_buy_btc: min_buy,

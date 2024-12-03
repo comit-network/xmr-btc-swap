@@ -2,6 +2,7 @@ pub mod request;
 pub mod tauri_bindings;
 
 use crate::cli::command::{Bitcoin, Monero};
+use crate::common::tor::init_tor_client;
 use crate::common::tracing_util::Format;
 use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
@@ -29,7 +30,6 @@ use tracing::Level;
 use url::Url;
 use uuid::Uuid;
 
-use super::tor::init_tor_client;
 use super::watcher::Watcher;
 
 static START: Once = Once::new();

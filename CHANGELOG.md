@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - GUI: Changed terminology from "swap providers" to "makers"
 - GUI: For each maker, we now display a unique deterministically generated avatar derived from the maker's public key
+- ASB (experimental): We now listen on an onion address by default using an internal Tor client. You do not need to run a Tor daemon on your own anymore. The `tor.control_port` and `tor.socks5_port` properties in the config file have been removed. A new `tor.register_hidden_service` property has been added which when set to `true` will run a hidden service on which connections will be accepted. You can configure the number of introduction points to use by setting the `tor.hidden_service_num_intro_points` (3 - 20) property in the config file. The onion address will be advertised to all rendezvous points without having to be added to `network.external_addresses`. For now, this feature is experimental and may be unstable. We recommend you use it in combination with a clearnet address. This feature is powered by [arti](https://tpo.pages.torproject.net/core/arti/), an implementation of the Tor protocol in Rust by the Tor Project.
+- CLI + GUI: We can now dial makers over `/onion3/****` addresses using the integrated Tor client.
 
 ## [1.0.0-rc.6] - 2024-11-21
 

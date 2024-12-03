@@ -490,7 +490,7 @@ where
                     )
                 })?;
 
-        tracing::debug!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
+        tracing::trace!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
 
         if min_buy > max_bitcoin_for_monero {
             tracing::trace!(

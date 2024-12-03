@@ -22,16 +22,81 @@ use std::time::Duration;
 use uuid::Uuid;
 
 pub mod transport {
-    use libp2p::{dns, identity, tcp, Transport};
+    use std::sync::Arc;
+
+    use arti_client::{config::onion_service::OnionServiceConfigBuilder, TorClient};
+    use libp2p::{core::transport::OptionalTransport, dns, identity, tcp, Transport};
+    use libp2p_community_tor::AddressConversion;
+    use tor_rtcompat::tokio::TokioRustlsRuntime;
 
     use super::*;
 
+    static ASB_ONION_SERVICE_NICKNAME: &str = "asb";
+    static ASB_ONION_SERVICE_PORT: u16 = 9939;
+
+    type OnionTransportWithAddresses = (Boxed<(PeerId, StreamMuxerBox)>, Vec<Multiaddr>);
+
     /// Creates the libp2p transport for the ASB.
-    pub fn new(identity: &identity::Keypair) -> Result<Boxed<(PeerId, StreamMuxerBox)>> {
-        let tcp = tcp::tokio::Transport::new(tcp::Config::new().nodelay(true));
+    ///
+    /// If you pass in a `None` for `maybe_tor_client`, the ASB will not use Tor at all.
+    ///
+    /// If you pass in a `Some(tor_client)`, the ASB will listen on an onion service and return
+    /// the onion address. If it fails to listen on the onion address, it will only use tor for
+    /// dialing and not listening.
+    pub fn new(
+        identity: &identity::Keypair,
+        maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
+        num_intro_points: u8,
+        register_hidden_service: bool,
+    ) -> Result<OnionTransportWithAddresses> {
+        let (maybe_tor_transport, onion_addresses) = if let Some(tor_client) = maybe_tor_client {
+            let mut tor_transport = libp2p_community_tor::TorTransport::from_client(
+                tor_client,
+                AddressConversion::DnsOnly,
+            );
+
+            let addresses = if register_hidden_service {
+                let onion_service_config = OnionServiceConfigBuilder::default()
+                    .nickname(
+                        ASB_ONION_SERVICE_NICKNAME
+                            .parse()
+                            .expect("Static nickname to be valid"),
+                    )
+                    .num_intro_points(num_intro_points)
+                    .build()
+                    .expect("We specified a valid nickname");
+
+                match tor_transport.add_onion_service(onion_service_config, ASB_ONION_SERVICE_PORT)
+                {
+                    Ok(addr) => {
+                        tracing::debug!(
+                            %addr,
+                            "Setting up onion service for libp2p to listen on"
+                        );
+                        vec![addr]
+                    }
+                    Err(err) => {
+                        tracing::warn!(error=%err, "Failed to listen on onion address");
+                        vec![]
+                    }
+                }
+            } else {
+                vec![]
+            };
+
+            (OptionalTransport::some(tor_transport), addresses)
+        } else {
+            (OptionalTransport::none(), vec![])
+        };
+
+        let tcp = maybe_tor_transport
+            .or_transport(tcp::tokio::Transport::new(tcp::Config::new().nodelay(true)));
         let tcp_with_dns = dns::tokio::Transport::system(tcp)?;
 
-        authenticate_and_multiplex(tcp_with_dns.boxed(), identity)
+        Ok((
+            authenticate_and_multiplex(tcp_with_dns.boxed(), identity)?,
+            onion_addresses,
+        ))
     }
 }
 

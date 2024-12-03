@@ -243,7 +243,7 @@ async fn start_alice(
     let latest_rate = FixedRate::default();
     let resume_only = false;
 
-    let mut swarm = swarm::asb(
+    let (mut swarm, _) = swarm::asb(
         seed,
         min_buy,
         max_buy,
@@ -252,6 +252,7 @@ async fn start_alice(
         env_config,
         XmrBtcNamespace::Testnet,
         &[],
+        None,
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();

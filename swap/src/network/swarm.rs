@@ -1,3 +1,4 @@
+use crate::asb::config::TorConf;
 use crate::asb::{LatestRate, RendezvousNode};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::rendezvous::XmrBtcNamespace;
@@ -23,7 +24,9 @@ pub fn asb<LR>(
     env_config: env::Config,
     namespace: XmrBtcNamespace,
     rendezvous_addrs: &[Multiaddr],
-) -> Result<Swarm<asb::Behaviour<LR>>>
+    maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
+    tor_conf: TorConf,
+) -> Result<(Swarm<asb::Behaviour<LR>>, Vec<Multiaddr>)>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
@@ -50,7 +53,12 @@ where
         rendezvous_nodes,
     );
 
-    let transport = asb::transport::new(&identity)?;
+    let (transport, onion_addresses) = asb::transport::new(
+        &identity,
+        maybe_tor_client,
+        tor_conf.hidden_service_num_intro_points,
+        tor_conf.register_hidden_service,
+    )?;
 
     let swarm = SwarmBuilder::with_existing_identity(identity)
         .with_tokio()
@@ -59,7 +67,7 @@ where
         .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::MAX))
         .build();
 
-    Ok(swarm)
+    Ok((swarm, onion_addresses))
 }
 
 pub async fn cli<T>(
