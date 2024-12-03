@@ -253,6 +253,8 @@ async fn start_alice(
         XmrBtcNamespace::Testnet,
         &[],
         None,
+        false,
+        1,
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();

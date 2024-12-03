@@ -46,8 +46,8 @@ pub mod transport {
     pub fn new(
         identity: &identity::Keypair,
         maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
-        num_intro_points: u8,
         register_hidden_service: bool,
+        num_intro_points: u8,
     ) -> Result<OnionTransportWithAddresses> {
         let (maybe_tor_transport, onion_addresses) = if let Some(tor_client) = maybe_tor_client {
             let mut tor_transport = libp2p_community_tor::TorTransport::from_client(

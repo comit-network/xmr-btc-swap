@@ -165,7 +165,8 @@ pub async fn main() -> Result<()> {
                 namespace,
                 &rendezvous_addrs,
                 tor_client,
-                config.tor,
+                config.tor.register_hidden_service,
+                config.tor.hidden_service_num_intro_points,
             )?;
 
             for listen in config.network.listen.clone() {
