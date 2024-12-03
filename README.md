@@ -3,6 +3,8 @@
 This is the monorepo containing the source code for all of our core projects:
 
 - [`swap`](swap/README.md) contains the source code for the main swapping binaries, `asb` and `swap`
+  - [`maker`](dev-docs/asb/README.md)
+  - [`taker`](dev-docs/cli/README.md)
 - [`gui`](src-gui/README.md) contains the new tauri based user interface
 - [`tauri`](src-tauri/) contains the tauri bindings between binaries and user interface
 - and other crates we use in our binaries
