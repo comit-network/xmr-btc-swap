@@ -717,28 +717,40 @@ impl EventLoopHandle {
 
         let transfer_proof = self.build_transfer_proof_request(msg);
 
-        backoff::future::retry(backoff, || async {
-            // Create a oneshot channel to receive the acknowledgment of the transfer proof
-            let (singular_sender, singular_receiver) = oneshot::channel();
+        backoff::future::retry_notify(
+            backoff,
+            || async {
+                // Create a oneshot channel to receive the acknowledgment of the transfer proof
+                let (singular_sender, singular_receiver) = oneshot::channel();
 
-            if let Err(err) = sender.send((self.peer, transfer_proof.clone(), singular_sender)) {
-                let err = anyhow!(err).context("Failed to communicate transfer proof through event loop channel");
-                tracing::error!(%err, swap_id = %self.swap_id, "Failed to send transfer proof");
-                return Err(backoff::Error::permanent(err));
-            }
+                if let Err(err) = sender.send((self.peer, transfer_proof.clone(), singular_sender))
+                {
+                    return Err(backoff::Error::permanent(anyhow!(err).context(
+                        "Failed to communicate transfer proof through event loop channel",
+                    )));
+                }
 
-            match singular_receiver.await {
-                Ok(Ok(())) => Ok(()),
-                Ok(Err(err)) => {
-                    tracing::warn!(%err, "Failed to send transfer proof due to a network error. We will retry");
-                    Err(backoff::Error::transient(anyhow!(err)))
+                match singular_receiver.await {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(err)) => Err(backoff::Error::transient(
+                        anyhow!(err)
+                            .context("A network error occurred while sending the transfer proof"),
+                    )),
+                    Err(_) => Err(backoff::Error::permanent(anyhow!(
+                        "The sender channel should never be closed without sending a response"
+                    ))),
                 }
-                Err(_) => {
-                    Err(backoff::Error::permanent(anyhow!("The sender channel should never be closed without sending a response")))
-                }
-            }
-        })
-            .await?;
+            },
+            |e, wait_time: Duration| {
+                tracing::warn!(
+                    swap_id = %self.swap_id,
+                    error = ?e,
+                    "Failed to send transfer proof. We will retry in {} seconds",
+                    wait_time.as_secs()
+                )
+            },
+        )
+        .await?;
 
         self.transfer_proof_sender.take();
 

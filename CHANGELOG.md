@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - GUI: Release .deb installer for Debian-based systems
+- ASB: The maker will now retry indefinitely to redeem the Bitcoin until the cancel timelock expires. This fixes an issue where the swap would be refunded if the maker failed to publish the redeem transaction on the first try (e.g due to a network error).
 
 ## [1.0.0-rc.7] - 2024-11-26
 
