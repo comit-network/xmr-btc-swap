@@ -67,11 +67,11 @@ In particular, you may be interested in setting up your ASB to be reachable via 
 
 In order to understand the different components of the ASB and CLI better here is a component diagram showcasing the ASB and CLI setup using public Bitcoin and Monero infrastructure:
 
-![Service Provider scenarios](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/comit-network/xmr-btc-swap/363ce1cdf6fe6478736ff91e1458d650c2319248/dev-docs/asb/diagrams/cli-asb-components-asb-pub-nodes.puml)
+![Service Provider scenarios](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/UnstoppableSwap/core/refs/heads/master/dev-docs/asb/diagrams/cli-asb-components-asb-pub-nodes.puml)
 
 Contrary, here is a diagram that showcases a service provider running it's own blockchain infrastructure for the ASB:
 
-![Service Provider scenarios](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/comit-network/xmr-btc-swap/363ce1cdf6fe6478736ff91e1458d650c2319248/dev-docs/asb/diagrams/cli-asb-components-asb-self-hosted.puml)
+![Service Provider scenarios](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/UnstoppableSwap/core/refs/heads/master/dev-docs/asb/diagrams/cli-asb-components-asb-self-hosted.puml)
 
 The diagram shows that the `asb` group (representing the `asb` binary) consists of three components:
 
