@@ -109,7 +109,7 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
           - target: x86_64-apple-darwin
-            os: macos-12
+            os: macos-13
           - target: aarch64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
