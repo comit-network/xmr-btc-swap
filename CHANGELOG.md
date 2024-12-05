@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.10] - 2024-12-05
+
 - GUI: Release .deb installer for Debian-based systems
 - ASB: The maker will now retry indefinitely to redeem the Bitcoin until the cancel timelock expires. This fixes an issue where the swap would be refunded if the maker failed to publish the redeem transaction on the first try (e.g due to a network error).
 - ASB (experimental): We now listen on an onion address by default using an internal Tor client. You do not need to run a Tor daemon on your own anymore. The `tor.control_port` and `tor.socks5_port` properties in the config file have been removed. A new `tor.register_hidden_service` property has been added which when set to `true` will run a hidden service on which connections will be accepted. You can configure the number of introduction points to use by setting the `tor.hidden_service_num_intro_points` (3 - 20) property in the config file. The onion address will be advertised to all rendezvous points without having to be added to `network.external_addresses`. For now, this feature is experimental and may be unstable. We recommend you use it in combination with a clearnet address. This feature is powered by [arti](https://tpo.pages.torproject.net/core/arti/), an implementation of the Tor protocol in Rust by the Tor Project.
@@ -421,7 +423,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.8...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.10...HEAD
+[1.0.0-rc.10]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.8...1.0.0-rc.10
 [1.0.0-rc.8]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.7...1.0.0-rc.8
 [1.0.0-rc.7]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.6...1.0.0-rc.7
 [1.0.0-rc.6]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.5...1.0.0-rc.6
