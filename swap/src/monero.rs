@@ -109,6 +109,18 @@ impl Amount {
         self.0
     }
 
+    /// Return Monero Amount as XMR.
+    pub fn as_xmr(&self) -> f64 {
+        let amount_decimal = Decimal::from(self.0);
+        let offset_decimal = Decimal::from(PICONERO_OFFSET);
+        let result = amount_decimal / offset_decimal;
+
+        // Convert to f64 only at the end, after the division
+        result
+            .to_f64()
+            .expect("Conversion from piconero to XMR should not overflow f64")
+    }
+
     /// Calculate the maximum amount of Bitcoin that can be bought at a given
     /// asking price for this amount of Monero including the median fee.
     pub fn max_bitcoin_for_price(&self, ask_price: bitcoin::Amount) -> Option<bitcoin::Amount> {

@@ -15,6 +15,8 @@
 use anyhow::{bail, Context, Result};
 use comfy_table::Table;
 use libp2p::Swarm;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::env;
 use std::sync::Arc;
@@ -31,10 +33,13 @@ use swap::common::{self, get_logs, warn_if_outdated};
 use swap::database::{open_db, AccessMode};
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
+use swap::protocol::alice::swap::is_complete;
 use swap::protocol::alice::{run, AliceState};
+use swap::protocol::{Database, State};
 use swap::seed::Seed;
 use swap::{bitcoin, kraken, monero};
 use tracing_subscriber::filter::LevelFilter;
+use uuid::Uuid;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
@@ -95,9 +100,11 @@ pub async fn main() -> Result<()> {
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
+    let db_file = config.data.dir.join("sqlite");
+
     match cmd {
         Command::Start { resume_only } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             // check and warn for duplicate rendezvous points
             let mut rendezvous_addrs = config.network.rendezvous_point.clone();
@@ -228,19 +235,49 @@ pub async fn main() -> Result<()> {
 
             event_loop.run().await;
         }
-        Command::History => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadOnly, None).await?;
-
+        Command::History { only_unfinished } => {
+            let db = open_db(db_file, AccessMode::ReadOnly, None).await?;
             let mut table = Table::new();
 
-            table.set_header(vec!["SWAP ID", "STATE"]);
+            table.set_header(vec![
+                "Swap ID",
+                "Start Date",
+                "State",
+                "Bitcoin Lock TxId",
+                "BTC Amount",
+                "XMR Amount",
+                "Exchange Rate",
+                "Taker Peer ID",
+                "Completed",
+            ]);
 
-            for (swap_id, state) in db.all().await? {
-                let state: AliceState = state.try_into()?;
-                table.add_row(vec![swap_id.to_string(), state.to_string()]);
+            let all_swaps = db.all().await?;
+            for (swap_id, state) in all_swaps {
+                let state: AliceState = state
+                    .try_into()
+                    .expect("Alice database only has Alice states");
+
+                if only_unfinished && is_complete(&state) {
+                    continue;
+                }
+
+                match SwapDetails::from_db_state(swap_id, state, &db).await {
+                    Ok(details) => {
+                        if json {
+                            details.log_info();
+                        } else {
+                            table.add_row(details.to_table_row());
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(swap_id = %swap_id, error = %e, "Failed to get swap details");
+                    }
+                }
             }
 
-            println!("{}", table);
+            if !json {
+                println!("{}", table);
+            }
         }
         Command::Config => {
             let config_json = serde_json::to_string_pretty(&config)?;
@@ -289,7 +326,7 @@ pub async fn main() -> Result<()> {
             tracing::info!(%bitcoin_balance, %monero_balance, "Current balance");
         }
         Command::Cancel { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
@@ -298,7 +335,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
         Command::Refund { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
@@ -314,7 +351,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Monero successfully refunded");
         }
         Command::Punish { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
@@ -323,7 +360,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
         Command::SafelyAbort { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             safely_abort(swap_id, db).await?;
 
@@ -333,7 +370,7 @@ pub async fn main() -> Result<()> {
             swap_id,
             do_not_await_finality,
         } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
+            let db = open_db(db_file, AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
@@ -392,4 +429,96 @@ async fn init_monero_wallet(
     .await?;
 
     Ok(wallet)
+}
+
+/// This struct is used to extract swap details from the database and print them in a table format
+#[derive(Debug)]
+struct SwapDetails {
+    swap_id: String,
+    start_date: String,
+    state: String,
+    btc_lock_txid: String,
+    btc_amount: String,
+    xmr_amount: String,
+    exchange_rate: String,
+    peer_id: String,
+    completed: bool,
+}
+
+impl SwapDetails {
+    async fn from_db_state(
+        swap_id: Uuid,
+        latest_state: AliceState,
+        db: &Arc<dyn Database + Send + Sync>,
+    ) -> Result<Self> {
+        let completed = is_complete(&latest_state);
+
+        let all_states = db.get_states(swap_id).await?;
+        let state3 = all_states
+            .iter()
+            .find_map(|s| match s {
+                State::Alice(AliceState::BtcLockTransactionSeen { state3 }) => Some(state3),
+                _ => None,
+            })
+            .context("Failed to get \"BtcLockTransactionSeen\" state")?;
+
+        let exchange_rate = Self::calculate_exchange_rate(state3.btc, state3.xmr)?;
+        let start_date = db.get_swap_start_date(swap_id).await?;
+        let btc_lock_txid = state3.tx_lock.txid();
+        let peer_id = db.get_peer_id(swap_id).await?;
+
+        Ok(Self {
+            swap_id: swap_id.to_string(),
+            start_date: start_date.to_string(),
+            state: latest_state.to_string(),
+            btc_lock_txid: btc_lock_txid.to_string(),
+            btc_amount: state3.btc.to_string(),
+            xmr_amount: state3.xmr.to_string(),
+            exchange_rate,
+            peer_id: peer_id.to_string(),
+            completed,
+        })
+    }
+
+    fn calculate_exchange_rate(btc: bitcoin::Amount, xmr: monero::Amount) -> Result<String> {
+        let btc_decimal = Decimal::from_f64(btc.to_btc())
+            .ok_or_else(|| anyhow::anyhow!("Failed to convert BTC amount to Decimal"))?;
+        let xmr_decimal = Decimal::from_f64(xmr.as_xmr())
+            .ok_or_else(|| anyhow::anyhow!("Failed to convert XMR amount to Decimal"))?;
+
+        let rate = btc_decimal
+            .checked_div(xmr_decimal)
+            .ok_or_else(|| anyhow::anyhow!("Division by zero or overflow"))?;
+
+        Ok(format!("{} XMR/BTC", rate.round_dp(8)))
+    }
+
+    fn to_table_row(&self) -> Vec<String> {
+        vec![
+            self.swap_id.clone(),
+            self.start_date.clone(),
+            self.state.clone(),
+            self.btc_lock_txid.clone(),
+            self.btc_amount.clone(),
+            self.xmr_amount.clone(),
+            self.exchange_rate.clone(),
+            self.peer_id.clone(),
+            self.completed.to_string(),
+        ]
+    }
+
+    fn log_info(&self) {
+        tracing::info!(
+            swap_id = %self.swap_id,
+            swap_start_date = %self.start_date,
+            latest_state = %self.state,
+            btc_lock_txid = %self.btc_lock_txid,
+            btc_amount = %self.btc_amount,
+            xmr_amount = %self.xmr_amount,
+            exchange_rate = %self.exchange_rate,
+            taker_peer_id = %self.peer_id,
+            completed = self.completed,
+            "Found swap in database"
+        );
+    }
 }

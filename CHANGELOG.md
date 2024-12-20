@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: The `history` command will now display additional information about each swap such as the amounts involved, the current state and the txid of the Bitcoin lock transaction.
+
 ## [1.0.0-rc.10] - 2024-12-05
 
 - GUI: Release .deb installer for Debian-based systems
