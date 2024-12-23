@@ -1,11 +1,12 @@
 import { listen } from "@tauri-apps/api/event";
-import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, BalanceResponse, TauriDatabaseStateEvent, TauriTimelockChangeEvent, TauriBackgroundRefundEvent } from "models/tauriModel";
+import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, BalanceResponse, TauriDatabaseStateEvent, TauriTimelockChangeEvent, TauriBackgroundRefundEvent, TauriTorEvent } from "models/tauriModel";
 import { contextStatusEventReceived, receivedCliLog, rpcSetBalance, timelockChangeEventReceived, rpcSetBackgroundRefundState } from "store/features/rpcSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
 import { updatePublicRegistry, updateRates } from "./api";
 import { checkContextAvailability, getSwapInfo, initializeContext, updateAllNodeStatuses } from "./rpc";
 import { store } from "./store/storeRenderer";
+import { torEventReceived } from "store/features/torSlice";
 
 // Update the public registry every 5 minutes
 const PROVIDER_UPDATE_INTERVAL = 5 * 60 * 1_000;
@@ -56,7 +57,6 @@ export async function setupBackgroundTasks(): Promise<void> {
     });
 
     listen<TauriLogEvent>("cli-log-emitted", (event) => {
-        logger.info("Received cli log event", event.payload);
         store.dispatch(receivedCliLog(event.payload));
     });
 

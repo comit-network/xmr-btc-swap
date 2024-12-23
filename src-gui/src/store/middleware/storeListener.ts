@@ -1,10 +1,11 @@
 import { createListenerMiddleware } from "@reduxjs/toolkit";
-import { getAllSwapInfos, checkBitcoinBalance, updateAllNodeStatuses, fetchSellersAtPresetRendezvousPoints } from "renderer/rpc";
+import { getAllSwapInfos, checkBitcoinBalance, updateAllNodeStatuses, fetchSellersAtPresetRendezvousPoints, getSwapInfo } from "renderer/rpc";
 import logger from "utils/logger";
 import { contextStatusEventReceived } from "store/features/rpcSlice";
 import { addNode, setFetchFiatPrices, setFiatCurrency } from "store/features/settingsSlice";
 import { updateRates } from "renderer/api";
 import { store } from "renderer/store/storeRenderer";
+import { swapProgressEventReceived } from "store/features/swapSlice";
 
 export function createMainListeners() {
   const listener = createListenerMiddleware();
@@ -27,6 +28,23 @@ export function createMainListeners() {
           fetchSellersAtPresetRendezvousPoints(),
         ]);
       }
+    },
+  });
+
+  // Listener for:
+  // - when a swap is released (fetch bitcoin balance)
+  // - when a swap progress event is received (update the swap info)
+  listener.startListening({
+    actionCreator: swapProgressEventReceived,
+    effect: async (action) => {
+      if (action.payload.event.type === "Released") {
+        logger.info("Swap released, updating bitcoin balance...");
+        await checkBitcoinBalance();
+      }
+
+      // Update the swap info
+      logger.info("Swap progress event received, updating swap info from database...");
+      await getSwapInfo(action.payload.swap_id);
     },
   });
 

@@ -63,7 +63,8 @@ export const rpcSlice = createSlice({
     receivedCliLog(slice, action: PayloadAction<TauriLogEvent>) {
       const buffer = action.payload.buffer;
       const logs = getLogsAndStringsFromRawFileString(buffer);
-      slice.logs = slice.logs.concat(logs);
+      const logsWithoutExisting = logs.filter(log => !slice.logs.includes(log));
+      slice.logs = slice.logs.concat(logsWithoutExisting);
     },
     contextStatusEventReceived(
       slice,
