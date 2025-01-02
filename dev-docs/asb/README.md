@@ -29,6 +29,9 @@ Public Electrum mainnet nodes can be found [here](https://1209k.com/bitcoin-eye/
 
 Consider joining the designated [Matrix chat](https://matrix.to/#/%23unstoppableswap-market-makers:matrix.org) to connect with other individuals running asbs. The core developers are active in this chat and always looking for feedback.
 
+### Using Docker
+
+Running the ASB and its required services (Bitcoin node, Monero node, wallet RPC) can be complex to set up manually. We provide a Docker Compose solution that handles all of this automatically. See our [docker-compose repository](https://github.com/UnstoppableSwap/asb-docker-compose) for setup instructions and configuration details.
 ## ASB Details
 
 The ASB is a long running daemon that acts as the trading partner to the swap CLI.
