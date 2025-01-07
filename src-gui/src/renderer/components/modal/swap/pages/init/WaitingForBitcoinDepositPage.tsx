@@ -5,6 +5,7 @@ import BitcoinIcon from "../../../../icons/BitcoinIcon";
 import { MoneroSatsExchangeRate, SatsAmount } from "../../../../other/Units";
 import DepositAddressInfoBox from "../../DepositAddressInfoBox";
 import DepositAmountHelper from "./DepositAmountHelper";
+import { Alert } from "@material-ui/lab";
 
 const useStyles = makeStyles((theme) => ({
   amountHelper: {
@@ -67,20 +68,28 @@ export default function WaitingForBtcDepositPage({
                 </li>
                 <li>
                   The swap will start automatically as soon as the minimum
-                  amount is deposited
+                  amount is deposited.
+                </li>
+                <li>
+                  <DepositAmountHelper
+                    min_deposit_until_swap_will_start={
+                      min_deposit_until_swap_will_start
+                    }
+                    max_deposit_until_maximum_amount_is_reached={
+                      max_deposit_until_maximum_amount_is_reached
+                    }
+                    min_bitcoin_lock_tx_fee={min_bitcoin_lock_tx_fee}
+                    quote={quote}
+                  />
                 </li>
               </ul>
             </Typography>
-            <DepositAmountHelper
-              min_deposit_until_swap_will_start={
-                min_deposit_until_swap_will_start
-              }
-              max_deposit_until_maximum_amount_is_reached={
-                max_deposit_until_maximum_amount_is_reached
-              }
-              min_bitcoin_lock_tx_fee={min_bitcoin_lock_tx_fee}
-              quote={quote}
-            />
+
+            <Alert severity="info">
+              Please do not use replace-by-fee on your deposit transaction.
+              You'll need to start a new swap if you do.
+              The funds will be available for future swaps.
+            </Alert>
           </Box>
         }
         icon={<BitcoinIcon />}

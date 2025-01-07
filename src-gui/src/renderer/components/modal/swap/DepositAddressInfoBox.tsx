@@ -2,6 +2,7 @@ import { Box } from "@material-ui/core";
 import { ReactNode } from "react";
 import ActionableMonospaceTextBox from "renderer/components/other/ActionableMonospaceTextBox";
 import InfoBox from "./InfoBox";
+import { Alert } from "@material-ui/lab";
 
 type Props = {
   title: string;
