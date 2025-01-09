@@ -210,3 +210,8 @@ Sparrow wallet import works as follows:
 - Profit!
 
 ![image](transactions-tab.png)
+
+If the bitcoin amount in your wallet doesn't match "asb balance" output and you don't see (all) the transactions you need to increase the gap limit:
+- go to Settings > Advanced... > Gap limit
+
+![image](gap-limit.png)
