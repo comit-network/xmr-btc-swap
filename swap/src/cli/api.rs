@@ -364,8 +364,6 @@ impl ContextBuilder {
         let initialize_monero_wallet = async {
             match self.monero {
                 Some(monero) => {
-                    let monero_daemon_address = monero.apply_defaults(self.is_testnet);
-
                     self.tauri_handle.emit_context_init_progress_event(
                         TauriContextStatusEvent::Initializing(vec![
                             TauriPartialInitProgress::OpeningMoneroWallet(
@@ -376,7 +374,7 @@ impl ContextBuilder {
 
                     let (wlt, prc) = init_monero_wallet(
                         data_dir.clone(),
-                        monero_daemon_address,
+                        monero.monero_daemon_address,
                         env_config,
                         self.tauri_handle.clone(),
                     )
@@ -548,7 +546,7 @@ async fn init_bitcoin_wallet(
 
 async fn init_monero_wallet(
     data_dir: PathBuf,
-    monero_daemon_address: String,
+    monero_daemon_address: impl Into<Option<String>> + Clone,
     env_config: EnvConfig,
     tauri_handle: Option<TauriHandle>,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
@@ -559,7 +557,7 @@ async fn init_monero_wallet(
     let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero"), tauri_handle).await?;
 
     tracing::debug!(
-        address = monero_daemon_address,
+        override_monero_daemon_address = monero_daemon_address.clone().into(),
         "Attempting to start monero-wallet-rpc process"
     );
 

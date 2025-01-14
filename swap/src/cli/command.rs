@@ -21,10 +21,6 @@ use uuid::Uuid;
 use super::api::request::GetLogsArgs;
 use super::api::ContextBuilder;
 
-// See: https://moneroworld.com/
-pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
-pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rino.io:38081";
-
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=tbtc
@@ -504,18 +500,6 @@ pub struct Monero {
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
     )]
     pub monero_daemon_address: Option<String>,
-}
-
-impl Monero {
-    pub fn apply_defaults(self, testnet: bool) -> String {
-        if let Some(address) = self.monero_daemon_address {
-            address
-        } else if testnet {
-            DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string()
-        } else {
-            DEFAULT_MONERO_DAEMON_ADDRESS.to_string()
-        }
-    }
 }
 
 #[derive(structopt::StructOpt, Debug)]
