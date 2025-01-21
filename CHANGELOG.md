@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Docs: Added a dedicated page for makers.
+- Docs: Improved the refund and punish page.
 - ASB: Fixed an issue where the ASB would silently fail if the publication of the Monero refund transaction failed.
 
 ## [1.0.0-rc.12] - 2025-01-14
-
+ 
+- GUI: Fixed a bug where the CLI wasn't passed the correct Monero node.
+- 
 ## [1.0.0-rc.11] - 2024-12-22
 
 - ASB: The `history` command will now display additional information about each swap such as the amounts involved, the current state and the txid of the Bitcoin lock transaction.

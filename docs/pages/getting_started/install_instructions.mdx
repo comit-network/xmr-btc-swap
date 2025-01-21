@@ -2,9 +2,14 @@ import { Tabs } from 'nextra/components'
 
 # Installation
 
+To install the app you can either download ready-to-use binaries or build it from source.
+Unless you know what you're doing, you probably want to use the precompiled binaries.
+
+## Precompiled binaries
+
 Precompiled binaries of the _GUI_ are available for most platforms. Simply download the appropriate binary for your system and follow the instructions.
 
-<Tabs items={['Windows', 'macOS (Silicon)', 'macOS (Intel)', 'Linux (x86_64)']}>
+<Tabs items={['Windows', 'macOS (Silicon)', 'macOS (Intel)', 'Linux (x86_64)', 'Linux (arm64)']}>
   <Tabs.Tab>
     1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_x64-setup.exe)
     2. Open the downloaded `.exe` installer
@@ -32,4 +37,28 @@ Precompiled binaries of the _GUI_ are available for most platforms. Simply downl
     ./UnstoppableSwap_1.0.0-rc.4_amd64.AppImage
     ```
   </Tabs.Tab>
+  <Tabs.Tab>
+    Due to limitations with our CI pipeline, we currently can't provide precompiled binaries for arm64 linux systems.
+  </Tabs.Tab>
 </Tabs>
+
+## Building from source
+
+If you want to build the application from source you'll need to have the following tools installed:
+
+- `cargo` ([installation](https://www.rust-lang.org/tools/install)) and `cargo tauri` ([installation](https://v2.tauri.app/reference/cli/) and [prerequisites](https://v2.tauri.app/start/prerequisites/))
+- `node` ([installation](https://nodejs.org/en/download/)) and `yarn` (version 1.22, not 4.x)
+- `dprint` (`cargo install dprint@0.39.1`)
+- `typeshare` (`cargo install typeshare-cli`)
+
+After that you only need to clone the repository and run the following commands:
+
+```bash
+git clone https://github.com/UnstoppableSwap/core.git
+cd core/src-tauri
+cargo tauri build # may take a while
+```
+
+This will create the `core/target/release/bundle` folder which contains the executable in a platform specific folder.
+By default this will compile the binary the platform you are currently on.
+You can configure this using options for the `cargo tauri build` command ([docs](https://v2.tauri.app/reference/cli/#build)).

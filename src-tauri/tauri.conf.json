@@ -7,7 +7,7 @@
     "frontendDist": "../src-gui/dist",
     "beforeBuildCommand": {
       "cwd": "../src-gui",
-      "script": "yarn run build"
+      "script": "yarn install && yarn run build"
     }
   },
   "app": {

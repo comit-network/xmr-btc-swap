@@ -1,24 +1,69 @@
+
+import { Callout } from 'nextra/components'
+
 # Cancel, Refund, and Punish explained
 
-Atomic Swaps offer a lot of security and privacy benefits, but they also come with some responsibilities. It is important to recognize that Atomic Swaps are trustless, but not risk-free. As long as you follow the rules of the protocol, you can be sure that you will not lose your funds.
+Atomic Swaps offer a lot of security and privacy benefits, but they also come with some responsibilities. 
+As long as you follow the rules of the protocol, you can be sure that you will not lose your funds.
 
-If you want to learn more about technical details, you can read this paper: [Atomic Swaps between Bitcoin and Monero, _Philipp Hoenisch, Lucas Soriano del Pino_](https://arxiv.org/abs/2101.12332) or read this [blog post](https://comit.network/blog/2020/10/06/monero-bitcoin/).
+<Callout type="info">
+If you want to learn more about the technical details, you can read the paper _Atomic Swaps between Bitcoin and Monero by Philipp Hoenisch and Lucas Soriano del Pino_ ([link](https://arxiv.org/abs/2101.12332)) or read this COMIT blog post ([link](https://comit.network/blog/2020/10/06/monero-bitcoin/)).
+</Callout>
 
-We have chosen to include a fairly technical explanation here. However, the GUI will guide you through the process and make it as easy as possible. You do not need to manually do any of the steps described here.
+We have chosen to include a fairly technical explanation here. 
+The GUI will guide you through the process and make it as easy as possible. 
+
+<Callout type="info">
+Be sure to click the "Resume" button of your swap, if you aren't already resuming it. 
+Otherwise, the GUI cannot perform the necessary actions.
+You do not need to manually do any of the specific steps described here.
+</Callout>
 
 ## Cancel
 
-If the _maker_ has not been able to redeem the Bitcoin within 12 hours (72 Bitcoin blocks) from the start of the swap, the swap will be cancelled.
-This is done by either you or the _maker_ publishing a special Bitcoin transaction called the `Bitcoin Cancel Transaction`.
-As soon as this transaction is included in the Bitcoin blockchain, the swap is locked in a state where only the [_Refund_](#refund) and [_Punish_](#punish) paths can be activated. The _Happy Path_ path where you redeem the Monero is no longer possible.
+If the maker has not been able to redeem the Bitcoin (that you locked) within ~12 hours (72 Bitcoin blocks) from the start of the swap[^1], the swap will be cancelled.
+This is done either by you or by the maker, by publishing a special Bitcoin transaction called the _Bitcoin cancel transaction_, or _tx_cancel_.
+As soon as this transaction is confirmed, the swap is locked in a state where only the [_refund_](#refund) and [_punish_](#punish) paths can be activated. 
+
+[^1]: To be exact, the time frame is ~12 hours (72 Bitcoin blocks) from the _confirmation_ of the Bitcoin _lock_ transaction.
 
 ## Refund
 
-As soon as the swap is cancelled, you can refund your Bitcoin. This is done by publishing the `Bitcoin Refund Transaction` on the Bitcoin blockchain.
-If this is done within 24 hours (144 Bitcoin blocks) from the inclusion of the `Bitcoin Cancel Transaction`, you will get your Bitcoin back.
-If you do not refund your Bitcoin within this time frame, the _maker_ can punish you. This is a security measure to ensure that you do not cancel the swap and then refuse to refund your Bitcoin which would result in the _maker_ losing their Monero.
+As soon as the swap is cancelled, you can refund your Bitcoin. 
+The GUI will do this automatically for you.
+This is done by publishing the Bitcoin _refund_ transaction, or _tx_refund_.
+This must be done within ~24 hours (144 Bitcoin blocks) from the confirmation of the Bitcoin _cancel_ transaction.
+
+<Callout type="info">
+If the Bitcoin is not refunded within this time frame, the maker can [_punish_](#punish) you. 
+This is a security measure to ensure that malicious actors can't refund their Bitcoin while the maker loses their Monero.
+You may still be able to redeem the Monero, if the maker [cooperates](#cooperative-redeem).
+</Callout>
 
 ## Punish
 
-If you do not refund your Bitcoin within 24 hours (144 Bitcoin blocks) from the inclusion of the `Bitcoin Cancel Transaction`, the _maker_ will _punish_ you. This will result in the _maker_ taking your Bitcoin as a penalty for not refunding it in time.
-Even if this state is reached and the _maker_ has punished you, there's still hope to redeem the Monero. The _maker_ can choose to allow you to redeem the Monero by transmitting a secret key to you. This however is at the discretion of the _maker_ and they are not obligated to do so.
+If you do not refund your Bitcoin within ~24 hours (~144 Bitcoin blocks) from the confirmation of the _Bitcoin cancel transaction_, the maker will _punish_ you. 
+This is done by redeeming the Bitcoin that you locked earlier.
+At this point, you can no longer _refund_ the swap and get back your Bitcoin.
+
+<Callout type="info">
+You may still be able to _complete_ the swap by redeeming the Monero.
+</Callout>
+
+## Cooperative Redeem
+
+If the maker has punished you, you may still be able to _complete_ the swap by redeeming the Monero.
+This requires the maker to cooperate.
+Most makers do cooperate, since the alternative is that the Monero will be locked in the swap forever.
+
+To attempt a cooperative redeem, simply resume the swap.
+A request will be made to the maker to send you the secret key.
+If the request fails (e.g. because of network issues), you can still try again later.
+There is no time limit for this.
+
+Once the GUI receives the secret key, it will automatically redeem the Monero to the address you specified when you started the swap.
+
+<Callout type="info">
+With most makers, you can still redeem the Monero even after being punished.
+This is, however, purely voluntary and we advise against relying on this.
+</Callout>

@@ -1,0 +1,274 @@
+import { Callout } from 'nextra/components'
+
+## An Overview of Becoming a Maker
+
+Makers run an automated swap backend (`asb`), which users can connect to and swap with.
+The `asb` accepts Bitcoin and sells Monero, for a fee.
+
+The `asb` needs to communicate with the Bitcoin and Monero blockchains.
+For this, it uses `monero-wallet-rpc` for Monero and `electrs` for Bitcoin.
+
+It's also strongly recommended to run your own Monero and Bitcoin nodes.
+
+## Docker Compose setup
+
+We maintain a Docker Compose configuration ([link](https://github.com/UnstoppableSwap/asb-docker-compose)) that automatically starts and manages these services:
+
+- `asb` (the maker service, connecting to `monero-wallet-rpc` and `electrs`)
+- `monero-wallet-rpc` (an RPC server, managing the Monero wallet and connecting to `monerod`)
+- `electrs` (a Bitcoin blockchain indexer, connecting to `bitcoind`)
+- `monerod` (a Monero node, connecting to the Monero blockchain)
+- `bitcoind` (a Bitcoin node, connecting to the Bitcoin blockchain)
+
+To run this setup you'll need Docker and Docker Compose installed.
+
+### Getting started
+
+Now you can clone the configuration repo and `cd` into it.
+We're going to setup an asb on mainnet.
+If you want to setup for testnet, go into the `testnet` directory instead.
+All other steps remain the same.
+
+```bash
+git clone https://github.com/UnstoppableSwap/asb-docker-compose.git
+cd asb-docker-compose/mainnet
+```
+
+The directory contains three files: the docker compose file, the enviroment variables file and the asb configuration file.
+The directory structure looks like this:
+
+```bash
+asb-docker-compose/mainnet/
+├─ config_mainnet.toml  # asb configuration
+├─ docker-compose.yml   # docker compose configuration
+├─ .env                 # port configuration for docker compose
+```
+
+The `docker-compose.yml` and `.env` files are part of the docker compose setup.
+We will prioritize the asb configuration file in this guide, because you probably don't want to change the docker compose setup.
+
+### Usage and commands
+
+_This list is also available in the [repository](https://github.com/UnstoppableSwap/asb-docker-compose/), including variations for testnet._
+
+First, make sure you're in the directory with the `docker-compose.yml` file:
+
+```bash copy
+cd asb-docker-compose/mainnet
+```
+
+If you aren't familiar with docker compose, here are the most important commands:
+
+| Command | Description |
+| --- | --- |
+| `docker compose up -d` | Start all services. |
+| `docker compose down` | Stop all services. |
+| `docker compose ps` | List all currently running services. |
+| `docker compose pull` | Pull the latest images for all services. You need to run `docker compose up -d` after this to actually update the services. |
+| `docker compose logs -f` | Access the logs of all services. To only get the logs of a specific service, use `docker compose logs -f <service_name>`. To only see the last e.g. 100 lines, use `docker compose logs -f --tail 100`. |
+
+You can also execute `asb` commands, to get the history of swaps for example:
+
+```bash copy
+docker compose exec mainnet_asb asb --config=/asb-data/config_mainnet.toml history
+```
+
+Below is a list of asb commands you can use.
+Some of them require access to some resources, in which case you'll need to stop the asb first and then resume afterwards:
+
+```bash copy
+docker compose down
+docker compose exec mainnet_asb asb --config=/asb-data/config_mainnet.toml <command>
+docker compose up -d
+```
+
+| Command | Description |
+| --- | --- |
+| `help` | Prints a list of available options and commands (under _subcommands_). |
+| `history` | Prints a list of all previous and current swaps. |
+| `start` | Starts the asb. This is automatically done when you run `docker compose up -d`. |
+| `config` | Prints the current configuration. |
+| `export-bitcoin-wallet` | Prints the internal bitcoin wallet descriptor which can be used to access the asb's bitcoin wallet. |
+| `withdraw-btc --address <YOUR_ADDRESS>` | Withdraws Bitcoin from the internal wallet into a specified address. |
+
+### Asb Configuration
+
+Let's have a look at the asb configuration file.
+It is used to configure the behaviour of the asb.
+It uses the TOML language ([docs](https://toml.io/)).
+
+The file has different sections, each with different configuration options:
+
+- `maker`: specifies the core behaviour of the asb
+- `bitcoin`: specifies the Bitcoin configuration
+- `monero`: specifies the Monero configuration
+- `tor`: specifies the Tor configuration
+- `data`: specifies the data directory
+- `network`: specifies the networking configuration
+
+
+#### Maker Section
+
+The most important section is the `[maker]` section, which specifies the core behaviour of the asb.
+This is what a standard maker section looks like:
+
+```toml filename="config_mainnet.toml"
+[maker]
+min_buy_btc = 0.001
+max_buy_btc = 0.1
+ask_spread = 0.02
+price_ticker_ws_url = "wss://ws.kraken.com/"
+
+# ...
+```
+
+Below an explanation of what each option does:
+
+| Option | Description |
+| --- | --- |
+| `min_buy_btc` | The minimum amount of Bitcoin the asb will buy from takers, in BTC. |
+| `max_buy_btc` | The maximum amount of Bitcoin the asb will buy from takers, in BTC. |
+| `ask_spread` | The markup the asb will charge compared to the market price, as a factor. The market price is fetched via the `price_ticker_ws_url`. A value of `0.02` means the asb will charge 2% more than the market price. |
+| `price_ticker_ws_url` | The URL of a websocket that provides the market price. The default is the Kraken API, but you can build your own websocket server which mimics the Kraken API. |
+
+### Bitcoin Section
+
+The `bitcoin` section specifies a few details about the asb's interaction with the Bitcoin blockchain.
+We do not recommend changing these settings, however we document them for completeness sake.
+
+```toml filename="config_mainnet.toml"
+# ...
+
+[bitcoin]
+target_block = 1 
+electrum_rpc_url = "tcp://mainnet_electrs:50001"
+network = "Mainnet"
+
+# ...
+```
+
+| Option | Description |
+| --- | --- |
+| `target_block` | This determines the block height that the asb will try to get it's Bitcoin transactions confirmed at. The default value of `1` means the asb will try to get it's transactions confirmed in the next block.  |
+| `electrum_rpc_url` | The URL of the _electrs_ server the asb will connect to. The _electrs_ server is is used to interact with the Bitcoin blockchain. The default URL points to the docker-hosted _electrs_ server. |
+| `network` | The Bitcoin network the asb will connect to. |
+
+### Monero Section
+
+The `monero` section specifies a few details about the asb's interaction with the Monero blockchain.
+We do not recommend changing these settings, however we document them for completeness sake.
+
+```toml filename="config_mainnet.toml"
+# ...
+
+[monero]
+wallet_rpc_url = "http://mainnet_monero-wallet-rpc:18083/json_rpc"
+network = "Mainnet"
+
+# ...
+```
+
+| Option | Description |
+| --- | --- |
+| `wallet_rpc_url` | The URL of the _monero-wallet-rpc_ server the asb will connect to. The _monero-wallet-rpc_ server is is used to interact with the Monero blockchain. The default URL points to the docker-hosted _monero-wallet-rpc_ server. |
+| `network` | The Monero network the asb will connect to. |
+
+### Tor Section
+
+The `tor` section specifies the asb's onion service (hidden service) configuration.
+An onion service can be used to make the asb publicly accessible without exposing the server's IP address or requiring an opened port ([further reading](https://community.torproject.org/onion-services/overview/)).
+
+```toml filename="config_mainnet.toml"
+# ...
+
+[tor]
+register_hidden_service = true
+hidden_service_num_intro_points = 5
+
+# ...
+```
+
+| Option | Description |
+| --- | --- |
+| `register_hidden_service` | Whether the asb should register an onion service.  |
+| `hidden_service_num_intro_points` | If the asb registers an onion service, this specifies the number of introduction points the asb will use. |
+
+
+### Network Section
+
+The `network` section specifies the asb's networking configuration.
+This includes:
+ - which rendezvous points the asb will connect to,
+ - on which port, and
+ - external addresses the asb will advertise to the rendezvous points.
+
+<Callout type="info">
+These addresses are specified using the multiaddr format ([link](https://multiformats.io/multiaddr)).
+A multiaddr combines all necessary information into a single string.
+
+For example, the first rendezvous point's multiaddr specifies the rendezvous point at the DNS address `discover.unstoppableswap.net`, on port `8888` with the peer ID `12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE`.
+</Callout>
+
+```toml filename="config_mainnet.toml"
+# ...
+
+[network]
+# the ip and port the asb will listen on
+listen = ["/ip4/0.0.0.0/tcp/9939"] 
+
+# the rendezvous points the asb will connect to (address, port and peer id)
+rendezvous_point = [
+    "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE"
+]
+
+# the external addresses the asb will advertise to the rendezvous points (only address)
+external_addresses = [
+    # e.g. "/dns4/your.domain.com/tcp/9939/p2p/your1peer2id"
+]
+```
+
+| Option | Description | Format |
+| --- | --- | --- |
+| `listen` | The ip and port the asb will listen on. The IP address `0.0.0.0` means the asb will listen on all IP addresses. Remember that the asb service is running in a docker container. Make sure the port is the same as in the `.env` file. | This multiaddr should only include an IP address and a port number. |
+| `rendezvous_point` | A list of rendezvous points the asb will connect to. | These multiaddrs should include an address (e.g. IPv4, IPv6, DNS), a port number and a peer ID. |
+| `external_addresses` | A list of external addresses the asb will advertise to the rendezvous points. If you registered a domain, you can add it here. If you enabled the onion service, it will be included automatically, so you don't need to specify the onion address. | These multiaddrs should only include an address (e.g. IPv4, IPv6, DNS). |
+
+
+Et, voilà! 
+You've successfully configured your asb.
+
+### Default Configuration
+
+This is what the default configuration might look like.
+
+```toml filename="config_mainnet.toml" copy
+[maker]
+min_buy_btc = 0.001
+max_buy_btc = 0.1
+ask_spread = 0.02
+price_ticker_ws_url = "wss://ws.kraken.com/"
+
+[bitcoin]
+electrum_rpc_url = "tcp://mainnet_electrs:50001"
+target_block = 1 
+network = "Mainnet"
+
+[monero]
+wallet_rpc_url = "http://mainnet_monero-wallet-rpc:18083/json_rpc"
+network = "Mainnet"
+
+[tor]
+register_hidden_service = true
+hidden_service_num_intro_points = 5
+
+[data]
+dir = "/asb-data/" 
+
+[network]
+listen = ["/ip4/0.0.0.0/tcp/9939"]
+rendezvous_point = [
+    "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE", 
+    "/dns4/eratosthen.es/tcp/7798/p2p/12D3KooWAh7EXXa2ZyegzLGdjvj1W4G3EXrTGrf6trraoT1MEobs"
+]
+external_addresses = []
+```

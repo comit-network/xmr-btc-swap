@@ -3,7 +3,8 @@ import { Cards } from 'nextra/components'
 
 # Introduction
 
-**UnstoppableSwap** is a protocol _and_ desktop application for swapping Monero and Bitcoin. We use atomic swaps to make trustless and private trades possible.
+**UnstoppableSwap** is a protocol _and_ desktop application for swapping Monero and Bitcoin. 
+It uses atomic swaps to make trustless and private trades possible without the need for a centralized exchange.
 
 ## Quick Start
 
@@ -15,3 +16,18 @@ To start using UnstoppableSwap, you need to install the application. Then you ca
   <Cards.Card arrow title="Completing your first swap" href="/usage/first_swap">
   </Cards.Card>
 </Cards>
+
+## What is an Atomic Swap?
+
+Atomic swaps are cross-blockchain transactions that are executed without the need for a centralized exchange.
+They are _atomic_ because the protocol guarantees that you will not lose your assets if the swap fails[^1].
+
+## How does UnstoppableSwap work?
+
+**UnstoppableSwap** is a protocol _and_ desktop application.
+When you run the app, you can connect to and swap with different _makers_.
+_Makers_ are users who run the UnstoppableSwap protocol on their own computer or server to provide liquidity.
+They buy your Bitcoin and in return give you Monero.
+Each maker can set their own prices and fees.
+
+[^1]: The guarantee only holds when the protocol is followed.
