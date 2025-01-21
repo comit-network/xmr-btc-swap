@@ -522,7 +522,7 @@ impl State3 {
             .await?;
 
         monero_wallet
-            .create_from(
+            .create_from_keys_and_sweep(
                 file_name,
                 spend_key,
                 view_key,

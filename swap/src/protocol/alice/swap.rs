@@ -427,15 +427,37 @@ where
             spend_key,
             state3,
         } => {
-            state3
-                .refund_xmr(
-                    monero_wallet,
-                    monero_wallet_restore_blockheight,
-                    swap_id.to_string(),
-                    spend_key,
-                    transfer_proof,
-                )
-                .await?;
+            // We retry indefinitely to refund the Monero funds, until the refund transaction is confirmed
+            let backoff = backoff::ExponentialBackoffBuilder::new()
+                .with_max_elapsed_time(None)
+                .with_max_interval(Duration::from_secs(60))
+                .build();
+
+            backoff::future::retry_notify(
+                backoff,
+                || async {
+                    state3
+                        .refund_xmr(
+                            monero_wallet,
+                            monero_wallet_restore_blockheight,
+                            swap_id.to_string(),
+                            spend_key,
+                            transfer_proof.clone(),
+                        )
+                        .await
+                        .map_err(backoff::Error::transient)
+                },
+                |e, wait_time: Duration| {
+                    tracing::warn!(
+                        swap_id = %swap_id,
+                        error = ?e,
+                        "Failed to refund Monero. We will retry in {} seconds",
+                        wait_time.as_secs()
+                    )
+                },
+            )
+            .await
+            .expect("We should never run out of retries while refunding Monero");
 
             AliceState::XmrRefunded
         }

@@ -116,64 +116,49 @@ impl Wallet {
     /// keys. The generated wallet will be opened, all funds sweeped to the
     /// main_address and then the wallet will be re-loaded using the internally
     /// stored name.
-    pub async fn create_from(
+    pub async fn create_from_keys_and_sweep(
         &self,
         file_name: String,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: BlockHeight,
     ) -> Result<()> {
-        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
-        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
+        // Close the default wallet, generate the new wallet from the keys and load it
+        self.create_from_and_load(
+            file_name,
+            private_spend_key,
+            private_view_key,
+            restore_height,
+        )
+        .await?;
 
-        let temp_wallet_address =
-            Address::standard(self.network, public_spend_key, public_view_key);
+        // Refresh the generated wallet
+        if let Err(error) = self.refresh(20).await {
+            return Err(anyhow::anyhow!(error)
+                .context("Failed to refresh generated wallet for sweeping to default wallet"));
+        }
 
-        // Close the default wallet before generating the other wallet to ensure that
-        // it saves its state correctly
-        let _ = self.inner.lock().await.close_wallet().await?;
-
-        let _ = self
+        // Sweep all the funds from the generated wallet to the default wallet
+        let sweep_result = self
             .inner
             .lock()
             .await
-            .generate_from_keys(
-                file_name,
-                temp_wallet_address.to_string(),
-                private_spend_key.to_string(),
-                PrivateKey::from(private_view_key).to_string(),
-                restore_height.height,
-                String::from(""),
-                true,
-            )
-            .await?;
+            .sweep_all(self.main_address.to_string())
+            .await;
 
-        // Try to send all the funds from the generated wallet to the default wallet
-        match self.refresh(3).await {
-            Ok(_) => match self
-                .inner
-                .lock()
-                .await
-                .sweep_all(self.main_address.to_string())
-                .await
-            {
-                Ok(sweep_all) => {
-                    for tx in sweep_all.tx_hash_list {
-                        tracing::info!(
-                            %tx,
-                            monero_address = %self.main_address,
-                            "Monero transferred back to default wallet");
-                    }
+        match sweep_result {
+            Ok(sweep_all) => {
+                for tx in sweep_all.tx_hash_list {
+                    tracing::info!(
+                        %tx,
+                        monero_address = %self.main_address,
+                        "Monero transferred back to default wallet");
                 }
-                Err(error) => {
-                    tracing::warn!(
-                        address = %self.main_address,
-                        "Failed to transfer Monero to default wallet: {:#}", error
-                    );
-                }
-            },
+            }
             Err(error) => {
-                tracing::warn!("Failed to refresh generated wallet: {:#}", error);
+                return Err(
+                    anyhow::anyhow!(error).context("Failed to transfer Monero to default wallet")
+                );
             }
         }
 

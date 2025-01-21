@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: Fixed an issue where the ASB would silently fail if the publication of the Monero refund transaction failed.
+
 ## [1.0.0-rc.12] - 2025-01-14
 
 ## [1.0.0-rc.11] - 2024-12-22
