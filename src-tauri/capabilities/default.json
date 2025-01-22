@@ -12,6 +12,7 @@
     "process:default",
     "cli:allow-cli-matches",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "opener:default"
   ]
 }

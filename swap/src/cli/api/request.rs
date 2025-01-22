@@ -1308,6 +1308,12 @@ pub struct CheckMoneroNodeResponse {
     pub available: bool,
 }
 
+#[typeshare]
+#[derive(Deserialize, Serialize)]
+pub struct GetDataDirArgs {
+    pub is_testnet: bool,
+}
+
 #[derive(Error, Debug)]
 #[error("this is not one of the known monero networks")]
 struct UnknownMoneroNetwork(String);

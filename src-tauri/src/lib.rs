@@ -3,15 +3,9 @@ use std::result::Result;
 use std::sync::Arc;
 use swap::cli::{
     api::{
-        request::{
-            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
-            CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse,
-            ExportBitcoinWalletArgs, GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs,
-            GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs,
-            ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
-        },
-        tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
-        Context, ContextBuilder,
+        data, request::{
+            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs, CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse, ExportBitcoinWalletArgs, GetDataDirArgs, GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs
+        }, tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings}, Context, ContextBuilder
     },
     command::{Bitcoin, Monero},
 };
@@ -162,6 +156,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_balance,
             get_monero_addresses,
@@ -181,6 +176,7 @@ pub fn run() {
             check_monero_node,
             check_electrum_node,
             get_wallet_descriptor,
+            get_data_dir
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -221,6 +217,7 @@ tauri_command!(monero_recovery, MoneroRecoveryArgs);
 tauri_command!(get_logs, GetLogsArgs);
 tauri_command!(list_sellers, ListSellersArgs);
 tauri_command!(cancel_and_refund, CancelAndRefundArgs);
+
 // These commands require no arguments
 tauri_command!(get_wallet_descriptor, ExportBitcoinWalletArgs, no_args);
 tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);
@@ -250,6 +247,17 @@ async fn check_electrum_node(
     _: tauri::State<'_, RwLock<State>>,
 ) -> Result<CheckElectrumNodeResponse, String> {
     args.request().await.to_string_result()
+}
+
+// Returns the data directory
+// This is independent of the context to ensure the user can open the directory even if the context cannot
+// be initialized (for troubleshooting purposes)
+#[tauri::command]
+async fn get_data_dir(
+    args: GetDataDirArgs,
+    _: tauri::State<'_, RwLock<State>>,
+) -> Result<String, String> {
+    Ok(data::data_dir_from(None, args.is_testnet).to_string_result()?.to_string_lossy().to_string())
 }
 
 /// Tauri command to initialize the Context

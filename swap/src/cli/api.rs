@@ -577,7 +577,7 @@ async fn init_monero_wallet(
     Ok((monero_wallet, monero_wallet_rpc_process))
 }
 
-mod data {
+pub mod data {
     use super::*;
 
     pub fn data_dir_from(arg_dir: Option<PathBuf>, testnet: bool) -> Result<PathBuf> {

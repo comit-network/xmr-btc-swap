@@ -29,6 +29,7 @@ import {
   CheckElectrumNodeResponse,
   GetMoneroAddressesResponse,
   TauriBackgroundRefundEvent,
+  GetDataDirArgs,
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
@@ -276,4 +277,11 @@ export async function updateAllNodeStatuses() {
 
 export async function getMoneroAddresses(): Promise<GetMoneroAddressesResponse> {
   return await invokeNoArgs<GetMoneroAddressesResponse>("get_monero_addresses");
+}
+
+export async function getDataDir(): Promise<string> {
+  const testnet = isTestnet();
+  return await invoke<GetDataDirArgs, string>("get_data_dir", {
+    is_testnet: testnet,
+  });
 }

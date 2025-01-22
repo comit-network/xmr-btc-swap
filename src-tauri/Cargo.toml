@@ -22,6 +22,7 @@ swap = { path = "../swap", features = [ "tauri" ] }
 sysinfo = "=0.32.1"
 tauri = { version = "^2.0.0", features = [ "config-json5" ] }
 tauri-plugin-clipboard-manager = "^2.0.0"
+tauri-plugin-opener = "2.2.5"
 tauri-plugin-process = "^2.0.0"
 tauri-plugin-shell = "^2.0.0"
 tauri-plugin-store = "^2.0.0"

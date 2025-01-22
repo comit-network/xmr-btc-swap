@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: Added a dedicated page for makers.
 - Docs: Improved the refund and punish page.
 - ASB: Fixed an issue where the ASB would silently fail if the publication of the Monero refund transaction failed.
+- GUI: Add a button to open the data directory for troubleshooting purposes.
 
 ## [1.0.0-rc.12] - 2025-01-14
  
