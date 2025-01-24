@@ -7,15 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.13] - 2025-01-24
+
 - Docs: Added a dedicated page for makers.
 - Docs: Improved the refund and punish page.
 - ASB: Fixed an issue where the ASB would silently fail if the publication of the Monero refund transaction failed.
 - GUI: Add a button to open the data directory for troubleshooting purposes.
 
 ## [1.0.0-rc.12] - 2025-01-14
- 
+
 - GUI: Fixed a bug where the CLI wasn't passed the correct Monero node.
-- 
+-
+
 ## [1.0.0-rc.11] - 2024-12-22
 
 - ASB: The `history` command will now display additional information about each swap such as the amounts involved, the current state and the txid of the Bitcoin lock transaction.
@@ -436,7 +439,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.12...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.13...HEAD
+[1.0.0-rc.13]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.12...1.0.0-rc.13
 [1.0.0-rc.12]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.11...1.0.0-rc.12
 [1.0.0-rc.11]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.10...1.0.0-rc.11
 [1.0.0-rc.10]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.8...1.0.0-rc.10
