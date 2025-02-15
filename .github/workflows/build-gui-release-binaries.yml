@@ -64,6 +64,12 @@ jobs:
             gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
             gir1.2-webkit2-4.1=2.44.0-2;
 
+      - name: work around spurious network errors in curl 8.0
+        run: |
+          if rustc --version --verbose | grep -q '^release: 1\.79\.'; then
+            echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV
+          fi
+
       - name: install frontend dependencies
         working-directory: src-gui
         run: yarn install
