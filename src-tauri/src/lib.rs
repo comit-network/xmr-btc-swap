@@ -3,9 +3,16 @@ use std::result::Result;
 use std::sync::Arc;
 use swap::cli::{
     api::{
-        data, request::{
-            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs, CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse, ExportBitcoinWalletArgs, GetDataDirArgs, GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs
-        }, tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings}, Context, ContextBuilder
+        data,
+        request::{
+            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
+            CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse,
+            ExportBitcoinWalletArgs, GetDataDirArgs, GetHistoryArgs, GetLogsArgs,
+            GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs,
+            MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
+        },
+        tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
+        Context, ContextBuilder,
     },
     command::{Bitcoin, Monero},
 };
@@ -257,7 +264,10 @@ async fn get_data_dir(
     args: GetDataDirArgs,
     _: tauri::State<'_, RwLock<State>>,
 ) -> Result<String, String> {
-    Ok(data::data_dir_from(None, args.is_testnet).to_string_result()?.to_string_lossy().to_string())
+    Ok(data::data_dir_from(None, args.is_testnet)
+        .to_string_result()?
+        .to_string_lossy()
+        .to_string())
 }
 
 /// Tauri command to initialize the Context
