@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- CI: Update Rust version to 1.80
+
 ## [1.0.0-rc.13] - 2025-01-24
 
 - Docs: Added a dedicated page for makers.
