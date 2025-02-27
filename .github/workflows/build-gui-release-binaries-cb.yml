@@ -52,7 +52,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install Rust Stable
-        uses: dtolnay/rust-toolchain@1.79
+        uses: dtolnay/rust-toolchain@1.80
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
@@ -81,9 +81,7 @@ jobs:
       - name: Work around spurious network errors in curl 8.0
         shell: bash
         run: |
-          if rustc --version --verbose | grep -q '^release: 1\.79\.'; then
-            echo "CARGO_HTTP_MULTIPLEXING=false" >> $GITHUB_ENV
-          fi
+          echo "CARGO_HTTP_MULTIPLEXING=false" >> $GITHUB_ENV
 
       - name: Install Frontend Dependencies
         working-directory: src-gui
