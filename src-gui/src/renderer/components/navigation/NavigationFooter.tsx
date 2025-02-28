@@ -1,4 +1,4 @@
-import { Box, makeStyles } from "@material-ui/core";
+import { Box, makeStyles, Tooltip } from "@material-ui/core";
 import GitHubIcon from "@material-ui/icons/GitHub";
 import RedditIcon from "@material-ui/icons/Reddit";
 import DaemonStatusAlert from "../alert/DaemonStatusAlert";
@@ -9,6 +9,7 @@ import DiscordIcon from "../icons/DiscordIcon";
 import LinkIconButton from "../icons/LinkIconButton";
 import { DISCORD_URL } from "../pages/help/ContactInfoBox";
 import BackgroundRefundAlert from "../alert/BackgroundRefundAlert";
+import MatrixIcon from "../icons/MatrixIcon";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -34,15 +35,20 @@ export default function NavigationFooter() {
       <DaemonStatusAlert />
       <MoneroWalletRpcUpdatingAlert />
       <Box className={classes.linksOuter}>
-        <LinkIconButton url="https://reddit.com/r/unstoppableswap">
-          <RedditIcon />
-        </LinkIconButton>
-        <LinkIconButton url="https://github.com/UnstoppableSwap/unstoppableswap-gui">
-          <GitHubIcon />
-        </LinkIconButton>
-        <LinkIconButton url={DISCORD_URL}>
-          <DiscordIcon />
-        </LinkIconButton>
+        <Tooltip title="Check out the GitHub repository">
+          <span>
+            <LinkIconButton url="https://github.com/UnstoppableSwap/unstoppableswap-gui">
+              <GitHubIcon />
+            </LinkIconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Join the Matrix room">
+          <span>
+            <LinkIconButton url="https://matrix.to/#/#unstoppableswap-space:matrix.org">
+              <MatrixIcon />
+            </LinkIconButton>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );
