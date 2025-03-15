@@ -1,15 +1,13 @@
 import { Box, makeStyles, Tooltip } from "@material-ui/core";
 import GitHubIcon from "@material-ui/icons/GitHub";
-import RedditIcon from "@material-ui/icons/Reddit";
 import DaemonStatusAlert from "../alert/DaemonStatusAlert";
 import FundsLeftInWalletAlert from "../alert/FundsLeftInWalletAlert";
 import MoneroWalletRpcUpdatingAlert from "../alert/MoneroWalletRpcUpdatingAlert";
 import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
-import DiscordIcon from "../icons/DiscordIcon";
 import LinkIconButton from "../icons/LinkIconButton";
-import { DISCORD_URL } from "../pages/help/ContactInfoBox";
 import BackgroundRefundAlert from "../alert/BackgroundRefundAlert";
 import MatrixIcon from "../icons/MatrixIcon";
+import { BookRounded } from "@material-ui/icons";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -46,6 +44,13 @@ export default function NavigationFooter() {
           <span>
             <LinkIconButton url="https://matrix.to/#/#unstoppableswap-space:matrix.org">
               <MatrixIcon />
+            </LinkIconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Read our official documentation">
+          <span>
+            <LinkIconButton url="https://docs.unstoppableswap.net">
+              <BookRounded />
             </LinkIconButton>
           </span>
         </Tooltip>
