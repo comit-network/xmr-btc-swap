@@ -376,10 +376,19 @@ async fn wait_for_confirmations_with<
             // TODO: Implement this using a generic proxy for each function call once https://github.com/thomaseizinger/rust-jsonrpc-client/issues/47 is fixed.
             Err(jsonrpc::Error::JsonRpc(jsonrpc::JsonRpcError { code: -13, .. })) => {
                 tracing::debug!(
-                    "Opening wallet `{}` because no wallet is loaded",
-                    wallet_name
+                    "No wallet loaded. Opening wallet `{}` to continue monitoring of Monero transaction {}",
+                    wallet_name,
+                    txid
                 );
-                let _ = client.open_wallet(wallet_name.clone()).await;
+
+                if let Err(err) = client.open_wallet(wallet_name.clone()).await {
+                    tracing::warn!(
+                        %err,
+                        "Failed to open wallet `{}` to continue monitoring of Monero transaction {}",
+                        wallet_name,
+                        txid
+                    );
+                }
                 continue;
             }
             Err(other) => {
@@ -576,7 +585,7 @@ mod tests {
         assert_eq!(
             writer.captured(),
             r" INFO swap::monero::wallet: Received new confirmation for Monero lock tx txid=<FOO> seen_confirmations=1 needed_confirmations=5
-DEBUG swap::monero::wallet: Opening wallet `foo-wallet` because no wallet is loaded
+DEBUG swap::monero::wallet: No wallet loaded. Opening wallet `foo-wallet` to continue monitoring of Monero transaction <FOO>
  INFO swap::monero::wallet: Received new confirmation for Monero lock tx txid=<FOO> seen_confirmations=3 needed_confirmations=5
  INFO swap::monero::wallet: Received new confirmation for Monero lock tx txid=<FOO> seen_confirmations=5 needed_confirmations=5
 "
