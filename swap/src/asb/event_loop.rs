@@ -249,7 +249,7 @@ where
                             tracing::warn!(%peer, "Ignoring spot price request: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                            match self.make_quote_or_use_cached().await {
+                            match self.make_quote_or_use_cached(self.min_buy, self.max_buy).await {
                                 Ok(quote_arc) => {
                                     if self.swarm.behaviour_mut().quote.send_response(channel, (*quote_arc).clone()).is_err() {
                                         tracing::debug!(%peer, "Failed to respond with quote");
@@ -481,12 +481,12 @@ where
 
     /// Get a quote from the cache or calculate a new one by calling make_quote.
     /// Returns the result wrapped in Arcs for consistent caching.
-    async fn make_quote_or_use_cached(&mut self) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
+    async fn make_quote_or_use_cached(&mut self, min_buy: bitcoin::Amount, max_buy: bitcoin::Amount) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
         // We use the min and max buy amounts to create a unique key for the cache
         // Although these values stay constant over the lifetime of an instance of the asb, this might change in the future
         let key = QuoteCacheKey {
-            min_buy: self.min_buy,
-            max_buy: self.max_buy,
+            min_buy,
+            max_buy,
         };
 
         // Check if we have a cached quote
