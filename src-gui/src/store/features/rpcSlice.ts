@@ -6,12 +6,28 @@ import {
   TauriContextStatusEvent,
   TauriTimelockChangeEvent,
   BackgroundRefundState,
+  ConfirmationRequestType,
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
 import { getLogsAndStringsFromRawFileString } from "utils/parseUtils";
 import { CliLog } from "models/cliModel";
 import logger from "utils/logger";
+
+// --- Refactored Confirmation Types ---
+
+// Remove previous definitions if they exist (or ensure they match)
+// interface PreBtcLockConfirmationData { ... }
+// type ConfirmationRequestData = ...
+
+// This interface represents the actual payload received from the Tauri event `confirmation_request`
+// It includes the request_id, timeout, and the flattened generated type
+export interface ConfirmationRequestPayload extends ConfirmationRequestType {
+  request_id: string;
+  timeout_secs: number;
+}
+
+// --- End Refactored Confirmation Types ---
 
 interface State {
   balance: number | null;
@@ -32,6 +48,10 @@ interface State {
     swapId: string;
     state: BackgroundRefundState;
   } | null;
+  pendingConfirmations: {
+    // Store the full payload, keyed by request_id
+    [requestId: string]: ConfirmationRequestPayload;
+  };
 }
 
 export interface RPCSlice {
@@ -52,6 +72,7 @@ const initialState: RPCSlice = {
       updateState: false,
     },
     backgroundRefund: null,
+    pendingConfirmations: {},
   },
   logs: [],
 };
@@ -138,6 +159,12 @@ export const rpcSlice = createSlice({
         state: action.payload.state,
       };
     },
+    confirmationRequested(slice, action: PayloadAction<ConfirmationRequestPayload>) {
+      slice.state.pendingConfirmations[action.payload.request_id] = action.payload;
+    },
+    confirmationResolved(slice, action: PayloadAction<{ requestId: string }>) {
+      delete slice.state.pendingConfirmations[action.payload.requestId];
+    },
   },
 });
 
@@ -152,7 +179,9 @@ export const {
   rpcSetMoneroRecoveryKeys,
   rpcResetMoneroRecoveryKeys,
   rpcSetBackgroundRefundState,
-  timelockChangeEventReceived
+  timelockChangeEventReceived,
+  confirmationRequested,
+  confirmationResolved,
 } = rpcSlice.actions;
 
 export default rpcSlice.reducer;

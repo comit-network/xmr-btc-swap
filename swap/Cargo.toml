@@ -112,7 +112,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 typeshare = "1.0.3"
 unsigned-varint = { version = "0.8.0", features = [ "codec", "asynchronous_codec" ] }
 url = { version = "2", features = [ "serde" ] }
-uuid = { version = "1.9", features = [ "serde", "v4" ] }
+uuid = { version = "1.9", features = ["serde", "v4"] }
 void = "1"
 
 [target.'cfg(not(windows))'.dependencies]

@@ -60,7 +60,7 @@ export async function fetchSellersAtPresetRendezvousPoints() {
     const response = await listSellersAtRendezvousPoint(rendezvousPoint);
     store.dispatch(discoveredMakersByRendezvous(response.sellers));
 
-    logger.log(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
+    logger.info(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
   }),
   );
 }

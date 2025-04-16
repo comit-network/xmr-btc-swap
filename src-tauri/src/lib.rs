@@ -17,6 +17,7 @@ use swap::cli::{
     command::{Bitcoin, Monero},
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
+use uuid::Uuid;
 
 /// Trait to convert Result<T, E> to Result<T, String>
 /// Tauri commands require the error type to be a string
@@ -183,7 +184,9 @@ pub fn run() {
             check_monero_node,
             check_electrum_node,
             get_wallet_descriptor,
-            get_data_dir
+            get_data_dir,
+            accept_confirmation,
+            deny_confirmation
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -347,3 +350,49 @@ async fn initialize_context(
         }
     }
 }
+
+// --- Confirmation Commands ---
+
+#[tauri::command]
+async fn accept_confirmation(
+    request_id: String,
+    context_state: tauri::State<'_, RwLock<State>>,
+) -> Result<(), String> {
+    let context_lock = context_state.read().await;
+    let context = context_lock.try_get_context()?;
+
+    // Use the getter to get the handle from context
+    if let Some(handle) = context.tauri_handle() {
+        let uuid = Uuid::parse_str(&request_id)
+            .map_err(|e| format!("Invalid request ID format: {}", e))?;
+        handle
+            .resolve_confirmation(uuid, true)
+            .await
+            .to_string_result()
+    } else {
+        Err("Tauri handle not available in context".to_string())
+    }
+}
+
+#[tauri::command]
+async fn deny_confirmation(
+    request_id: String,
+    context_state: tauri::State<'_, RwLock<State>>,
+) -> Result<(), String> {
+    let context_lock = context_state.read().await;
+    let context = context_lock.try_get_context()?;
+
+    // Use the getter to get the handle from context
+    if let Some(handle) = context.tauri_handle() {
+        let uuid = Uuid::parse_str(&request_id)
+            .map_err(|e| format!("Invalid request ID format: {}", e))?;
+        handle
+            .resolve_confirmation(uuid, false)
+            .await
+            .to_string_result()
+    } else {
+        Err("Tauri handle not available in context".to_string())
+    }
+}
+
+// --- End Confirmation Commands ---

@@ -512,6 +512,10 @@ impl Context {
     pub fn bitcoin_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
         self.bitcoin_wallet.clone()
     }
+
+    pub fn tauri_handle(&self) -> Option<TauriHandle> {
+        self.tauri_handle.clone()
+    }
 }
 
 impl fmt::Debug for Context {

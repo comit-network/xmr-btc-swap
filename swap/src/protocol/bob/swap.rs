@@ -1,13 +1,17 @@
 use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
+use crate::cli::api::tauri_bindings::ConfirmationRequestType;
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriHandle, TauriSwapProgressEvent};
+use crate::cli::api::Context;
 use crate::cli::EventLoopHandle;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::state::*;
 use crate::protocol::{bob, Database};
 use crate::{bitcoin, monero};
-use anyhow::{bail, Context, Result};
+use anyhow::anyhow;
+use anyhow::{bail, Context as AnyContext, Result};
+use futures::channel::mpsc;
 use std::sync::Arc;
 use tokio::select;
 use uuid::Uuid;
@@ -131,6 +135,8 @@ async fn next_state(
 
             tracing::info!(%swap_id, "Starting new swap");
 
+            // Ensure confirmation logic is NOT here
+
             BobState::SwapSetupCompleted(state2)
         }
         BobState::SwapSetupCompleted(state2) => {
@@ -144,6 +150,44 @@ async fn next_state(
             // Bob would record a wallet-height that is past the lock transaction height,
             // which can lead to the wallet not detect the transaction.
             let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+
+            // --- Start Confirmation Logic ---
+            const CONFIRMATION_TIMEOUT_SECS: u64 = 120;
+            let state2_json = serde_json::to_string(&state2)
+                .context("Failed to serialize State2 for confirmation")?;
+            let request_type = ConfirmationRequestType::PreBtcLock { state2_json };
+
+            tracing::info!("Requesting user confirmation before locking BTC...");
+            // Use the event_emitter Option<TauriHandle>
+            if let Some(handle) = &event_emitter {
+                let confirmation_result = handle
+                    .request_confirmation(request_type, CONFIRMATION_TIMEOUT_SECS)
+                    .await;
+
+                match confirmation_result {
+                    Ok(true) => {
+                        tracing::info!("User accepted BTC lock confirmation.");
+                        // Proceed
+                    }
+                    Ok(false) => {
+                        tracing::warn!("User denied or timed out on BTC lock confirmation.");
+                        return Err(anyhow!(
+                            "Swap aborted by user/timeout before locking Bitcoin."
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::error!("Error during confirmation request: {}", e);
+                        return Err(e.context("Failed to get user confirmation for BTC lock"));
+                    }
+                }
+            } else {
+                // Handle case where no UI is available
+                tracing::warn!("Confirmation required, but no UI handle available. Aborting swap.");
+                return Err(anyhow!(
+                    "Confirmation required, but no UI handle available."
+                ));
+            }
+            // --- End Confirmation Logic ---
 
             // Alice and Bob have exchanged info
             // Sign the Bitcoin lock transaction

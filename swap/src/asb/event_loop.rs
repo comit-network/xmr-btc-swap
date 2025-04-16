@@ -481,13 +481,14 @@ where
 
     /// Get a quote from the cache or calculate a new one by calling make_quote.
     /// Returns the result wrapped in Arcs for consistent caching.
-    async fn make_quote_or_use_cached(&mut self, min_buy: bitcoin::Amount, max_buy: bitcoin::Amount) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
+    async fn make_quote_or_use_cached(
+        &mut self,
+        min_buy: bitcoin::Amount,
+        max_buy: bitcoin::Amount,
+    ) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
         // We use the min and max buy amounts to create a unique key for the cache
         // Although these values stay constant over the lifetime of an instance of the asb, this might change in the future
-        let key = QuoteCacheKey {
-            min_buy,
-            max_buy,
-        };
+        let key = QuoteCacheKey { min_buy, max_buy };
 
         // Check if we have a cached quote
         let maybe_cached_quote = self.quote_cache.get(&key).await;
