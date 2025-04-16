@@ -1,8 +1,13 @@
 use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use strum::Display;
+use tokio::sync::{oneshot, Mutex as TokioMutex};
 use typeshare::typeshare;
 use url::Url;
 use uuid::Uuid;
@@ -17,11 +22,46 @@ const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 const BALANCE_CHANGE_EVENT_NAME: &str = "balance-change";
 const BACKGROUND_REFUND_EVENT_NAME: &str = "background-refund";
 
-#[derive(Debug, Clone)]
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
+pub enum ConfirmationRequestType {
+    PreBtcLock { state2_json: String },
+}
+
+struct PendingConfirmation {
+    responder: oneshot::Sender<bool>,
+    expired: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[typeshare]
+pub struct ConfirmationEventPayload {
+    request_id: String,
+    #[typeshare(serialized_as = "number")]
+    timeout_secs: u64,
+    details: ConfirmationRequestType,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[typeshare]
+pub struct ConfirmationResolvedPayload {
+    request_id: String,
+}
+
+#[cfg(feature = "tauri")]
+struct TauriHandleInner {
+    app_handle: tauri::AppHandle,
+    pending_confirmations: TokioMutex<HashMap<Uuid, PendingConfirmation>>,
+}
+
+// Keep TauriHandle deriving Clone
+#[derive(Clone)]
 pub struct TauriHandle(
     #[cfg(feature = "tauri")]
     #[cfg_attr(feature = "tauri", allow(unused))]
-    std::sync::Arc<tauri::AppHandle>,
+    // Wrap the inner state management struct in Arc
+    Arc<TauriHandleInner>,
 );
 
 impl TauriHandle {
@@ -29,17 +69,135 @@ impl TauriHandle {
     pub fn new(tauri_handle: tauri::AppHandle) -> Self {
         Self(
             #[cfg(feature = "tauri")]
-            std::sync::Arc::new(tauri_handle),
+            Arc::new(TauriHandleInner {
+                app_handle: tauri_handle,
+                pending_confirmations: TokioMutex::new(HashMap::new()),
+            }),
         )
     }
 
     #[allow(unused_variables)]
     pub fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         #[cfg(feature = "tauri")]
-        tauri::Emitter::emit(self.0.as_ref(), event, payload).map_err(anyhow::Error::from)?;
+        {
+            let inner = self.0.as_ref();
+            tauri::Emitter::emit(&inner.app_handle, event, payload).map_err(anyhow::Error::from)?;
+        }
 
         Ok(())
     }
+
+    // --- Confirmation Methods ---
+    pub async fn request_confirmation(
+        &self,
+        request_type: ConfirmationRequestType,
+        timeout_secs: u64,
+    ) -> Result<bool> {
+        #[cfg(not(feature = "tauri"))]
+        {
+            // If Tauri feature is not enabled, we cannot show UI.
+            // Decide behavior: maybe auto-deny?
+            tracing::warn!("Confirmation requested but Tauri feature not enabled. Auto-denying.");
+            return Ok(false);
+        }
+
+        #[cfg(feature = "tauri")]
+        {
+            let request_id = Uuid::new_v4();
+            let (tx, rx) = oneshot::channel();
+            let expired = Arc::new(AtomicBool::new(false));
+            let timeout_duration = Duration::from_secs(timeout_secs);
+
+            let payload = ConfirmationEventPayload {
+                request_id: request_id.to_string(),
+                timeout_secs,
+                details: request_type.clone(), // Clone for the event
+            };
+
+            // Emit event first
+            self.emit_tauri_event("confirmation_request", payload)?;
+            tracing::info!(%request_id, "Emitted confirmation request event");
+
+            let pending_confirmation = PendingConfirmation {
+                responder: tx,
+                expired: expired.clone(),
+            };
+
+            // Lock map and insert
+            {
+                let mut pending_map = self.0.pending_confirmations.lock().await;
+                pending_map.insert(request_id, pending_confirmation);
+            }
+
+            // Clone Arc for the timeout task
+            let inner_clone = Arc::clone(&self.0);
+
+            // Spawn timeout task
+            tokio::spawn(async move {
+                tokio::time::sleep(timeout_duration).await;
+                if !expired.load(Ordering::SeqCst) {
+                    let mut pending_map = inner_clone.pending_confirmations.lock().await;
+                    if let Some(pending) = pending_map.remove(&request_id) {
+                        tracing::warn!(%request_id, "Confirmation request timed out.");
+                        let _ = pending.responder.send(false); // Send timeout signal (false = denied)
+
+                        // Also emit resolved event on timeout
+                        let _ = tauri::Emitter::emit(
+                            &inner_clone.app_handle,
+                            "confirmation_resolved",
+                            ConfirmationResolvedPayload {
+                                request_id: request_id.to_string(),
+                            },
+                        );
+                    }
+                }
+            });
+
+            // Wait for response from frontend (or timeout)
+            rx.await
+                .map_err(|_| anyhow!("Confirmation responder dropped"))
+        }
+    }
+
+    pub async fn resolve_confirmation(&self, request_id: Uuid, accepted: bool) -> Result<()> {
+        #[cfg(not(feature = "tauri"))]
+        {
+            // Should not be callable if tauri is not enabled, but handle defensively
+            return Err(anyhow!(
+                "Cannot resolve confirmation: Tauri feature not enabled."
+            ));
+        }
+
+        #[cfg(feature = "tauri")]
+        {
+            let mut pending_map = self.0.pending_confirmations.lock().await;
+            if let Some(pending) = pending_map.remove(&request_id) {
+                if !pending.expired.swap(true, Ordering::SeqCst) {
+                    // Send result only if not already expired
+                    let _ = pending.responder.send(accepted);
+                    tracing::info!(%request_id, %accepted, "Resolved confirmation request from frontend.");
+
+                    // Emit resolution event
+                    let payload = ConfirmationResolvedPayload {
+                        request_id: request_id.to_string(),
+                    };
+                    self.emit_tauri_event("confirmation_resolved", payload)?;
+                    Ok(())
+                } else {
+                    // Already expired and handled by timeout task
+                    tracing::debug!(%request_id, "Confirmation already expired when frontend tried to resolve.");
+                    // Return Ok because the resolution (timeout) happened, just not via this call.
+                    // Or return Err? Let's return Ok for now.
+                    Ok(())
+                }
+            } else {
+                Err(anyhow!(
+                    "Confirmation request ID not found (maybe already resolved or timed out)"
+                ))
+            }
+        }
+    }
+    // --- End Confirmation Methods ---
 }
 
 pub trait TauriEmitter {
