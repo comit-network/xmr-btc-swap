@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: Update Rust version to 1.80
 - GUI: Update social media links
+- ASB: Quotes are now cached (Time-to-live of 2 minutes) to avoid overloading the maker with requests in times of high demand
 
 ## [1.0.0-rc.13] - 2025-01-24
 
