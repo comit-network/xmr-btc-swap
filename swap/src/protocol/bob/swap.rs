@@ -416,7 +416,11 @@ async fn next_state(
             event_emitter
                 .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::CancelTimelockExpired);
 
-            if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+            if let Err(err) = state4.check_for_tx_cancel(bitcoin_wallet).await {
+                tracing::debug!(
+                    %err,
+                    "Couldn't find tx_cancel yet, publishing ourselves"
+                );
                 state4.submit_tx_cancel(bitcoin_wallet).await?;
             }
 

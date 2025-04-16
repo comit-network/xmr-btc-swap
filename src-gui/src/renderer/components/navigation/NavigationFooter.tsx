@@ -7,7 +7,7 @@ import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
 import LinkIconButton from "../icons/LinkIconButton";
 import BackgroundRefundAlert from "../alert/BackgroundRefundAlert";
 import MatrixIcon from "../icons/MatrixIcon";
-import { BookRounded } from "@material-ui/icons";
+import { BookRounded, MenuBook } from "@material-ui/icons";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -50,7 +50,7 @@ export default function NavigationFooter() {
         <Tooltip title="Read our official documentation">
           <span>
             <LinkIconButton url="https://docs.unstoppableswap.net">
-              <BookRounded />
+              <MenuBook />
             </LinkIconButton>
           </span>
         </Tooltip>
