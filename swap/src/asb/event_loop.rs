@@ -26,10 +26,16 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
+/// The time-to-live for quotes in the cache
+const QUOTE_CACHE_TTL: Duration = Duration::from_secs(120);
+
 /// Simple unit struct to serve as a key for the quote cache.
 /// Since all quotes are the same type currently, we can use a simple key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct QuoteCacheKey;
+struct QuoteCacheKey {
+    min_buy: bitcoin::Amount,
+    max_buy: bitcoin::Amount,
+}
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<LR>
@@ -45,7 +51,7 @@ where
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
     external_redeem_address: Option<bitcoin::Address>,
-    
+
     /// Cache for quotes
     quote_cache: Cache<QuoteCacheKey, Result<Arc<BidQuote>, Arc<anyhow::Error>>>,
 
@@ -136,12 +142,8 @@ where
         let swap_channel = MpscChannels::default();
         let (outgoing_transfer_proofs_sender, outgoing_transfer_proofs_requests) =
             tokio::sync::mpsc::unbounded_channel();
-            
-        // --- Initialize moka::future::Cache ---
-        let quote_cache = Cache::builder()
-            .time_to_live(Duration::from_secs(120)) // 2 minutes TTL
-            .build(); // Builds a future::Cache
-        // --- End cache initialization ---
+
+        let quote_cache = Cache::builder().time_to_live(QUOTE_CACHE_TTL).build();
 
         let event_loop = EventLoop {
             swarm,
@@ -250,13 +252,13 @@ where
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             // --- Use the new caching function ---
                             match self.make_quote_or_use_cached().await {
-                                Ok(quote) => {
-                                    if self.swarm.behaviour_mut().quote.send_response(channel, quote).is_err() {
+                                Ok(quote_arc) => {
+                                    if self.swarm.behaviour_mut().quote.send_response(channel, (*quote_arc).clone()).is_err() {
                                         tracing::debug!(%peer, "Failed to respond with quote");
                                     }
                                 }
-                                Err(error) => {
-                                    tracing::warn!(%peer, "Failed to make or retrieve quote: {:#}", error);
+                                Err(error_arc) => {
+                                    tracing::warn!(%peer, "Failed to make or retrieve quote: {:#}", error_arc);
                                     continue;
                                 }
                             }
@@ -480,150 +482,100 @@ where
         }
     }
 
-    /// Get a quote from the cache or calculate a new one using moka::future::Cache
-    /// Stores the Result<Arc<BidQuote>, Arc<anyhow::Error>> in the cache.
-    async fn make_quote_or_use_cached(&self) -> Result<BidQuote> {
-        let key = QuoteCacheKey;
-        
-        // Clone needed data for the async calculation block
-        let min_buy = self.min_buy;
-        let max_buy = self.max_buy;
-        let mut latest_rate = self.latest_rate.clone();
-        let monero_wallet = self.monero_wallet.clone();
+    /// Get a quote from the cache or calculate a new one by calling make_quote.
+    /// Returns the result wrapped in Arcs for consistent caching.
+    async fn make_quote_or_use_cached(&mut self) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
+        // We use the min and max buy amounts to create a unique key for the cache
+        // Although these values stay constant over the lifetime of an instance of the asb, this might change in the future
+        let key = QuoteCacheKey {
+            min_buy: self.min_buy,
+            max_buy: self.max_buy,
+        };
 
-        // get_with expects the future to return V, where V is our Result<..., Arc<Error>>
-        let cached_result: Result<Arc<BidQuote>, Arc<anyhow::Error>> = self.quote_cache.get_with(key, async move {
-            tracing::debug!("Cache miss or expired, calculating new quote result");
-            
-            // Inner function to perform the calculation and return Result<..., anyhow::Error>
-            let calculation_result = async {
-                 let ask_price = latest_rate
-                    .latest_rate()
-                    .context("Failed to get latest rate")?
-                    .ask()
-                    .context("Failed to compute asking price")?;
+        // Check if we have a cached quote
+        let maybe_cached_quote = self.quote_cache.get(&key).await;
 
-                let balance = monero_wallet.get_balance().await?;
-                let xmr_balance = Amount::from_piconero(balance.unlocked_balance);
-
-                let max_bitcoin_for_monero =
-                    xmr_balance
-                        .max_bitcoin_for_price(ask_price)
-                        .ok_or_else(|| {
-                            anyhow!(
-                                "Bitcoin price ({}) x Monero ({}) overflow",
-                                ask_price,
-                                xmr_balance
-                            )
-                        })?;
-
-                tracing::trace!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
-
-                if min_buy > max_bitcoin_for_monero {
-                    tracing::trace!(
-                        "Your Monero balance is too low... Min: {}, Max possible: {}",
-                        min_buy, max_bitcoin_for_monero
-                    );
-                    return Ok(Arc::new(BidQuote {
-                        price: ask_price,
-                        min_quantity: bitcoin::Amount::ZERO,
-                        max_quantity: bitcoin::Amount::ZERO,
-                    }));
-                }
-
-                if max_buy > max_bitcoin_for_monero {
-                    tracing::trace!(
-                        "Your Monero balance is too low... Max requested: {}, Max possible: {}",
-                        max_buy, max_bitcoin_for_monero
-                    );
-                    return Ok(Arc::new(BidQuote {
-                        price: ask_price,
-                        min_quantity: min_buy,
-                        max_quantity: max_bitcoin_for_monero,
-                    }));
-                }
-
-                Ok(Arc::new(BidQuote {
-                    price: ask_price,
-                    min_quantity: min_buy,
-                    max_quantity: max_buy,
-                }))
-            }.await;
-            
-            // Map the Result<..., anyhow::Error> to Result<..., Arc<anyhow::Error>> for caching
-            calculation_result.map_err(Arc::new)
-        }).await;
-
-        // The cached_result is the actual Result we stored.
-        // Now, convert it back to the expected return type Result<BidQuote, anyhow::Error>
-        match cached_result {
-            Ok(bid_quote_arc) => Ok((*bid_quote_arc).clone()), // Clone the BidQuote out of the Arc
-            Err(error_arc) => {
-                 // Clone the error message from the Arc<anyhow::Error>
-                 // We convert it back to a regular anyhow::Error
-                 Err(anyhow::Error::msg(error_arc.to_string()))
-            }
+        if let Some(cached_quote_result) = maybe_cached_quote {
+            tracing::trace!("Got a request for a quote, using cached value.");
+            return cached_quote_result;
         }
+
+        // We have a cache miss, so we compute a new quote
+        tracing::trace!("Got a request for a quote, computing new quote.");
+        let result = self.make_quote(self.min_buy, self.max_buy).await;
+
+        // Insert the computed quote into the cache
+        // Need to clone it as insert takes ownership
+        self.quote_cache.insert(key, result.clone()).await;
+
+        // Return the computed quote
+        result
     }
 
-    /// Original make_quote (potentially unused if all callers switch)
+    /// Computes a quote and returns the result wrapped in Arcs.
     async fn make_quote(
-        &mut self, // Note: might still need &mut if latest_rate() does
+        &mut self,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
-    ) -> Result<BidQuote> {
+    ) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
         let ask_price = self
             .latest_rate
             .latest_rate()
-            .context("Failed to get latest rate")?
+            .map_err(|e| Arc::new(anyhow!(e).context("Failed to get latest rate")))?
             .ask()
-            .context("Failed to compute asking price")?;
+            .map_err(|e| Arc::new(e.context("Failed to compute asking price")))?;
 
-        let balance = self.monero_wallet.get_balance().await?;
+        let balance = self
+            .monero_wallet
+            .get_balance()
+            .await
+            .map_err(|e| Arc::new(e.context("Failed to get Monero balance")))?;
         let xmr_balance = Amount::from_piconero(balance.unlocked_balance);
 
         let max_bitcoin_for_monero =
             xmr_balance
                 .max_bitcoin_for_price(ask_price)
                 .ok_or_else(|| {
-                    anyhow!(
+                    Arc::new(anyhow!(
                         "Bitcoin price ({}) x Monero ({}) overflow",
                         ask_price,
                         xmr_balance
-                    )
+                    ))
                 })?;
 
         tracing::trace!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
 
         if min_buy > max_bitcoin_for_monero {
-             tracing::trace!(
-                 "Your Monero balance is too low... Min: {}, Max possible: {}",
-                 min_buy, max_bitcoin_for_monero
-             );
-            return Ok(BidQuote {
+            tracing::trace!(
+                "Your Monero balance is too low... Min: {}, Max possible: {}",
+                min_buy,
+                max_bitcoin_for_monero
+            );
+            return Ok(Arc::new(BidQuote {
                 price: ask_price,
                 min_quantity: bitcoin::Amount::ZERO,
                 max_quantity: bitcoin::Amount::ZERO,
-            });
+            }));
         }
 
         if max_buy > max_bitcoin_for_monero {
-             tracing::trace!(
-                 "Your Monero balance is too low... Max requested: {}, Max possible: {}",
-                 max_buy, max_bitcoin_for_monero
-             );
-            return Ok(BidQuote {
+            tracing::trace!(
+                "Your Monero balance is too low... Max requested: {}, Max possible: {}",
+                max_buy,
+                max_bitcoin_for_monero
+            );
+            return Ok(Arc::new(BidQuote {
                 price: ask_price,
                 min_quantity: min_buy,
                 max_quantity: max_bitcoin_for_monero,
-            });
+            }));
         }
 
-        Ok(BidQuote {
+        Ok(Arc::new(BidQuote {
             price: ask_price,
             min_quantity: min_buy,
             max_quantity: max_buy,
-        })
+        }))
     }
 
     /// Removed cache invalidation logic from handle_execution_setup_done for now
