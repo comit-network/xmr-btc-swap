@@ -4,7 +4,7 @@ import { useAppSelector } from '../../../store/hooks'; // Adjust path
 import { ConfirmationRequestPayload } from '../../../store/features/rpcSlice'; // Adjust path
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, LinearProgress
-} from '@material-ui/core'; // Assuming Material-UI is used
+} from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles((theme) => ({

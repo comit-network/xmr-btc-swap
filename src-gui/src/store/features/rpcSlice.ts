@@ -20,11 +20,12 @@ import logger from "utils/logger";
 // interface PreBtcLockConfirmationData { ... }
 // type ConfirmationRequestData = ...
 
+// Define the payload structure correctly, matching tauriModel.ts
 // This interface represents the actual payload received from the Tauri event `confirmation_request`
-// It includes the request_id, timeout, and the flattened generated type
-export interface ConfirmationRequestPayload extends ConfirmationRequestType {
+export interface ConfirmationRequestPayload {
   request_id: string;
   timeout_secs: number;
+  details: ConfirmationRequestType; // The enum type is nested under details
 }
 
 // --- End Refactored Confirmation Types ---
@@ -160,6 +161,7 @@ export const rpcSlice = createSlice({
       };
     },
     confirmationRequested(slice, action: PayloadAction<ConfirmationRequestPayload>) {
+      console.log("received confirmation request", action.payload);
       slice.state.pendingConfirmations[action.payload.request_id] = action.payload;
     },
     confirmationResolved(slice, action: PayloadAction<{ requestId: string }>) {

@@ -9,7 +9,6 @@ import {
   confirmationResolved,
   ConfirmationRequestPayload,
 } from "../../../../store/features/rpcSlice";
-import ConfirmationModal from "../../modal/ConfirmationModal";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -66,7 +65,6 @@ export default function SwapPage() {
     <Box className={classes.outer}>
       <ApiAlertsBox />
       <SwapWidget />
-      <ConfirmationModal />
     </Box>
   );
 }

@@ -1,6 +1,5 @@
 import { Box, makeStyles, Typography } from "@material-ui/core";
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
-import { useAppSelector } from "store/hooks";
 import BitcoinIcon from "../../../../icons/BitcoinIcon";
 import { MoneroSatsExchangeRate, SatsAmount } from "../../../../other/Units";
 import DepositAddressInfoBox from "../../DepositAddressInfoBox";
@@ -57,18 +56,17 @@ export default function WaitingForBtcDepositPage({
                   )}
                 </li>
                 <li>
-                  All Bitcoin sent to this this address will converted into
-                  Monero at an exchance rate of{" "}
+                  Bitcoin sent to this this address will be converted into
+                  Monero at an exchange rate of{" ≈ "}
                   <MoneroSatsExchangeRate rate={quote.price} displayMarkup={true} />
                 </li>
                 <li>
-                  The network fee of{" "}
+                  The Network fee of{" ≈  "}
                   <SatsAmount amount={min_bitcoin_lock_tx_fee} /> will
                   automatically be deducted from the deposited coins
                 </li>
                 <li>
-                  The swap will start automatically as soon as the minimum
-                  amount is deposited.
+                  After the deposit is detected, you'll get to confirm the exact details before your funds are locked
                 </li>
                 <li>
                   <DepositAmountHelper

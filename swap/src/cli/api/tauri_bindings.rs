@@ -1,3 +1,4 @@
+use crate::bitcoin;
 use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
 use anyhow::{anyhow, Result};
 use bitcoin::Txid;
@@ -24,9 +25,26 @@ const BACKGROUND_REFUND_EVENT_NAME: &str = "background-refund";
 
 #[typeshare]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PreBtcLockDetails {
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc_lock_amount: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc_network_fee: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    pub xmr_receive_amount: monero::Amount,
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+}
+
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
 pub enum ConfirmationRequestType {
-    PreBtcLock { state2_json: String },
+    /// Request confirmation before locking Bitcoin.
+    /// Contains specific details for review.
+    PreBtcLock(PreBtcLockDetails),
 }
 
 struct PendingConfirmation {
@@ -87,7 +105,6 @@ impl TauriHandle {
         Ok(())
     }
 
-    // --- Confirmation Methods ---
     pub async fn request_confirmation(
         &self,
         request_type: ConfirmationRequestType,
@@ -95,10 +112,8 @@ impl TauriHandle {
     ) -> Result<bool> {
         #[cfg(not(feature = "tauri"))]
         {
-            // If Tauri feature is not enabled, we cannot show UI.
-            // Decide behavior: maybe auto-deny?
-            tracing::warn!("Confirmation requested but Tauri feature not enabled. Auto-denying.");
-            return Ok(false);
+            // We want the CLI to be non-interactive. Therefore, we accept by default if no TauriHandle is available
+            return Ok(true);
         }
 
         #[cfg(feature = "tauri")]
@@ -201,6 +216,12 @@ impl TauriHandle {
 }
 
 pub trait TauriEmitter {
+    async fn request_confirmation(
+        &self,
+        request_type: ConfirmationRequestType,
+        timeout_secs: u64,
+    ) -> Result<bool>;
+
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()>;
 
     fn emit_swap_progress_event(&self, swap_id: Uuid, event: TauriSwapProgressEvent) {
@@ -252,6 +273,14 @@ pub trait TauriEmitter {
 }
 
 impl TauriEmitter for TauriHandle {
+    async fn request_confirmation(
+        &self,
+        request_type: ConfirmationRequestType,
+        timeout_secs: u64,
+    ) -> Result<bool> {
+        self.request_confirmation(request_type, timeout_secs).await
+    }
+
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         self.emit_tauri_event(event, payload)
     }
@@ -261,7 +290,22 @@ impl TauriEmitter for Option<TauriHandle> {
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         match self {
             Some(tauri) => tauri.emit_tauri_event(event, payload),
+
+            // If no TauriHandle is available, we just ignore the event and pretend as if it was emitted
             None => Ok(()),
+        }
+    }
+
+    async fn request_confirmation(
+        &self,
+        request_type: ConfirmationRequestType,
+        timeout_secs: u64,
+    ) -> Result<bool> {
+        match self {
+            Some(tauri) => tauri.request_confirmation(request_type, timeout_secs).await,
+
+            // We want the CLI to be non-interactive. Therefore, we accept by default if no TauriHandle is available
+            None => Ok(true),
         }
     }
 }

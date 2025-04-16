@@ -194,7 +194,6 @@ pub struct Context {
 }
 
 /// A conveniant builder struct for [`Context`].
-#[derive(Debug)]
 #[must_use = "ContextBuilder must be built to be useful"]
 pub struct ContextBuilder {
     monero: Option<Monero>,
