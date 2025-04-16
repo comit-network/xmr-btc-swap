@@ -29,8 +29,7 @@ use uuid::Uuid;
 /// The time-to-live for quotes in the cache
 const QUOTE_CACHE_TTL: Duration = Duration::from_secs(120);
 
-/// Simple unit struct to serve as a key for the quote cache.
-/// Since all quotes are the same type currently, we can use a simple key.
+/// The key for the quote cache
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct QuoteCacheKey {
     min_buy: bitcoin::Amount,
@@ -250,7 +249,6 @@ where
                             tracing::warn!(%peer, "Ignoring spot price request: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                            // --- Use the new caching function ---
                             match self.make_quote_or_use_cached().await {
                                 Ok(quote_arc) => {
                                     if self.swarm.behaviour_mut().quote.send_response(channel, (*quote_arc).clone()).is_err() {
@@ -262,7 +260,6 @@ where
                                     continue;
                                 }
                             }
-                            // --- End use of caching function ---
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                             tracing::debug!(%peer, "Bob acknowledged transfer proof");
@@ -547,10 +544,10 @@ where
 
         if min_buy > max_bitcoin_for_monero {
             tracing::trace!(
-                "Your Monero balance is too low... Min: {}, Max possible: {}",
-                min_buy,
-                max_bitcoin_for_monero
+                "Your Monero balance is too low to initiate a swap, as your minimum swap amount is {}. You could at most swap {}",
+                min_buy, max_bitcoin_for_monero
             );
+
             return Ok(Arc::new(BidQuote {
                 price: ask_price,
                 min_quantity: bitcoin::Amount::ZERO,
@@ -560,10 +557,10 @@ where
 
         if max_buy > max_bitcoin_for_monero {
             tracing::trace!(
-                "Your Monero balance is too low... Max requested: {}, Max possible: {}",
-                max_buy,
-                max_bitcoin_for_monero
+                "Your Monero balance is too low to initiate a swap with the maximum swap amount {} that you have specified in your config. You can at most swap {}",
+                max_buy, max_bitcoin_for_monero
             );
+
             return Ok(Arc::new(BidQuote {
                 price: ask_price,
                 min_quantity: min_buy,
@@ -578,14 +575,12 @@ where
         }))
     }
 
-    /// Removed cache invalidation logic from handle_execution_setup_done for now
     async fn handle_execution_setup_done(
         &mut self,
         bob_peer_id: PeerId,
         swap_id: Uuid,
         state3: State3,
     ) {
-        // Original logic without cache invalidation
         let handle = self.new_handle(bob_peer_id, swap_id);
 
         let initial_state = AliceState::Started {
