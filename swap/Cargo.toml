@@ -43,6 +43,7 @@ jsonrpsee = { version = "0.16.2", features = [ "server" ] }
 jsonrpsee-core = "0.16.2"
 libp2p = { version = "0.53.2", features = [ "tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa" ] }
 libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", branch = "main", features = [ "listen-onion-service" ] }
+moka = { version = "0.12", features = [ "sync", "future" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 once_cell = "1.19"
