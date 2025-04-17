@@ -1,11 +1,9 @@
 import { invoke as invokeUnsafe } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import {
   BalanceArgs,
   BalanceResponse,
   BuyXmrArgs,
   BuyXmrResponse,
-  TauriLogEvent,
   GetLogsArgs,
   GetLogsResponse,
   GetSwapInfoResponse,
@@ -14,12 +12,8 @@ import {
   ResumeSwapArgs,
   ResumeSwapResponse,
   SuspendCurrentSwapResponse,
-  TauriContextStatusEvent,
-  TauriSwapProgressEventWrapper,
   WithdrawBtcArgs,
   WithdrawBtcResponse,
-  TauriDatabaseStateEvent,
-  TauriTimelockChangeEvent,
   GetSwapInfoArgs,
   ExportBitcoinWalletResponse,
   CheckMoneroNodeArgs,
@@ -28,25 +22,21 @@ import {
   CheckElectrumNodeArgs,
   CheckElectrumNodeResponse,
   GetMoneroAddressesResponse,
-  TauriBackgroundRefundEvent,
   GetDataDirArgs,
+  ResolveApprovalArgs,
+  ResolveApprovalResponse,
 } from "models/tauriModel";
 import {
-  contextStatusEventReceived,
-  receivedCliLog,
-  rpcSetBackgroundRefundState,
   rpcSetBalance,
   rpcSetSwapInfo,
-  timelockChangeEventReceived,
 } from "store/features/rpcSlice";
-import { swapProgressEventReceived } from "store/features/swapSlice";
 import { store } from "./store/storeRenderer";
 import { Maker } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
 import logger from "utils/logger";
-import { getNetwork, getNetworkName, isTestnet } from "store/config";
+import { getNetwork, isTestnet } from "store/config";
 import { Blockchain, Network } from "store/features/settingsSlice";
 import { setStatus } from "store/features/nodesSlice";
 import { discoveredMakersByRendezvous } from "store/features/makersSlice";
@@ -60,7 +50,7 @@ export async function fetchSellersAtPresetRendezvousPoints() {
     const response = await listSellersAtRendezvousPoint(rendezvousPoint);
     store.dispatch(discoveredMakersByRendezvous(response.sellers));
 
-    logger.log(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
+    logger.info(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
   }),
   );
 }
@@ -284,4 +274,8 @@ export async function getDataDir(): Promise<string> {
   return await invoke<GetDataDirArgs, string>("get_data_dir", {
     is_testnet: testnet,
   });
+}
+
+export async function resolveApproval(requestId: string, accept: boolean): Promise<void> {
+  await invoke<ResolveApprovalArgs, ResolveApprovalResponse>("resolve_approval_request", { request_id: requestId, accept });
 }

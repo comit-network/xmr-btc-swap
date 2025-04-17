@@ -109,7 +109,7 @@ export default function InitPage() {
           onInvoke={init}
           displayErrorSnackbar
         >
-          Request quote and start swap
+          Begin swap
         </PromiseInvokeButton>
       </Box>
     </Box>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: The user will now be asked to approve the swap offer again before the Bitcoin lock transaction is published. Makers should take care to only assume a swap has been accepted by the taker if the Bitcoin lock transaction is detected (`Advancing state state=bitcoin lock transaction in mempool ...`). Swaps that have been safely aborted will not be displayed in the GUI anymore.
+
 ## [1.0.0-rc.16] - 2025-04-17
 
 - ASB: Quotes are now cached (Time-to-live of 2 minutes) to avoid overloading the maker with requests in times of high demand

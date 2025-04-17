@@ -1,5 +1,5 @@
 import { sortBy } from "lodash";
-import { BobStateName, GetSwapInfoResponseExt } from "models/tauriModelExt";
+import { BobStateName, GetSwapInfoResponseExt, PendingApprovalRequest, PendingLockBitcoinApprovalRequest } from "models/tauriModelExt";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
@@ -16,22 +16,29 @@ export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 export function useResumeableSwapsCount(
   additionalFilter?: (s: GetSwapInfoResponseExt) => boolean,
 ) {
+  const saneSwapInfos = useSaneSwapInfos();
+
   return useAppSelector(
     (state) =>
-      Object.values(state.rpc.state.swapInfos).filter(
+      saneSwapInfos.filter(
         (swapInfo: GetSwapInfoResponseExt) =>
           !swapInfo.completed && (additionalFilter == null || additionalFilter(swapInfo))
       ).length,
   );
 }
 
-
+/**
+ * Counts the number of resumeable swaps excluding:
+ * - Punished swaps
+ * - Swaps where the sanity check was not passed (e.g. they were aborted)
+ */
 export function useResumeableSwapsCountExcludingPunished() {
   return useResumeableSwapsCount(
-    (s) => s.state_name !== BobStateName.BtcPunished,
+    (s) => s.state_name !== BobStateName.BtcPunished && s.state_name !== BobStateName.SwapSetupCompleted,
   );
 }
 
+/// Returns true if we have a swap that is running
 export function useIsSwapRunning() {
   return useAppSelector(
     (state) =>
@@ -43,6 +50,8 @@ export function useIsContextAvailable() {
   return useAppSelector((state) => state.rpc.status?.type === "Available");
 }
 
+/// We do not use a sanity check here, as opposed to the other useSwapInfo hooks,
+/// because we are explicitly asking for a specific swap
 export function useSwapInfo(
   swapId: string | null,
 ): GetSwapInfoResponseExt | null {
@@ -51,7 +60,7 @@ export function useSwapInfo(
   );
 }
 
-export function useActiveSwapId() {
+export function useActiveSwapId(): string | null {
   return useAppSelector((s) => s.swap.state?.swapId ?? null);
 }
 
@@ -80,11 +89,36 @@ export function useAllMakers() {
   });
 }
 
-export function useSwapInfosSortedByDate() {
+/// This hook returns the all swap infos, as an array
+/// Excluding those who are in a state where it's better to hide them from the user
+export function useSaneSwapInfos() {
   const swapInfos = useAppSelector((state) => state.rpc.state.swapInfos);
+  return Object.values(swapInfos).filter((swap) => {
+    // We hide swaps that are in the SwapSetupCompleted state
+    // This is because they are probably ones where:
+    // 1. The user force stopped the swap while we were waiting for their confirmation of the offer
+    // 2. We where therefore unable to transition to SafelyAborted
+    if (swap.state_name === BobStateName.SwapSetupCompleted) {
+      return false;
+    }
+
+    // We hide swaps that were safely aborted
+    // No funds were locked. Cannot be resumed.
+    // Wouldn't be beneficial to show them to the user
+    if (swap.state_name === BobStateName.SafelyAborted) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+/// This hook returns the swap infos sorted by date
+export function useSwapInfosSortedByDate() {
+  const swapInfos = useSaneSwapInfos();
 
   return sortBy(
-    Object.values(swapInfos),
+    swapInfos,
     (swap) => -parseDateString(swap.start_date),
   );
 }
@@ -102,4 +136,14 @@ export function useSettings<T>(selector: (settings: SettingsState) => T): T {
 export function useNodes<T>(selector: (nodes: NodesSlice) => T): T {
   const nodes = useAppSelector((state) => state.nodes);
   return selector(nodes);
+}
+
+export function usePendingApprovals(): PendingApprovalRequest[] {
+  const approvals = useAppSelector((state) => state.rpc.state.approvalRequests);
+  return Object.values(approvals).filter((c) => c.state === "Pending");
+}
+
+export function usePendingLockBitcoinApproval(): PendingLockBitcoinApprovalRequest[] {
+  const approvals = usePendingApprovals();
+  return approvals.filter((c) => c.content.details.type === "LockBitcoin");
 }

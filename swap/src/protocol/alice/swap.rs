@@ -81,7 +81,7 @@ where
                 Err(_) => {
                     tracing::info!(
                         minutes = %env_config.bitcoin_lock_mempool_timeout.as_secs_f64() / 60.0,
-                        "TxLock lock was not seen in mempool in time",
+                        "TxLock lock was not seen in mempool in time. Alice might have denied our offer.",
                     );
                     AliceState::SafelyAborted
                 }

@@ -2,6 +2,6 @@ import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
 export default function ReceivedQuotePage() {
   return (
-    <CircularProgressWithSubtitle description="Processing received quote" />
+    <CircularProgressWithSubtitle description="Syncing local wallet" />
   );
 }

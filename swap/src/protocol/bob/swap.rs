@@ -1,16 +1,21 @@
 use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
-use crate::cli::api::tauri_bindings::{TauriEmitter, TauriHandle, TauriSwapProgressEvent};
+use crate::cli::api::tauri_bindings::ApprovalRequestDetails;
+use crate::cli::api::tauri_bindings::{
+    LockBitcoinDetails, TauriEmitter, TauriHandle, TauriSwapProgressEvent,
+};
 use crate::cli::EventLoopHandle;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::state::*;
 use crate::protocol::{bob, Database};
 use crate::{bitcoin, monero};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context as AnyContext, Result};
 use std::sync::Arc;
 use tokio::select;
 use uuid::Uuid;
+
+const PRE_BTC_LOCK_APPROVAL_TIMEOUT_SECS: u64 = 120;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -145,6 +150,8 @@ async fn next_state(
             // which can lead to the wallet not detect the transaction.
             let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
+            let xmr_receive_amount = state2.xmr;
+
             // Alice and Bob have exchanged info
             // Sign the Bitcoin lock transaction
             let (state3, tx_lock) = state2.lock_btc().await?;
@@ -153,12 +160,50 @@ async fn next_state(
                 .await
                 .context("Failed to sign Bitcoin lock transaction")?;
 
-            // Publish the signed Bitcoin lock transaction
-            let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
+            let btc_network_fee = tx_lock.fee().context("Failed to get fee")?;
+            let btc_lock_amount = bitcoin::Amount::from_sat(
+                signed_tx
+                    .output
+                    .get(0)
+                    .context("Failed to get lock amount")?
+                    .value,
+            );
 
-            BobState::BtcLocked {
-                state3,
-                monero_wallet_restore_blockheight,
+            let request = ApprovalRequestDetails::LockBitcoin(LockBitcoinDetails {
+                btc_lock_amount,
+                btc_network_fee,
+                xmr_receive_amount,
+                swap_id,
+            });
+
+            // We request approval before publishing the Bitcoin lock transaction, as the exchange rate determined at this step might be different from the
+            // we previously displayed to the user.
+            let approval_result = event_emitter
+                .request_approval(request, PRE_BTC_LOCK_APPROVAL_TIMEOUT_SECS)
+                .await;
+
+            match approval_result {
+                Ok(true) => {
+                    tracing::debug!("User approved swap offer");
+
+                    // Publish the signed Bitcoin lock transaction
+                    let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
+
+                    BobState::BtcLocked {
+                        state3,
+                        monero_wallet_restore_blockheight,
+                    }
+                }
+                Ok(false) => {
+                    tracing::warn!("User denied or timed out on swap offer approval");
+
+                    BobState::SafelyAborted
+                }
+                Err(err) => {
+                    tracing::warn!(%err, "Failed to get user approval for swap offer. Assuming swap was aborted.");
+
+                    BobState::SafelyAborted
+                }
             }
         }
         // Bob has locked Bitcoin

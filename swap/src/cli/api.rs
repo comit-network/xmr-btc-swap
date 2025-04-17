@@ -194,7 +194,6 @@ pub struct Context {
 }
 
 /// A conveniant builder struct for [`Context`].
-#[derive(Debug)]
 #[must_use = "ContextBuilder must be built to be useful"]
 pub struct ContextBuilder {
     monero: Option<Monero>,
@@ -511,6 +510,10 @@ impl Context {
 
     pub fn bitcoin_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
         self.bitcoin_wallet.clone()
+    }
+
+    pub fn tauri_handle(&self) -> Option<TauriHandle> {
+        self.tauri_handle.clone()
     }
 }
 

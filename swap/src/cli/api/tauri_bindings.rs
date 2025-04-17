@@ -1,8 +1,15 @@
+use crate::bitcoin;
 use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use strum::Display;
+use tokio::sync::{oneshot, Mutex as TokioMutex};
 use typeshare::typeshare;
 use url::Url;
 use uuid::Uuid;
@@ -16,12 +23,70 @@ const TIMELOCK_CHANGE_EVENT_NAME: &str = "timelock-change";
 const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 const BALANCE_CHANGE_EVENT_NAME: &str = "balance-change";
 const BACKGROUND_REFUND_EVENT_NAME: &str = "background-refund";
+const APPROVAL_EVENT_NAME: &str = "approval_event";
 
-#[derive(Debug, Clone)]
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LockBitcoinDetails {
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc_lock_amount: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc_network_fee: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    pub xmr_receive_amount: monero::Amount,
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+}
+
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
+pub enum ApprovalRequestDetails {
+    /// Request approval before locking Bitcoin.
+    /// Contains specific details for review.
+    LockBitcoin(LockBitcoinDetails),
+}
+
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "state", content = "content")]
+pub enum ApprovalRequest {
+    Pending {
+        request_id: String,
+        #[typeshare(serialized_as = "number")]
+        expiration_ts: u64,
+        details: ApprovalRequestDetails,
+    },
+    Resolved {
+        request_id: String,
+        details: ApprovalRequestDetails,
+    },
+    Rejected {
+        request_id: String,
+        details: ApprovalRequestDetails,
+    },
+}
+
+struct PendingApproval {
+    responder: Option<oneshot::Sender<bool>>,
+    details: ApprovalRequestDetails,
+    #[allow(dead_code)]
+    expiration_ts: u64,
+}
+
+#[cfg(feature = "tauri")]
+struct TauriHandleInner {
+    app_handle: tauri::AppHandle,
+    pending_approvals: TokioMutex<HashMap<Uuid, PendingApproval>>,
+}
+
+#[derive(Clone)]
 pub struct TauriHandle(
     #[cfg(feature = "tauri")]
     #[cfg_attr(feature = "tauri", allow(unused))]
-    std::sync::Arc<tauri::AppHandle>,
+    Arc<TauriHandleInner>,
 );
 
 impl TauriHandle {
@@ -29,20 +94,146 @@ impl TauriHandle {
     pub fn new(tauri_handle: tauri::AppHandle) -> Self {
         Self(
             #[cfg(feature = "tauri")]
-            std::sync::Arc::new(tauri_handle),
+            Arc::new(TauriHandleInner {
+                app_handle: tauri_handle,
+                pending_approvals: TokioMutex::new(HashMap::new()),
+            }),
         )
     }
 
     #[allow(unused_variables)]
     pub fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         #[cfg(feature = "tauri")]
-        tauri::Emitter::emit(self.0.as_ref(), event, payload).map_err(anyhow::Error::from)?;
+        {
+            let inner = self.0.as_ref();
+            tauri::Emitter::emit(&inner.app_handle, event, payload).map_err(anyhow::Error::from)?;
+        }
 
         Ok(())
+    }
+
+    /// Helper to emit a approval event via the unified event name
+    fn emit_approval(&self, event: ApprovalRequest) -> Result<()> {
+        self.emit_tauri_event(APPROVAL_EVENT_NAME, event)
+    }
+
+    pub async fn request_approval(
+        &self,
+        request_type: ApprovalRequestDetails,
+        timeout_secs: u64,
+    ) -> Result<bool> {
+        #[cfg(not(feature = "tauri"))]
+        {
+            return Ok(true);
+        }
+
+        #[cfg(feature = "tauri")]
+        {
+            // Compute absolute expiration timestamp, and UUID for the request
+            let request_id = Uuid::new_v4();
+            let now_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let expiration_ts = now_secs + timeout_secs;
+
+            // Build the approval event
+            let details = request_type.clone();
+            let pending_event = ApprovalRequest::Pending {
+                request_id: request_id.to_string(),
+                expiration_ts,
+                details: details.clone(),
+            };
+
+            // Emit the creation of the approval request to the frontend
+            self.emit_approval(pending_event.clone())?;
+
+            tracing::debug!(%request_id, request=?pending_event, "Emitted approval request event");
+
+            // Construct the data structure we use to internally track the approval request
+            let (responder, receiver) = oneshot::channel();
+            let timeout_duration = Duration::from_secs(timeout_secs);
+
+            let pending = PendingApproval {
+                responder: Some(responder),
+                details: request_type.clone(),
+                expiration_ts,
+            };
+
+            // Lock map and insert the pending approval
+            {
+                let mut pending_map = self.0.pending_approvals.lock().await;
+                pending_map.insert(request_id, pending);
+            }
+
+            // Determine if the request will be accepted or rejected
+            // Either by being resolved by the user, or by timing out
+            let accepted = tokio::select! {
+                res = receiver => res.map_err(|_| anyhow!("Approval responder dropped"))?,
+                _ = tokio::time::sleep(timeout_duration) => {
+                    tracing::debug!(%request_id, "Approval request timed out and was therefore rejected");
+                    false
+                },
+            };
+
+            let mut map = self.0.pending_approvals.lock().await;
+            if let Some(pending) = map.remove(&request_id) {
+                let event = if accepted {
+                    ApprovalRequest::Resolved {
+                        request_id: request_id.to_string(),
+                        details: pending.details,
+                    }
+                } else {
+                    ApprovalRequest::Rejected {
+                        request_id: request_id.to_string(),
+                        details: pending.details,
+                    }
+                };
+
+                self.emit_approval(event)?;
+                tracing::debug!(%request_id, %accepted, "Resolved approval request");
+            }
+
+            Ok(accepted)
+        }
+    }
+
+    pub async fn resolve_approval(&self, request_id: Uuid, accepted: bool) -> Result<()> {
+        #[cfg(not(feature = "tauri"))]
+        {
+            return Err(anyhow!(
+                "Cannot resolve approval: Tauri feature not enabled."
+            ));
+        }
+
+        #[cfg(feature = "tauri")]
+        {
+            let mut pending_map = self.0.pending_approvals.lock().await;
+            if let Some(pending) = pending_map.get_mut(&request_id) {
+                let _ = pending
+                    .responder
+                    .take()
+                    .context("Approval responder was already consumed")?
+                    .send(accepted);
+
+                Ok(())
+            } else {
+                Err(anyhow!("Approval not found or already handled"))
+            }
+        }
     }
 }
 
 pub trait TauriEmitter {
+    fn request_approval<'life0, 'async_trait>(
+        &'life0 self,
+        request_type: ApprovalRequestDetails,
+        timeout_secs: u64,
+    ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'async_trait>>
+    where
+        'life0: 'async_trait,
+        Self: 'async_trait;
+
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()>;
 
     fn emit_swap_progress_event(&self, swap_id: Uuid, event: TauriSwapProgressEvent) {
@@ -94,6 +285,18 @@ pub trait TauriEmitter {
 }
 
 impl TauriEmitter for TauriHandle {
+    fn request_approval<'life0, 'async_trait>(
+        &'life0 self,
+        request_type: ApprovalRequestDetails,
+        timeout_secs: u64,
+    ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'async_trait>>
+    where
+        'life0: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(self.request_approval(request_type, timeout_secs))
+    }
+
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         self.emit_tauri_event(event, payload)
     }
@@ -103,8 +306,27 @@ impl TauriEmitter for Option<TauriHandle> {
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         match self {
             Some(tauri) => tauri.emit_tauri_event(event, payload),
+
+            // If no TauriHandle is available, we just ignore the event and pretend as if it was emitted
             None => Ok(()),
         }
+    }
+
+    fn request_approval<'life0, 'async_trait>(
+        &'life0 self,
+        request_type: ApprovalRequestDetails,
+        timeout_secs: u64,
+    ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'async_trait>>
+    where
+        'life0: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async move {
+            match self {
+                Some(tauri) => tauri.request_approval(request_type, timeout_secs).await,
+                None => Ok(true),
+            }
+        })
     }
 }
 

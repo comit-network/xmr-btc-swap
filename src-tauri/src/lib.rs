@@ -9,7 +9,8 @@ use swap::cli::{
             CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse,
             ExportBitcoinWalletArgs, GetDataDirArgs, GetHistoryArgs, GetLogsArgs,
             GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs,
-            MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            MoneroRecoveryArgs, ResolveApprovalArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
+            WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
@@ -17,6 +18,7 @@ use swap::cli::{
     command::{Bitcoin, Monero},
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
+use uuid::Uuid;
 
 /// Trait to convert Result<T, E> to Result<T, String>
 /// Tauri commands require the error type to be a string
@@ -183,7 +185,8 @@ pub fn run() {
             check_monero_node,
             check_electrum_node,
             get_wallet_descriptor,
-            get_data_dir
+            get_data_dir,
+            resolve_approval_request,
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -224,6 +227,7 @@ tauri_command!(monero_recovery, MoneroRecoveryArgs);
 tauri_command!(get_logs, GetLogsArgs);
 tauri_command!(list_sellers, ListSellersArgs);
 tauri_command!(cancel_and_refund, CancelAndRefundArgs);
+tauri_command!(resolve_approval_request, ResolveApprovalArgs);
 
 // These commands require no arguments
 tauri_command!(get_wallet_descriptor, ExportBitcoinWalletArgs, no_args);

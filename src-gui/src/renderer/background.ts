@@ -1,12 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
-import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, BalanceResponse, TauriDatabaseStateEvent, TauriTimelockChangeEvent, TauriBackgroundRefundEvent, TauriTorEvent } from "models/tauriModel";
-import { contextStatusEventReceived, receivedCliLog, rpcSetBalance, timelockChangeEventReceived, rpcSetBackgroundRefundState } from "store/features/rpcSlice";
+import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, BalanceResponse, TauriDatabaseStateEvent, TauriTimelockChangeEvent, TauriBackgroundRefundEvent, ApprovalRequest } from "models/tauriModel";
+import { contextStatusEventReceived, receivedCliLog, rpcSetBalance, timelockChangeEventReceived, rpcSetBackgroundRefundState, approvalEventReceived } from "store/features/rpcSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
 import { updatePublicRegistry, updateRates } from "./api";
 import { checkContextAvailability, getSwapInfo, initializeContext, updateAllNodeStatuses } from "./rpc";
 import { store } from "./store/storeRenderer";
-import { torEventReceived } from "store/features/torSlice";
 
 // Update the public registry every 5 minutes
 const PROVIDER_UPDATE_INTERVAL = 5 * 60 * 1_000;
@@ -84,4 +83,9 @@ export async function setupBackgroundTasks(): Promise<void> {
         logger.info('Received background refund event', event.payload);
         store.dispatch(rpcSetBackgroundRefundState(event.payload));
     })
+
+    listen<ApprovalRequest>("approval_event", (event) => {
+        logger.info("Received approval_event:", event.payload);
+        store.dispatch(approvalEventReceived(event.payload));
+    });
 }
