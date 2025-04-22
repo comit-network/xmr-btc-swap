@@ -394,6 +394,12 @@ impl ContextBuilder {
         };
 
         let initialize_tor_client = async {
+            // Don't init a tor client unless we should use it.
+            if !self.tor {
+                tracing::warn!("Internal Tor client not enabled, skipping initialization");
+                return Ok(None);
+            }
+
             self.tauri_handle.emit_context_init_progress_event(
                 TauriContextStatusEvent::Initializing(vec![
                     TauriPartialInitProgress::EstablishingTorCircuits(

@@ -18,7 +18,6 @@ use swap::cli::{
     command::{Bitcoin, Monero},
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
-use uuid::Uuid;
 
 /// Trait to convert Result<T, E> to Result<T, String>
 /// Tauri commands require the error type to be a string
@@ -327,7 +326,7 @@ async fn initialize_context(
         })
         .with_json(false)
         .with_debug(true)
-        .with_tor(true)
+        .with_tor(settings.use_tor)
         .with_tauri(tauri_handle.clone())
         .build()
         .await;

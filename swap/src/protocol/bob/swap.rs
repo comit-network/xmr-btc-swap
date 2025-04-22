@@ -164,7 +164,7 @@ async fn next_state(
             let btc_lock_amount = bitcoin::Amount::from_sat(
                 signed_tx
                     .output
-                    .get(0)
+                    .first()
                     .context("Failed to get lock amount")?
                     .value,
             );

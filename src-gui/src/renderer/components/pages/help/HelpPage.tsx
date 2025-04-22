@@ -18,7 +18,7 @@ const useStyles = makeStyles((theme) => ({
 
 export default function HelpPage() {
   const classes = useStyles();
-  const location = useLocation(); 
+  const location = useLocation();
 
   useEffect(() => {
     if (location.hash) {

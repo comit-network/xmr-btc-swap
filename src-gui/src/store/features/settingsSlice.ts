@@ -9,6 +9,8 @@ export interface SettingsState {
   /// Whether to fetch fiat prices from the internet
   fetchFiatPrices: boolean;
   fiatCurrency: FiatCurrency;
+  /// Whether to enable Tor for p2p connections
+  enableTor: boolean
 }
 
 export enum FiatCurrency {
@@ -98,6 +100,7 @@ const initialState: SettingsState = {
   theme: Theme.Darker,
   fetchFiatPrices: true,
   fiatCurrency: FiatCurrency.Usd,
+  enableTor: true
 };
 
 const alertsSlice = createSlice({
@@ -134,6 +137,9 @@ const alertsSlice = createSlice({
     },
     resetSettings(_) {
       return initialState;
+    },
+    setTorEnabled(slice, action: PayloadAction<boolean>) {
+      slice.enableTor = action.payload;
     }
   },
 });
@@ -146,6 +152,7 @@ export const {
   resetSettings,
   setFetchFiatPrices,
   setFiatCurrency,
+  setTorEnabled,
 } = alertsSlice.actions;
 
 export default alertsSlice.reducer;

@@ -175,6 +175,7 @@ export async function listSellersAtRendezvousPoint(
 export async function initializeContext() {
   const network = getNetwork();
   const testnet = isTestnet();
+  const useTor = store.getState().settings.enableTor;
 
   // This looks convoluted but it does the following:
   // - Fetch the status of all nodes for each blockchain in parallel
@@ -208,6 +209,7 @@ export async function initializeContext() {
   const tauriSettings: TauriSettings = {
     electrum_rpc_url: bitcoinNode,
     monero_node_url: moneroNode,
+    use_tor: useTor
   };
 
   logger.info("Initializing context with settings", tauriSettings);

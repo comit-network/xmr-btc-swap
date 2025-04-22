@@ -44,6 +44,8 @@ import { Theme } from "renderer/components/theme";
 import { Add, ArrowUpward, Delete, Edit, HourglassEmpty } from "@material-ui/icons";
 import { getNetwork } from "store/config";
 import { currencySymbol } from "utils/formatUtils";
+import { setTorEnabled } from "store/features/settingsSlice";
+
 
 const PLACEHOLDER_ELECTRUM_RPC_URL = "ssl://blockstream.info:700";
 const PLACEHOLDER_MONERO_NODE_URL = "http://xmr-node.cakewallet.com:18081";
@@ -82,6 +84,7 @@ export default function SettingsBox() {
           <TableContainer>
             <Table>
               <TableBody>
+                <TorSettings />
                 <ElectrumRpcUrlSetting />
                 <MoneroNodeUrlSetting />
                 <FetchFiatPricesSetting />
@@ -488,5 +491,24 @@ function NodeTable({
         </TableBody>
       </Table>
     </TableContainer>
+  )
+}
+
+export function TorSettings() {
+  const dispatch = useAppDispatch();
+  const torEnabled = useSettings((settings) => settings.enableTor)
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => dispatch(setTorEnabled(event.target.checked));
+  const status = (state: boolean) => state === true ? "enabled" : "disabled";
+
+  return (
+    <TableRow>
+      <TableCell>
+        <SettingLabel label="Use Tor" tooltip="Tor (The Onion Router) is a decentralized network allowing for anonymous browsing. If enabled, the app will use its internal Tor client to hide your IP address from the maker. Requires a restart to take effect." />
+      </TableCell>
+
+      <TableCell>
+        <Switch checked={torEnabled} onChange={handleChange} color="primary" />
+      </TableCell>
+    </TableRow>
   )
 }

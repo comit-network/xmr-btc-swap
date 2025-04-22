@@ -133,7 +133,7 @@ impl TauriHandle {
             let request_id = Uuid::new_v4();
             let now_secs = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("it is later than the begin of the unix epoch")
                 .as_secs();
             let expiration_ts = now_secs + timeout_secs;
 
@@ -501,4 +501,6 @@ pub struct TauriSettings {
     /// The URL of the Electrum RPC server e.g `ssl://bitcoin.com:50001`
     #[typeshare(serialized_as = "string")]
     pub electrum_rpc_url: Option<Url>,
+    /// Whether to initialize and use a tor client.
+    pub use_tor: bool,
 }
