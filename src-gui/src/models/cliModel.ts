@@ -53,7 +53,7 @@ export function parseCliLogString(log: string): CliLog | string {
   try {
     const parsed = JSON.parse(log);
     if (isCliLog(parsed)) {
-      return parsed;
+      return parsed as CliLog;
     } else {
       return log;
     }
@@ -61,3 +61,4 @@ export function parseCliLogString(log: string): CliLog | string {
     return log;
   }
 }
+

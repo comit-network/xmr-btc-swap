@@ -3,7 +3,7 @@ use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock, T
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, Seller, SellerStatus};
-use crate::common::get_logs;
+use crate::common::{get_logs, redact};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::monero::wallet_rpc::MoneroDaemon;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -417,6 +417,29 @@ impl Request for GetLogsArgs {
         }
 
         Ok(GetLogsResponse { logs })
+    }
+}
+
+/// Best effort redaction of logs, e.g. wallet addresses, swap-ids
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RedactArgs {
+    pub text: String,
+}
+
+#[typeshare]
+#[derive(Serialize, Debug)]
+pub struct RedactResponse {
+    pub text: String,
+}
+
+impl Request for RedactArgs {
+    type Response = RedactResponse;
+
+    async fn request(self, _: Arc<Context>) -> Result<Self::Response> {
+        Ok(RedactResponse {
+            text: redact(&self.text),
+        })
     }
 }
 

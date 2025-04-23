@@ -52,7 +52,7 @@ export function getLinesOfString(data: string): string[] {
     .filter((l) => l.length > 0);
 }
 
-export function getLogsAndStringsFromRawFileString(
+export function parseLogsFromString(
   rawFileData: string,
 ): (CliLog | string)[] {
   return getLinesOfString(rawFileData).map(parseCliLogString);

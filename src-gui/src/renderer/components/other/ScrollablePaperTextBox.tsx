@@ -2,7 +2,7 @@ import { Box, Divider, IconButton, Paper, Typography } from "@material-ui/core";
 import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
 import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
-import { ReactNode, useRef } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { VList, VListHandle } from "virtua";
 import { ExpandableSearchBox } from "./ExpandableSearchBox";
 
@@ -14,6 +14,7 @@ export default function ScrollablePaperTextBox({
   copyValue,
   searchQuery = null,
   setSearchQuery = null,
+  topRightButton = null,
   minHeight = MIN_HEIGHT,
 }: {
   rows: ReactNode[];
@@ -22,6 +23,7 @@ export default function ScrollablePaperTextBox({
   searchQuery: string | null;
   setSearchQuery?: ((query: string) => void) | null;
   minHeight?: string;
+  topRightButton?: ReactNode | null
 }) {
   const virtuaEl = useRef<VListHandle | null>(null);
 
@@ -48,7 +50,10 @@ export default function ScrollablePaperTextBox({
         width: "100%",
       }}
     >
-      <Typography>{title}</Typography>
+      <Box style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Typography>{title}</Typography>
+        {topRightButton}
+      </Box>
       <Divider />
       <Box
         style={{
@@ -69,11 +74,11 @@ export default function ScrollablePaperTextBox({
         <IconButton onClick={onCopy} size="small">
           <FileCopyOutlinedIcon />
         </IconButton>
-        <IconButton onClick={scrollToBottom} size="small">
-          <KeyboardArrowDownIcon />
-        </IconButton>
         <IconButton onClick={scrollToTop} size="small">
           <KeyboardArrowUpIcon />
+        </IconButton>
+        <IconButton onClick={scrollToBottom} size="small">
+          <KeyboardArrowDownIcon />
         </IconButton>
         {searchQuery !== undefined && setSearchQuery !== undefined && (
           <ExpandableSearchBox query={searchQuery} setQuery={setSearchQuery} />

@@ -25,6 +25,8 @@ import {
   GetDataDirArgs,
   ResolveApprovalArgs,
   ResolveApprovalResponse,
+  RedactArgs,
+  RedactResponse,
 } from "models/tauriModel";
 import {
   rpcSetBalance,
@@ -40,6 +42,8 @@ import { getNetwork, isTestnet } from "store/config";
 import { Blockchain, Network } from "store/features/settingsSlice";
 import { setStatus } from "store/features/nodesSlice";
 import { discoveredMakersByRendezvous } from "store/features/makersSlice";
+import { CliLog } from "models/cliModel";
+import { logsToRawString, parseLogsFromString } from "utils/parseUtils";
 
 export const PRESET_RENDEZVOUS_POINTS = [
   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
@@ -162,6 +166,18 @@ export async function getLogsOfSwap(
     swap_id: swapId,
     redact,
   });
+}
+
+/// Call the rust backend to redact logs.
+export async function redactLogs(
+  logs: (string | CliLog)[]
+): Promise<(string | CliLog)[]> {
+  const response = await invoke<RedactArgs, RedactResponse>("redact", {
+    text: logsToRawString(logs)
+  })
+
+  console.log(response.text.split("\n").length)
+  return parseLogsFromString(response.text);
 }
 
 export async function listSellersAtRendezvousPoint(

@@ -10,7 +10,7 @@ import {
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
-import { getLogsAndStringsFromRawFileString } from "utils/parseUtils";
+import { parseLogsFromString } from "utils/parseUtils";
 import { CliLog } from "models/cliModel";
 import logger from "utils/logger";
 
@@ -68,7 +68,7 @@ export const rpcSlice = createSlice({
   reducers: {
     receivedCliLog(slice, action: PayloadAction<TauriLogEvent>) {
       const buffer = action.payload.buffer;
-      const logs = getLogsAndStringsFromRawFileString(buffer);
+      const logs = parseLogsFromString(buffer);
       const logsWithoutExisting = logs.filter(log => !slice.logs.includes(log));
       slice.logs = slice.logs.concat(logsWithoutExisting);
     },
