@@ -13,6 +13,7 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context as AnyContext, Result};
 use std::sync::Arc;
 use tokio::select;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 const PRE_BTC_LOCK_APPROVAL_TIMEOUT_SECS: u64 = 120;
@@ -69,7 +70,7 @@ pub async fn run_until(
             &mut swap.event_loop_handle,
             swap.db.clone(),
             swap.bitcoin_wallet.as_ref(),
-            swap.monero_wallet.as_ref(),
+            swap.monero_wallet.clone(),
             swap.monero_receive_address,
             swap.event_emitter.clone(),
         )
@@ -96,7 +97,7 @@ async fn next_state(
     event_loop_handle: &mut EventLoopHandle,
     db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: &bitcoin::Wallet,
-    monero_wallet: &monero::Wallet,
+    monero_wallet: Arc<Mutex<monero::Wallet>>,
     monero_receive_address: monero::Address,
     event_emitter: Option<TauriHandle>,
 ) -> Result<BobState> {
@@ -148,7 +149,8 @@ async fn next_state(
             // If the Monero transaction gets confirmed before Bob comes online again then
             // Bob would record a wallet-height that is past the lock transaction height,
             // which can lead to the wallet not detect the transaction.
-            let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+            let monero_wallet_restore_blockheight =
+                monero_wallet.lock().await.block_height().await?;
 
             let xmr_receive_amount = state2.xmr;
 
@@ -324,7 +326,8 @@ async fn next_state(
             let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
             // We pass a listener to the function that get's called everytime a new confirmation is spotted.
-            let watch_future = monero_wallet.watch_for_transfer_with(
+            let watch_future = monero::wallet::watch_for_transfer_with(
+                monero_wallet.clone(),
                 watch_request,
                 Some(Box::new(move |confirmations| {
                     // Clone them again so that we can move them again
@@ -442,7 +445,11 @@ async fn next_state(
             event_emitter.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::BtcRedeemed);
 
             let xmr_redeem_txids = state
-                .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                .redeem_xmr(
+                    &*monero_wallet.lock().await,
+                    swap_id.to_string(),
+                    monero_receive_address,
+                )
                 .await?;
 
             event_emitter.emit_swap_progress_event(
@@ -542,7 +549,11 @@ async fn next_state(
                     let state5 = state.attempt_cooperative_redeem(s_a);
 
                     match state5
-                        .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                        .redeem_xmr(
+                            &*monero_wallet.lock().await,
+                            swap_id.to_string(),
+                            monero_receive_address,
+                        )
                         .await
                     {
                         Ok(xmr_redeem_txids) => {

@@ -3,7 +3,7 @@ use crate::bitcoin::{
     TxPunish, TxRedeem, TxRefund, Txid,
 };
 use crate::env::Config;
-use crate::monero::wallet::{TransferRequest, WatchRequest};
+use crate::monero::wallet::{watch_for_transfer, TransferRequest, WatchRequest};
 use crate::monero::TransferProof;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
@@ -14,6 +14,8 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -507,7 +509,7 @@ impl State3 {
 
     pub async fn refund_xmr(
         &self,
-        monero_wallet: &monero::Wallet,
+        monero_wallet: Arc<Mutex<monero::Wallet>>,
         monero_wallet_restore_blockheight: BlockHeight,
         file_name: String,
         spend_key: monero::PrivateKey,
@@ -516,12 +518,19 @@ impl State3 {
         let view_key = self.v;
 
         // Ensure that the XMR to be refunded are spendable by awaiting 10 confirmations
-        // on the lock transaction
-        monero_wallet
-            .watch_for_transfer(self.lock_xmr_watch_request(transfer_proof, 10))
-            .await?;
+        // on the lock transaction.
+        // We pass Mutex<Wallet> instead of a &mut Wallet to
+        // enable releasing the lock and avoid starving other tasks while waiting
+        // for the confirmations.
+        watch_for_transfer(
+            monero_wallet.clone(),
+            self.lock_xmr_watch_request(transfer_proof, 10),
+        )
+        .await?;
 
         monero_wallet
+            .lock()
+            .await
             .create_from_keys_and_sweep(
                 file_name,
                 spend_key,

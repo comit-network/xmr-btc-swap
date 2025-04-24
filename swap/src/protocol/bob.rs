@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::cli::api::tauri_bindings::TauriHandle;
@@ -19,7 +20,7 @@ pub struct Swap {
     pub event_loop_handle: cli::EventLoopHandle,
     pub db: Arc<dyn Database + Send + Sync>,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    pub monero_wallet: Arc<Mutex<monero::Wallet>>,
     pub env_config: env::Config,
     pub id: Uuid,
     pub monero_receive_address: monero::Address,
@@ -32,7 +33,7 @@ impl Swap {
         db: Arc<dyn Database + Send + Sync>,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<monero::Wallet>,
+        monero_wallet: Arc<Mutex<monero::Wallet>>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
         monero_receive_address: monero::Address,
@@ -60,7 +61,7 @@ impl Swap {
         db: Arc<dyn Database + Send + Sync>,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<monero::Wallet>,
+        monero_wallet: Arc<Mutex<monero::Wallet>>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
         monero_receive_address: monero::Address,

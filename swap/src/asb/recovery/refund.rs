@@ -6,6 +6,7 @@ use anyhow::{bail, Result};
 use libp2p::PeerId;
 use std::convert::TryInto;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
@@ -26,7 +27,7 @@ pub enum Error {
 pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    monero_wallet: Arc<Mutex<monero::Wallet>>,
     db: Arc<dyn Database>,
 ) -> Result<AliceState> {
     let state = db.get_state(swap_id).await?.try_into()?;
@@ -73,7 +74,7 @@ pub async fn refund(
 
     state3
         .refund_xmr(
-            &monero_wallet,
+            monero_wallet.clone(),
             monero_wallet_restore_blockheight,
             swap_id.to_string(),
             spend_key,

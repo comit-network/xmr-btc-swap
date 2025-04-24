@@ -188,7 +188,7 @@ pub struct Context {
     pub tasks: Arc<PendingTaskList>,
     tauri_handle: Option<TauriHandle>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
-    monero_wallet: Option<Arc<monero::Wallet>>,
+    monero_wallet: Option<Arc<TokioMutex<monero::Wallet>>>,
     monero_rpc_process: Option<Arc<SyncMutex<monero::WalletRpcProcess>>>,
     tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
 }
@@ -387,7 +387,10 @@ impl ContextBuilder {
                         ]),
                     );
 
-                    Ok((Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc)))))
+                    Ok((
+                        Some(Arc::new(TokioMutex::new(wlt))),
+                        Some(Arc::new(SyncMutex::new(prc))),
+                    ))
                 }
                 None => Ok((None, None)),
             }
@@ -482,7 +485,7 @@ impl Context {
         env_config: EnvConfig,
         db_path: PathBuf,
         bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
-        bob_monero_wallet: Arc<monero::Wallet>,
+        bob_monero_wallet: Arc<TokioMutex<monero::Wallet>>,
     ) -> Self {
         let config = Config::for_harness(seed, env_config);
 

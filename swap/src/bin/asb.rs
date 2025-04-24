@@ -122,11 +122,11 @@ pub async fn main() -> Result<()> {
 
             // Initialize Monero wallet
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
-            let monero_address = monero_wallet.get_main_address();
+            let monero_address = monero_wallet.lock().await.get_main_address();
             tracing::info!(%monero_address, "Monero wallet address");
 
             // Check Monero balance
-            let monero = monero_wallet.get_balance().await?;
+            let monero = monero_wallet.lock().await.get_balance().await?;
             match (monero.balance, monero.unlocked_balance) {
                 (0, _) => {
                     tracing::warn!(
@@ -317,7 +317,7 @@ pub async fn main() -> Result<()> {
         }
         Command::Balance => {
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
-            let monero_balance = monero_wallet.get_balance().await?;
+            let monero_balance = monero_wallet.lock().await.get_balance().await?;
             tracing::info!(%monero_balance);
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
@@ -419,7 +419,7 @@ async fn init_bitcoin_wallet(
 async fn init_monero_wallet(
     config: &Config,
     env_config: swap::env::Config,
-) -> Result<monero::Wallet> {
+) -> Result<tokio::sync::Mutex<monero::Wallet>> {
     tracing::debug!("Opening Monero wallet");
     let wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
@@ -428,7 +428,7 @@ async fn init_monero_wallet(
     )
     .await?;
 
-    Ok(wallet)
+    Ok(tokio::sync::Mutex::new(wallet))
 }
 
 /// This struct is used to extract swap details from the database and print them in a table format

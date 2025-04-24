@@ -23,7 +23,8 @@ use std::convert::{Infallible, TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::time::timeout;
 use uuid::Uuid;
 
 /// The time-to-live for quotes in the cache
@@ -44,7 +45,7 @@ where
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    monero_wallet: Arc<Mutex<monero::Wallet>>,
     db: Arc<dyn Database + Send + Sync>,
     latest_rate: LR,
     min_buy: bitcoin::Amount,
@@ -131,7 +132,7 @@ where
         swarm: Swarm<Behaviour<LR>>,
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<monero::Wallet>,
+        monero_wallet: Arc<Mutex<monero::Wallet>>,
         db: Arc<dyn Database + Send + Sync>,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
@@ -231,7 +232,7 @@ where
                                 }
                             };
 
-                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, &self.external_redeem_address, btc).await {
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &*self.monero_wallet.lock().await, &self.external_redeem_address, btc).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,
                                 Err(error) => {
                                     tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error);
@@ -516,6 +517,11 @@ where
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
     ) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
+        /// This is how long we maximally wait for the wallet lock
+        /// -- else the quote will be out of date and we will return
+        /// an error.
+        const MAX_WAIT_DURATION: Duration = Duration::from_secs(60);
+
         let ask_price = self
             .latest_rate
             .latest_rate()
@@ -523,8 +529,9 @@ where
             .ask()
             .map_err(|e| Arc::new(e.context("Failed to compute asking price")))?;
 
-        let balance = self
-            .monero_wallet
+        let balance = timeout(MAX_WAIT_DURATION, self.monero_wallet.lock())
+            .await
+            .context("Timeout while waiting for lock on monero wallet while making quote")?
             .get_balance()
             .await
             .map_err(|e| Arc::new(e.context("Failed to get Monero balance")))?;
