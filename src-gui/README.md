@@ -38,3 +38,25 @@ You can also check whether the current bindings are up to date:
 ```bash
 yarn run check-bindings
 ```
+
+## Debugging
+
+Because the GUI is running in an embedded browser, we can't use the usual Browser extensions to debug the GUI. Instead we use standalone React DevTools / Redux DevTools.
+
+### React DevTools
+
+Run this command to start the React DevTools server. The frontend will connect to this server automatically:
+
+```bash
+npx react-devtools
+```
+
+### Redux DevTools
+
+Run this command to start the Redux DevTools server. The frontend will connect to this server automatically. You can then debug the global Redux state. Observe how it changes over time, go back in time, see dispatch history, etc.
+
+You may have to go to `Settings -> 'use local custom server' -> connect` inside the devtools window for the state to be reflected correctly.
+
+```bash
+npx redux-devtools --hostname=localhost --port=8098 --open
+```

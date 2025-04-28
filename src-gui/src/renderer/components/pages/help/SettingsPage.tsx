@@ -1,12 +1,12 @@
 import { Box, makeStyles } from "@material-ui/core";
 import ContactInfoBox from "./ContactInfoBox";
 import DonateInfoBox from "./DonateInfoBox";
-import FeedbackInfoBox from "./FeedbackInfoBox";
 import DaemonControlBox from "./DaemonControlBox";
 import SettingsBox from "./SettingsBox";
 import ExportDataBox from "./ExportDataBox";
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
+
 const useStyles = makeStyles((theme) => ({
   outer: {
     display: "flex",
@@ -16,7 +16,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export default function HelpPage() {
+export default function SettingsPage() {
   const classes = useStyles();
   const location = useLocation();
 
@@ -29,11 +29,9 @@ export default function HelpPage() {
 
   return (
     <Box className={classes.outer}>
-      <FeedbackInfoBox />
       <SettingsBox />
       <ExportDataBox />
       <DaemonControlBox />
-      <ContactInfoBox />
       <DonateInfoBox />
     </Box>
   );

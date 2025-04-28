@@ -1,12 +1,16 @@
-import { Box, List } from "@material-ui/core";
+import { Box, List, Badge } from "@material-ui/core";
 import AccountBalanceWalletIcon from "@material-ui/icons/AccountBalanceWallet";
-import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import HistoryOutlinedIcon from "@material-ui/icons/HistoryOutlined";
 import SwapHorizOutlinedIcon from "@material-ui/icons/SwapHorizOutlined";
+import FeedbackOutlinedIcon from '@material-ui/icons/FeedbackOutlined';
 import RouteListItemIconButton from "./RouteListItemIconButton";
 import UnfinishedSwapsBadge from "./UnfinishedSwapsCountBadge";
+import { useTotalUnreadMessagesCount } from "store/hooks";
+import SettingsIcon from '@material-ui/icons/Settings';
 
 export default function NavigationHeader() {
+  const totalUnreadCount = useTotalUnreadMessagesCount();
+
   return (
     <Box>
       <List>
@@ -21,8 +25,18 @@ export default function NavigationHeader() {
         <RouteListItemIconButton name="Wallet" route="/wallet">
           <AccountBalanceWalletIcon />
         </RouteListItemIconButton>
-        <RouteListItemIconButton name="Help & Settings" route="/help">
-          <HelpOutlineIcon />
+        <RouteListItemIconButton name="Feedback" route="/feedback">
+          <Badge
+            badgeContent={totalUnreadCount}
+            color="primary"
+            overlap="rectangular"
+            invisible={totalUnreadCount === 0}
+          >
+            <FeedbackOutlinedIcon />
+          </Badge>
+        </RouteListItemIconButton>
+        <RouteListItemIconButton name="Settings" route="/settings">
+          <SettingsIcon />
         </RouteListItemIconButton>
       </List>
     </Box>

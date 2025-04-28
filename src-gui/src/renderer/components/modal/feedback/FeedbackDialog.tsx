@@ -23,7 +23,7 @@ import TruncatedText from "renderer/components/other/TruncatedText";
 import { store } from "renderer/store/storeRenderer";
 import { useActiveSwapInfo, useAppSelector } from "store/hooks";
 import { logsToRawString, parseDateString } from "utils/parseUtils";
-import { submitFeedbackViaHttp } from "../../../api";
+import { submitFeedbackViaHttp, AttachmentInput } from "../../../api";
 import LoadingButton from "../../other/LoadingButton";
 import { PiconeroAmount } from "../../other/Units";
 import { getLogsOfSwap, redactLogs } from "renderer/rpc";
@@ -31,26 +31,58 @@ import logger from "utils/logger";
 import { Label, Visibility } from "@material-ui/icons";
 import CliLogsBox from "renderer/components/other/RenderedCliLog";
 import { CliLog, parseCliLogString } from "models/cliModel";
+import { addFeedbackId } from "store/features/conversationsSlice";
 
 async function submitFeedback(body: string, swapId: string | null, swapLogs: string | null, daemonLogs: string | null) {
-  let attachedBody = "";
+  const attachments: AttachmentInput[] = [];
 
   if (swapId !== null) {
     const swapInfo = store.getState().rpc.state.swapInfos[swapId];
-
-    if (swapInfo === undefined) {
-      throw new Error(`Swap with id ${swapId} not found`);
+    if (swapInfo) {
+      // Add swap info as an attachment
+      attachments.push({
+        key: `swap_info_${swapId}.json`,
+        content: JSON.stringify(swapInfo, null, 2), // Pretty print JSON
+      });
+      // Retrieve and add logs for the specific swap
+      try {
+          const logs = await getLogsOfSwap(swapId, false);
+          attachments.push({
+            key: `swap_logs_${swapId}.txt`,
+            content: logs.logs.map((l) => JSON.stringify(l)).join("\n"),
+          });
+      } catch (logError) {
+          logger.error(logError, "Failed to get logs for swap", { swapId });
+          // Optionally add an attachment indicating log retrieval failure
+          attachments.push({ key: `swap_logs_${swapId}.error`, content: "Failed to retrieve swap logs." });
+      }
+    } else {
+      logger.warn("Selected swap info not found in state", { swapId });
+      attachments.push({ key: `swap_info_${swapId}.error`, content: "Swap info not found." });
     }
 
-    attachedBody = `${JSON.stringify(swapInfo, null, 4)}\n\nLogs: ${swapLogs ?? ""}`;
+    // Add swap logs as an attachment
+    if (swapLogs) {
+      attachments.push({
+        key: `swap_logs_${swapId}.txt`,
+        content: swapLogs,
+      });
+    }
   }
 
+  // Handle daemon logs
   if (daemonLogs !== null) {
-    attachedBody += `\n\nDaemon Logs: ${daemonLogs ?? ""}`;
+    attachments.push({
+      key: "daemon_logs.txt",
+      content: daemonLogs,
+    });
   }
 
-  console.log(`Sending feedback with attachement: \`\n${attachedBody}\``)
-  await submitFeedbackViaHttp(body, attachedBody);
+  // Call the updated API function
+  const feedbackId = await submitFeedbackViaHttp(body, attachments);
+  
+  // Dispatch only the ID
+  store.dispatch(addFeedbackId(feedbackId));
 }
 
 /*
@@ -152,7 +184,12 @@ export default function FeedbackDialog({
 
     try {
       setPending(true);
-      await submitFeedback(bodyText, selectedSwap, logsToRawString(swapLogs), logsToRawString(daemonLogs));
+      await submitFeedback(
+        bodyText, 
+        selectedSwap, 
+        logsToRawString(swapLogs ?? []), 
+        logsToRawString(daemonLogs ?? [])
+      );
       enqueueSnackbar("Feedback submitted successfully!", {
         variant: "success",
       });

@@ -3,7 +3,7 @@ import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, 
 import { contextStatusEventReceived, receivedCliLog, rpcSetBalance, timelockChangeEventReceived, rpcSetBackgroundRefundState, approvalEventReceived } from "store/features/rpcSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
-import { updatePublicRegistry, updateRates } from "./api";
+import { fetchAllConversations, updatePublicRegistry, updateRates } from "./api";
 import { checkContextAvailability, getSwapInfo, initializeContext, updateAllNodeStatuses } from "./rpc";
 import { store } from "./store/storeRenderer";
 
@@ -16,6 +16,9 @@ const STATUS_UPDATE_INTERVAL = 2 * 60 * 1_000;
 // Update the exchange rate every 5 minutes
 const UPDATE_RATE_INTERVAL = 5 * 60 * 1_000;
 
+// Fetch all conversations every 10 minutes
+const FETCH_CONVERSATIONS_INTERVAL = 10 * 60 * 1_000;
+
 function setIntervalImmediate(callback: () => void, interval: number): void {
     callback();
     setInterval(callback, interval);
@@ -26,6 +29,7 @@ export async function setupBackgroundTasks(): Promise<void> {
     setIntervalImmediate(updatePublicRegistry, PROVIDER_UPDATE_INTERVAL);
     setIntervalImmediate(updateAllNodeStatuses, STATUS_UPDATE_INTERVAL);
     setIntervalImmediate(updateRates, UPDATE_RATE_INTERVAL);
+    setIntervalImmediate(fetchAllConversations, FETCH_CONVERSATIONS_INTERVAL);
 
     // // Setup Tauri event listeners
 
