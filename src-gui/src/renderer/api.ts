@@ -35,7 +35,7 @@ export async function submitFeedbackViaHttp(
   type Response = string;
 
   const requestPayload = {
-    body: content,
+    content,
     attachments: attachments || [], // Ensure attachments is always an array
   };
 
