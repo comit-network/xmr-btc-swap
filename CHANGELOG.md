@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.18] - 2025-04-28
+
 - GUI: Feedback submitted can be responded to by the core developers. The responses will be displayed under the "Feedback" tab.
 
 ## [1.0.0-rc.17] - 2025-04-18
@@ -454,7 +456,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.17...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.18...HEAD
+[1.0.0-rc.18]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.17...1.0.0-rc.18
 [1.0.0-rc.17]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.16...1.0.0-rc.17
 [1.0.0-rc.16]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.14...1.0.0-rc.16
 [1.0.0-rc.14]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.13...1.0.0-rc.14
