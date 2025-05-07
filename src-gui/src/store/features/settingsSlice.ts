@@ -11,6 +11,7 @@ export interface SettingsState {
   fiatCurrency: FiatCurrency;
   /// Whether to enable Tor for p2p connections
   enableTor: boolean
+  userHasSeenIntroduction: boolean;
 }
 
 export enum FiatCurrency {
@@ -98,9 +99,10 @@ const initialState: SettingsState = {
     }
   },
   theme: Theme.Darker,
-  fetchFiatPrices: true,
+  fetchFiatPrices: false,
   fiatCurrency: FiatCurrency.Usd,
-  enableTor: true
+  enableTor: true,
+  userHasSeenIntroduction: false
 };
 
 const alertsSlice = createSlice({
@@ -135,6 +137,9 @@ const alertsSlice = createSlice({
     removeNode(slice, action: PayloadAction<{ network: Network, type: Blockchain, node: string }>) {
       slice.nodes[action.payload.network][action.payload.type] = slice.nodes[action.payload.network][action.payload.type].filter(node => node !== action.payload.node);
     },
+    setUserHasSeenIntroduction(slice, action: PayloadAction<boolean>) {
+      slice.userHasSeenIntroduction = action.payload
+    },
     resetSettings(_) {
       return initialState;
     },
@@ -153,6 +158,7 @@ export const {
   setFetchFiatPrices,
   setFiatCurrency,
   setTorEnabled,
+  setUserHasSeenIntroduction,
 } = alertsSlice.actions;
 
 export default alertsSlice.reducer;

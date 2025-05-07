@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Added introduction flow for first-time users
+
 ## [1.0.0-rc.19] - 2025-04-28
 
 ## [1.0.0-rc.18] - 2025-04-28

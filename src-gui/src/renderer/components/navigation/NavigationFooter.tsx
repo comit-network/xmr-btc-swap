@@ -35,7 +35,7 @@ export default function NavigationFooter() {
       <Box className={classes.linksOuter}>
         <Tooltip title="Check out the GitHub repository">
           <span>
-            <LinkIconButton url="https://github.com/UnstoppableSwap/unstoppableswap-gui">
+            <LinkIconButton url="https://github.com/UnstoppableSwap/core">
               <GitHubIcon />
             </LinkIconButton>
           </span>
