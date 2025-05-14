@@ -71,7 +71,8 @@ jobs:
 
       - name: install frontend dependencies
         working-directory: src-gui
-        run: yarn install
+        # Set the yarn network timeout to a high value to avoid spurious network errors
+        run: yarn install --network-timeout 600000
 
       - name: install tauri-cli globally
         uses: taiki-e/cache-cargo-install-action@v2
