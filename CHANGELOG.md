@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - GUI: Added introduction flow for first-time users
+- CLI + GUI: Update monero-wallet-rpc to v0.18.4.0
 
 ## [1.0.0-rc.19] - 2025-04-28
 
