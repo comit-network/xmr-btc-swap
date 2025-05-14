@@ -6,6 +6,10 @@ on:
     branches:
       - "master" # Always build head of master for the badge in the README
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static_analysis:
     runs-on: ubuntu-latest
