@@ -3,7 +3,7 @@ import { TauriSwapProgressEventWrapper, TauriContextStatusEvent, TauriLogEvent, 
 import { contextStatusEventReceived, receivedCliLog, rpcSetBalance, timelockChangeEventReceived, rpcSetBackgroundRefundState, approvalEventReceived } from "store/features/rpcSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
-import { fetchAllConversations, updatePublicRegistry, updateRates } from "./api";
+import { fetchAllConversations, updateAlerts, updatePublicRegistry, updateRates } from "./api";
 import { checkContextAvailability, getSwapInfo, initializeContext, updateAllNodeStatuses } from "./rpc";
 import { store } from "./store/storeRenderer";
 
@@ -30,6 +30,9 @@ export async function setupBackgroundTasks(): Promise<void> {
     setIntervalImmediate(updateAllNodeStatuses, STATUS_UPDATE_INTERVAL);
     setIntervalImmediate(updateRates, UPDATE_RATE_INTERVAL);
     setIntervalImmediate(fetchAllConversations, FETCH_CONVERSATIONS_INTERVAL);
+
+    // Fetch all alerts
+    updateAlerts();
 
     // // Setup Tauri event listeners
 

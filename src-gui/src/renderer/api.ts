@@ -162,7 +162,12 @@ export async function updatePublicRegistry(): Promise<void> {
     store.dispatch(registryConnectionFailed());
     logger.error(error, "Error fetching providers");
   }
+}
 
+/**
+ * Fetch all alerts
+ */
+export async function updateAlerts(): Promise<void> {
   try {
     const alerts = await fetchAlertsViaHttp();
     store.dispatch(setAlerts(alerts));
