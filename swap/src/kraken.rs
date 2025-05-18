@@ -225,7 +225,7 @@ mod connection {
 /// Responsible for parsing websocket text messages to events and rate updates.
 mod wire {
     use super::*;
-    use bitcoin::util::amount::ParseAmountError;
+    use bitcoin::amount::ParseAmountError;
     use serde_json::Value;
 
     #[derive(Debug, Deserialize, PartialEq, Eq)]

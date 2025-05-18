@@ -11,7 +11,7 @@ use libp2p::PeerId;
 use monero_harness::{image, Monero};
 use std::cmp::Ordering;
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
@@ -27,7 +27,7 @@ use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob, Database};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
-use tempfile::{tempdir, NamedTempFile};
+use tempfile::NamedTempFile;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, RunnableImage};
 use tokio::sync::mpsc;
@@ -71,7 +71,6 @@ where
         containers.bitcoind_url.clone(),
         &monero,
         alice_starting_balances.clone(),
-        tempdir().unwrap().path(),
         electrs_rpc_port,
         &alice_seed,
         env_config,
@@ -102,7 +101,6 @@ where
         containers.bitcoind_url,
         &monero,
         bob_starting_balances.clone(),
-        tempdir().unwrap().path(),
         electrs_rpc_port,
         &bob_seed,
         env_config,
@@ -285,7 +283,6 @@ async fn init_test_wallets(
     bitcoind_url: Url,
     monero: &Monero,
     starting_balances: StartingBalances,
-    datadir: &Path,
     electrum_rpc_port: u16,
     seed: &Seed,
     env_config: Config,
@@ -315,16 +312,17 @@ async fn init_test_wallets(
         Url::parse(&input).unwrap()
     };
 
-    let btc_wallet = swap::bitcoin::Wallet::new(
-        electrum_rpc_url,
-        datadir,
-        seed.derive_extended_private_key(env_config.bitcoin_network)
-            .expect("Could not create extended private key from seed"),
-        env_config,
-        1,
-    )
-    .await
-    .expect("could not init btc wallet");
+    let btc_wallet = swap::bitcoin::wallet::WalletBuilder::default()
+        .seed(seed.clone())
+        .network(env_config.bitcoin_network)
+        .electrum_rpc_url(electrum_rpc_url.as_str().to_string())
+        .persister(swap::bitcoin::wallet::PersisterConfig::InMemorySqlite)
+        .finality_confirmations(1_u32)
+        .target_block(1_u32)
+        .sync_interval(Duration::from_secs(3)) // high sync interval to speed up tests
+        .build()
+        .await
+        .expect("could not init btc wallet");
 
     if starting_balances.btc != bitcoin::Amount::ZERO {
         mint(
@@ -957,6 +955,8 @@ async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client>
         .getnewaddress(None, None)
         .await?;
 
+    let reward_address = reward_address.require_network(bitcoind_client.network().await?)?;
+
     bitcoind_client
         .generatetoaddress(101 + spendable_quantity, reward_address.clone())
         .await?;
@@ -978,6 +978,9 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
         .with_wallet(BITCOIN_TEST_WALLET_NAME)?
         .getnewaddress(None, None)
         .await?;
+
+    let reward_address = reward_address.require_network(bitcoind_client.network().await?)?;
+
     bitcoind_client.generatetoaddress(1, reward_address).await?;
 
     Ok(())

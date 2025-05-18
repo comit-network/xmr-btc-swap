@@ -80,9 +80,11 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
     module.register_async_method("withdraw_btc", |params_raw, context| async move {
         let mut params: WithdrawBtcArgs = params_raw.parse()?;
 
-        params.address =
-            bitcoin_address::validate(params.address, context.config.env_config.bitcoin_network)
-                .to_jsonrpsee_result()?;
+        params.address = bitcoin_address::revalidate_network(
+            params.address,
+            context.config.env_config.bitcoin_network,
+        )
+        .to_jsonrpsee_result()?;
 
         params.request(context).await.to_jsonrpsee_result()
     })?;
@@ -93,7 +95,11 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         params.bitcoin_change_address = params
             .bitcoin_change_address
             .map(|address| {
-                bitcoin_address::validate(address, context.config.env_config.bitcoin_network)
+                bitcoin_address::validate_network(
+                    address,
+                    context.config.env_config.bitcoin_network,
+                )
+                .map(|a| a.into_unchecked())
             })
             .transpose()
             .to_jsonrpsee_result()?;

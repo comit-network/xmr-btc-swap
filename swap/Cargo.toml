@@ -20,15 +20,19 @@ asynchronous-codec = "0.7.0"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.22"
-bdk = "0.28"
+bdk = { version = "0.28" }
+bdk_chain = { version = "0.20" }
+bdk_electrum = { version = "0.19", default-features = false, features = [ "use-rustls-ring" ] }
+bdk_wallet = { version = "1.0.0-beta.5", features = [ "rusqlite", "test-utils" ] }
 big-bytes = "1"
-bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
+bitcoin = { version = "0.32", features = [ "rand", "serde" ] }
 bmrng = "0.5.2"
 comfy-table = "7.1"
 config = { version = "0.14", default-features = false, features = [ "toml" ] }
 conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.6"
+derive_builder = "0.20.2"
 dialoguer = "0.11"
 directories-next = "2"
 ecdsa_fun = { version = "0.10", default-features = false, features = [
@@ -55,12 +59,13 @@ rand_chacha = "0.3"
 regex = "1.10"
 reqwest = { version = "0.12", features = [
     "http2",
-    "rustls-tls",
+    "rustls-tls-native-roots",
     "stream",
     "socks",
 ], default-features = false }
 rust_decimal = { version = "1", features = [ "serde-float" ] }
 rust_decimal_macros = "1"
+rustls = { version = "0.23", default-features = false, features = [ "ring" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_cbor = "0.11"
 serde_json = "1"
@@ -122,7 +127,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", rev = "80cc8d05db2610d8531011be505b7bee2b5cdf9f" }
+bitcoin-harness = { git = "https://github.com/UnstoppableSwap/bitcoin-harness-rs", branch = "master" }
 get-port = "3"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 mockito = "1.4"

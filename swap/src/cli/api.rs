@@ -17,11 +17,9 @@ use arti_client::TorClient;
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as SyncMutex, Once};
-use tauri_bindings::{
-    PendingCompleted, TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriPartialInitProgress,
-};
+use tauri_bindings::{TauriBackgroundProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
 use tor_rtcompat::tokio::TokioRustlsRuntime;
@@ -282,9 +280,9 @@ impl ContextBuilder {
     /// Takes the builder, initializes the context by initializing the wallets and other components and returns the Context.
     pub async fn build(self) -> Result<Context> {
         // These are needed for everything else, and are blocking calls
-        let data_dir = data::data_dir_from(self.data, self.is_testnet)?;
+        let data_dir = &data::data_dir_from(self.data, self.is_testnet)?;
         let env_config = env_config_from(self.is_testnet);
-        let seed = Seed::from_file_or_generate(data_dir.as_path())
+        let seed = &Seed::from_file_or_generate(data_dir.as_path())
             .context("Failed to read seed in file")?;
 
         // Initialize logging
@@ -309,10 +307,12 @@ impl ContextBuilder {
         let tasks = PendingTaskList::default().into();
 
         // Initialize the database
-        self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(vec![
-                TauriPartialInitProgress::OpeningDatabase(PendingCompleted::Pending(())),
-            ]));
+        let database_progress_handle = self
+            .tauri_handle
+            .new_background_process_with_initial_progress(
+                TauriBackgroundProgress::OpeningDatabase,
+                (),
+            );
 
         let db = open_db(
             data_dir.join("sqlite"),
@@ -321,36 +321,32 @@ impl ContextBuilder {
         )
         .await?;
 
-        self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(vec![
-                TauriPartialInitProgress::OpeningDatabase(PendingCompleted::Completed),
-            ]));
+        database_progress_handle.finish();
 
-        // Initialize these components concurrently
+        let tauri_handle = &self.tauri_handle.clone();
+
         let initialize_bitcoin_wallet = async {
             match self.bitcoin {
                 Some(bitcoin) => {
                     let (url, target_block) = bitcoin.apply_defaults(self.is_testnet)?;
 
-                    self.tauri_handle.emit_context_init_progress_event(
-                        TauriContextStatusEvent::Initializing(vec![
-                            TauriPartialInitProgress::OpeningBitcoinWallet(
-                                PendingCompleted::Pending(()),
-                            ),
-                        ]),
-                    );
+                    let bitcoin_progress_handle = tauri_handle
+                        .new_background_process_with_initial_progress(
+                            TauriBackgroundProgress::OpeningBitcoinWallet,
+                            (),
+                        );
 
-                    let wallet =
-                        init_bitcoin_wallet(url, &seed, data_dir.clone(), env_config, target_block)
-                            .await?;
+                    let wallet = init_bitcoin_wallet(
+                        url,
+                        seed,
+                        data_dir,
+                        env_config,
+                        target_block,
+                        self.tauri_handle.clone(),
+                    )
+                    .await?;
 
-                    self.tauri_handle.emit_context_init_progress_event(
-                        TauriContextStatusEvent::Initializing(vec![
-                            TauriPartialInitProgress::OpeningBitcoinWallet(
-                                PendingCompleted::Completed,
-                            ),
-                        ]),
-                    );
+                    bitcoin_progress_handle.finish();
 
                     Ok::<std::option::Option<Arc<bitcoin::wallet::Wallet>>, Error>(Some(Arc::new(
                         wallet,
@@ -363,29 +359,21 @@ impl ContextBuilder {
         let initialize_monero_wallet = async {
             match self.monero {
                 Some(monero) => {
-                    self.tauri_handle.emit_context_init_progress_event(
-                        TauriContextStatusEvent::Initializing(vec![
-                            TauriPartialInitProgress::OpeningMoneroWallet(
-                                PendingCompleted::Pending(()),
-                            ),
-                        ]),
-                    );
+                    let monero_progress_handle = tauri_handle
+                        .new_background_process_with_initial_progress(
+                            TauriBackgroundProgress::OpeningMoneroWallet,
+                            (),
+                        );
 
                     let (wlt, prc) = init_monero_wallet(
-                        data_dir.clone(),
+                        data_dir.as_path(),
                         monero.monero_daemon_address,
                         env_config,
-                        self.tauri_handle.clone(),
+                        tauri_handle.clone(),
                     )
                     .await?;
 
-                    self.tauri_handle.emit_context_init_progress_event(
-                        TauriContextStatusEvent::Initializing(vec![
-                            TauriPartialInitProgress::OpeningMoneroWallet(
-                                PendingCompleted::Completed,
-                            ),
-                        ]),
-                    );
+                    monero_progress_handle.finish();
 
                     Ok((
                         Some(Arc::new(TokioMutex::new(wlt))),
@@ -403,26 +391,12 @@ impl ContextBuilder {
                 return Ok(None);
             }
 
-            self.tauri_handle.emit_context_init_progress_event(
-                TauriContextStatusEvent::Initializing(vec![
-                    TauriPartialInitProgress::EstablishingTorCircuits(
-                        PendingCompleted::Pending(()),
-                    ),
-                ]),
-            );
-
-            let maybe_tor_client = init_tor_client(&data_dir)
+            let maybe_tor_client = init_tor_client(data_dir, tauri_handle.clone())
                 .await
                 .inspect_err(|err| {
                     tracing::warn!(%err, "Failed to create Tor client. We will continue without Tor");
                 })
                 .ok();
-
-            self.tauri_handle.emit_context_init_progress_event(
-                TauriContextStatusEvent::Initializing(vec![
-                    TauriPartialInitProgress::EstablishingTorCircuits(PendingCompleted::Completed),
-                ]),
-            );
 
             Ok(maybe_tor_client)
         };
@@ -446,8 +420,7 @@ impl ContextBuilder {
             }
         }
 
-        self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Available);
+        tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Available);
 
         let context = Context {
             db,
@@ -457,11 +430,11 @@ impl ContextBuilder {
             config: Config {
                 namespace: XmrBtcNamespace::from_is_testnet(self.is_testnet),
                 env_config,
-                seed: seed.into(),
+                seed: seed.clone().into(),
                 debug: self.debug,
                 json: self.json,
                 is_testnet: self.is_testnet,
-                data_dir,
+                data_dir: data_dir.clone(),
             },
             swap_lock,
             tasks,
@@ -535,29 +508,36 @@ impl fmt::Debug for Context {
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
     seed: &Seed,
-    data_dir: PathBuf,
+    data_dir: &Path,
     env_config: EnvConfig,
     bitcoin_target_block: u16,
+    tauri_handle_option: Option<TauriHandle>,
 ) -> Result<bitcoin::Wallet> {
-    let wallet_dir = data_dir.join("wallet");
+    let mut builder = bitcoin::wallet::WalletBuilder::default()
+        .seed(seed.clone())
+        .network(env_config.bitcoin_network)
+        .electrum_rpc_url(electrum_rpc_url.as_str().to_string())
+        .persister(bitcoin::wallet::PersisterConfig::SqliteFile {
+            data_dir: data_dir.to_path_buf(),
+        })
+        .finality_confirmations(env_config.bitcoin_finality_confirmations)
+        .target_block(bitcoin_target_block)
+        .sync_interval(env_config.bitcoin_sync_interval());
 
-    let wallet = bitcoin::Wallet::new(
-        electrum_rpc_url.clone(),
-        &wallet_dir,
-        seed.derive_extended_private_key(env_config.bitcoin_network)?,
-        env_config,
-        bitcoin_target_block,
-    )
-    .await
-    .context("Failed to initialize Bitcoin wallet")?;
+    if let Some(handle) = tauri_handle_option {
+        builder = builder.tauri_handle(handle.clone());
+    }
 
-    wallet.sync().await?;
+    let wallet = builder
+        .build()
+        .await
+        .context("Failed to initialize Bitcoin wallet")?;
 
     Ok(wallet)
 }
 
 async fn init_monero_wallet(
-    data_dir: PathBuf,
+    data_dir: &Path,
     monero_daemon_address: impl Into<Option<String>> + Clone,
     env_config: EnvConfig,
     tauri_handle: Option<TauriHandle>,

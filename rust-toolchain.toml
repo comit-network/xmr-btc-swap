@@ -1,5 +1,5 @@
 [toolchain]
 # also update this in the readme, changelog, and github actions
-channel = "1.80"
+channel = "1.81"
 components = ["clippy"]
 targets = ["armv7-unknown-linux-gnueabihf"]

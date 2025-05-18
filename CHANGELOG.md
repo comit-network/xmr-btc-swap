@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- CLI + ASB + GUI: We upgraded dependencies related to the Bitcoin wallet. When you boot up the new version for the first time, a migration process will be run to convert the old wallet format to the new one. This might take a few minutes. We also fixed a bug where we would generate too many unused addresses in the Bitcoin wallet which would cause the wallet to take longer to start up as time goes on.
+- GUI: We display detailed progress about running background tasks (Tor bootstrapping, Bitcoin wallet sync progress, etc.)
+
 ## [1.0.0-rc.21] - 2025-05-15
 
 ## [1.0.0-rc.20] - 2025-05-14

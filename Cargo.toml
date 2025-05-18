@@ -1,8 +1,13 @@
 [workspace]
 resolver = "2"
-members = [ "monero-harness", "monero-rpc", "swap", "monero-wallet", "src-tauri" ]
+members = [ "monero-rpc", "swap", "monero-wallet", "src-tauri" ]
 
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51
 jsonrpc_client = { git = "https://github.com/delta1/rust-jsonrpc-client.git", rev = "3b6081697cd616c952acb9c2f02d546357d35506" }
 monero = { git = "https://github.com/comit-network/monero-rs", rev = "818f38b" }
+
+# patch until new release https://github.com/bitcoindevkit/bdk/pull/1766
+bdk_wallet = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_wallet" }
+bdk_electrum = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_electrum" }
+bdk_chain = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_chain" }

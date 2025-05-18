@@ -3,6 +3,8 @@ import {
   ApprovalRequest,
   ExpiredTimelocks,
   GetSwapInfoResponse,
+  PendingCompleted,
+  TauriBackgroundProgress,
   TauriSwapProgressEvent,
 } from "./tauriModel";
 
@@ -229,4 +231,18 @@ export function isPendingLockBitcoinApprovalEvent(
 
   // Check if the request is a LockBitcoin request
   return event.content.details.type === "LockBitcoin";
+}
+
+export function isPendingBackgroundProcess(
+  process: TauriBackgroundProgress,
+): process is TauriBackgroundProgress {
+  return process.progress.type === "Pending";
+}
+
+export type TauriBitcoinSyncProgress = Extract<TauriBackgroundProgress, { componentName: "SyncingBitcoinWallet" }>;
+
+export function isBitcoinSyncProgress(
+  progress: TauriBackgroundProgress,
+): progress is TauriBitcoinSyncProgress {
+  return progress.componentName === "SyncingBitcoinWallet";
 }

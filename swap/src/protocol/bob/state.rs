@@ -1,3 +1,4 @@
+use crate::bitcoin::address_serde;
 use crate::bitcoin::wallet::{EstimateFeeRate, Subscription};
 use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
@@ -9,7 +10,6 @@ use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use anyhow::{anyhow, bail, Context, Result};
-use bdk::database::BatchDatabase;
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -22,11 +22,12 @@ use std::fmt;
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum BobState {
     Started {
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
+        #[serde(with = "address_serde")]
         change_address: bitcoin::Address,
     },
     SwapSetupCompleted(State2),
@@ -181,15 +182,14 @@ impl State0 {
         }
     }
 
-    pub async fn receive<D, C>(
+    pub async fn receive(
         self,
-        wallet: &bitcoin::Wallet<D, C>,
+        wallet: &bitcoin::Wallet<
+            bdk_wallet::rusqlite::Connection,
+            impl EstimateFeeRate + Send + Sync + 'static,
+        >,
         msg: Message1,
-    ) -> Result<State1>
-    where
-        C: EstimateFeeRate,
-        D: BatchDatabase,
-    {
+    ) -> Result<State1> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (
@@ -322,20 +322,23 @@ pub struct State2 {
     pub xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     pub punish_timelock: PunishTimelock,
+    #[serde(with = "address_serde")]
     pub refund_address: bitcoin::Address,
+    #[serde(with = "address_serde")]
     redeem_address: bitcoin::Address,
+    #[serde(with = "address_serde")]
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_punish_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -402,17 +405,19 @@ pub struct State3 {
     xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
+    #[serde(with = "address_serde")]
     refund_address: bitcoin::Address,
+    #[serde(with = "address_serde")]
     redeem_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -520,17 +525,19 @@ pub struct State4 {
     v: monero::PrivateViewKey,
     pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
+    #[serde(with = "address_serde")]
     refund_address: bitcoin::Address,
+    #[serde(with = "address_serde")]
     redeem_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     monero_wallet_restore_blockheight: BlockHeight,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -687,13 +694,14 @@ pub struct State6 {
     pub monero_wallet_restore_blockheight: BlockHeight,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
+    #[serde(with = "address_serde")]
     refund_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -732,7 +740,7 @@ impl State6 {
     pub async fn check_for_tx_cancel(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<Transaction> {
+    ) -> Result<Arc<Transaction>> {
         let tx_cancel = self.construct_tx_cancel()?;
 
         let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
@@ -759,7 +767,7 @@ impl State6 {
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<bitcoin::Txid> {
         let signed_tx_refund = self.signed_refund_transaction()?;
-        let signed_tx_refund_txid = signed_tx_refund.txid();
+        let signed_tx_refund_txid = signed_tx_refund.compute_txid();
         bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         Ok(signed_tx_refund_txid)

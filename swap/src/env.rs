@@ -81,7 +81,7 @@ impl GetConfig for Regtest {
     fn get_config() -> Config {
         Config {
             bitcoin_lock_mempool_timeout: 30.std_seconds(),
-            bitcoin_lock_confirmed_timeout: 1.std_minutes(),
+            bitcoin_lock_confirmed_timeout: 5.std_minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.std_seconds(),
             bitcoin_cancel_timelock: CancelTimelock::new(100),

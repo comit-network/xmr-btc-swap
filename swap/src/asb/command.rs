@@ -1,8 +1,9 @@
 use crate::asb::config::GetDefaults;
-use crate::bitcoin::Amount;
+use crate::bitcoin::{bitcoin_address, Amount};
 use crate::env;
 use crate::env::GetConfig;
-use anyhow::{bail, Result};
+use anyhow::Result;
+use bitcoin::address::NetworkUnchecked;
 use bitcoin::Address;
 use serde::Serialize;
 use std::ffi::OsString;
@@ -60,7 +61,7 @@ where
             env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
                 amount,
-                address: bitcoin_address(address, testnet)?,
+                address: bitcoin_address::validate(address, testnet)?,
             },
         },
         RawCommand::Balance => Arguments {
@@ -135,23 +136,6 @@ where
     };
 
     Ok(arguments)
-}
-
-fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
-    let network = if is_testnet {
-        bitcoin::Network::Testnet
-    } else {
-        bitcoin::Network::Bitcoin
-    };
-
-    if address.network != network {
-        bail!(BitcoinAddressNetworkMismatch {
-            expected: network,
-            actual: address.network
-        });
-    }
-
-    Ok(address)
 }
 
 fn config_path(config: Option<PathBuf>, is_testnet: bool) -> Result<PathBuf> {
@@ -311,7 +295,7 @@ pub enum RawCommand {
         )]
         amount: Option<Amount>,
         #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
-        address: Address,
+        address: Address<NetworkUnchecked>,
     },
     #[structopt(
         about = "Prints the Bitcoin and Monero balance. Requires the monero-wallet-rpc to be running."
@@ -458,7 +442,8 @@ mod tests {
             env_config: mainnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
-                address: Address::from_str(BITCOIN_MAINNET_ADDRESS).unwrap(),
+                address: bitcoin_address::parse_and_validate(BITCOIN_MAINNET_ADDRESS, false)
+                    .unwrap(),
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -637,7 +622,8 @@ mod tests {
             env_config: testnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
-                address: Address::from_str(BITCOIN_TESTNET_ADDRESS).unwrap(),
+                address: bitcoin_address::parse_and_validate(BITCOIN_TESTNET_ADDRESS, true)
+                    .unwrap(),
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -778,29 +764,20 @@ mod tests {
     #[test]
     fn given_bitcoin_address_network_mismatch_then_error() {
         let error =
-            bitcoin_address(Address::from_str(BITCOIN_MAINNET_ADDRESS).unwrap(), true).unwrap_err();
+            bitcoin_address::parse_and_validate(BITCOIN_TESTNET_ADDRESS, false).unwrap_err();
 
+        let error_message = error.to_string();
         assert_eq!(
-            error
-                .downcast_ref::<BitcoinAddressNetworkMismatch>()
-                .unwrap(),
-            &BitcoinAddressNetworkMismatch {
-                expected: bitcoin::Network::Testnet,
-                actual: bitcoin::Network::Bitcoin
-            }
+            error_message,
+            "Bitcoin address network mismatch, expected `Bitcoin`"
         );
 
-        let error = bitcoin_address(Address::from_str(BITCOIN_TESTNET_ADDRESS).unwrap(), false)
-            .unwrap_err();
+        let error = bitcoin_address::parse_and_validate(BITCOIN_MAINNET_ADDRESS, true).unwrap_err();
 
+        let error_message = error.to_string();
         assert_eq!(
-            error
-                .downcast_ref::<BitcoinAddressNetworkMismatch>()
-                .unwrap(),
-            &BitcoinAddressNetworkMismatch {
-                expected: bitcoin::Network::Bitcoin,
-                actual: bitcoin::Network::Testnet
-            }
+            error_message,
+            "Bitcoin address network mismatch, expected `Testnet`"
         );
     }
 }

@@ -1,6 +1,7 @@
 import {
   Box,
   CircularProgress,
+  LinearProgress,
   makeStyles,
   Typography,
 } from "@material-ui/core";
@@ -31,5 +32,26 @@ export default function CircularProgressWithSubtitle({
         {description}
       </Typography>
     </Box>
+  );
+}
+
+export function LinearProgressWithSubtitle({
+  description,
+  value,
+}: {
+  description: string | ReactNode;
+  value: number;
+}) {
+  const classes = useStyles();
+
+  return (
+    <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" style={{ gap: "0.5rem" }}>
+      <Typography variant="subtitle2" className={classes.subtitle}>
+        {description}
+      </Typography>
+      <Box width="10rem">
+        <LinearProgress variant="determinate" value={value} />
+      </Box>
+  </Box>
   );
 }

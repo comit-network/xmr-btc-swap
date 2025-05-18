@@ -1,10 +1,10 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
-use ::bitcoin::util::sighash::SighashCache;
-use ::bitcoin::{secp256k1, EcdsaSighashType, Sighash};
+use ::bitcoin::sighash::SighashCache;
+use ::bitcoin::ScriptBuf;
+use ::bitcoin::{secp256k1, sighash::SegwitV0Sighash as Sighash, EcdsaSighashType};
 use anyhow::{Context, Result};
-use bdk::bitcoin::Script;
-use bdk::miniscript::Descriptor;
+use bdk_wallet::miniscript::Descriptor;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct TxPunish {
     inner: Transaction,
     digest: Sighash,
     cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
-    watch_script: Script,
+    watch_script: ScriptBuf,
 }
 
 impl TxPunish {
@@ -26,13 +26,13 @@ impl TxPunish {
             tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock), spending_fee);
 
         let digest = SighashCache::new(&tx_punish)
-            .segwit_signature_hash(
+            .p2wsh_signature_hash(
                 0, // Only one input: cancel transaction
                 &tx_cancel
                     .output_descriptor
                     .script_code()
                     .expect("scriptcode"),
-                tx_cancel.amount().to_sat(),
+                tx_cancel.amount(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");
@@ -69,16 +69,16 @@ impl TxPunish {
             // The order in which these are inserted doesn't matter
             satisfier.insert(
                 A,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_a,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_a,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_b,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_b,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
 
@@ -100,10 +100,10 @@ impl TxPunish {
 
 impl Watchable for TxPunish {
     fn id(&self) -> Txid {
-        self.inner.txid()
+        self.inner.compute_txid()
     }
 
-    fn script(&self) -> Script {
+    fn script(&self) -> ScriptBuf {
         self.watch_script.clone()
     }
 }

@@ -206,12 +206,13 @@ pub struct TorConf {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Maker {
-    #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
+    #[serde(with = "::bitcoin::amount::serde::as_btc")]
     pub min_buy_btc: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
+    #[serde(with = "::bitcoin::amount::serde::as_btc")]
     pub max_buy_btc: bitcoin::Amount,
     pub ask_spread: Decimal,
     pub price_ticker_ws_url: Url,
+    #[serde(default, with = "crate::bitcoin::address_serde::option")]
     pub external_bitcoin_redeem_address: Option<bitcoin::Address>,
 }
 

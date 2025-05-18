@@ -385,24 +385,27 @@ pub struct State3 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     pub punish_timelock: PunishTimelock,
+    #[serde(with = "crate::bitcoin::address_serde")]
     refund_address: bitcoin::Address,
+    #[serde(with = "crate::bitcoin::address_serde")]
     redeem_address: bitcoin::Address,
+    #[serde(with = "crate::bitcoin::address_serde")]
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     tx_punish_sig_bob: bitcoin::Signature,
     tx_cancel_sig_bob: bitcoin::Signature,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_punish_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -476,7 +479,7 @@ impl State3 {
 
     pub fn extract_monero_private_key(
         &self,
-        published_refund_tx: bitcoin::Transaction,
+        published_refund_tx: Arc<bitcoin::Transaction>,
     ) -> Result<monero::PrivateKey> {
         self.tx_refund().extract_monero_private_key(
             published_refund_tx,
@@ -489,13 +492,16 @@ impl State3 {
     pub async fn check_for_tx_cancel(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<Transaction> {
+    ) -> Result<Arc<Transaction>> {
         let tx_cancel = self.tx_cancel();
         let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
         Ok(tx)
     }
 
-    pub async fn fetch_tx_refund(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Transaction> {
+    pub async fn fetch_tx_refund(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<Arc<Transaction>> {
         let tx_refund = self.tx_refund();
         let tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
         Ok(tx)

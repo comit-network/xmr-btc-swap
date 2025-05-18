@@ -1,2 +1,4 @@
 target
 .vscode
+.claude/settings.local.json
+.DS_Store

@@ -17,7 +17,7 @@ pub mod ecdsa_fun {
 
 pub mod bitcoin {
     use super::*;
-    use ::bitcoin::util::bip32::ExtendedPrivKey;
+    use ::bitcoin::bip32::Xpriv as ExtendedPrivKey;
     use ::bitcoin::Network;
 
     pub fn extended_priv_key() -> impl Strategy<Value = ExtendedPrivKey> {

@@ -1,15 +1,16 @@
-use crate::bitcoin::wallet::{EstimateFeeRate, Watchable};
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet,
 };
-use ::bitcoin::util::psbt::PartiallySignedTransaction;
+use ::bitcoin::psbt::Psbt as PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::{bail, Context, Result};
-use bdk::database::BatchDatabase;
-use bdk::miniscript::Descriptor;
-use bdk::psbt::PsbtUtils;
-use bitcoin::{PackedLockTime, Script, Sequence};
+use bdk_wallet::miniscript::Descriptor;
+use bdk_wallet::psbt::PsbtUtils;
+use bitcoin::{locktime::absolute::LockTime as PackedLockTime, ScriptBuf, Sequence};
 use serde::{Deserialize, Serialize};
+
+use super::wallet::EstimateFeeRate;
 
 const SCRIPT_SIZE: usize = 34;
 const TX_LOCK_WEIGHT: usize = 485;
@@ -21,20 +22,19 @@ pub struct TxLock {
 }
 
 impl TxLock {
-    pub async fn new<D, C>(
-        wallet: &Wallet<D, C>,
+    pub async fn new(
+        wallet: &Wallet<
+            bdk_wallet::rusqlite::Connection,
+            impl EstimateFeeRate + Send + Sync + 'static,
+        >,
         amount: Amount,
         A: PublicKey,
         B: PublicKey,
         change: bitcoin::Address,
-    ) -> Result<Self>
-    where
-        C: EstimateFeeRate,
-        D: BatchDatabase,
-    {
+    ) -> Result<Self> {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0)?;
         let address = lock_output_descriptor
-            .address(wallet.get_network())
+            .address(wallet.network())
             .expect("can derive address from descriptor");
 
         let psbt = wallet
@@ -59,14 +59,14 @@ impl TxLock {
         btc: Amount,
     ) -> Result<Self> {
         let shared_output_candidate = match psbt.unsigned_tx.output.as_slice() {
-            [shared_output_candidate, _] if shared_output_candidate.value == btc.to_sat() => {
+            [shared_output_candidate, _] if shared_output_candidate.value == btc => {
                 shared_output_candidate
             }
-            [_, shared_output_candidate] if shared_output_candidate.value == btc.to_sat() => {
+            [_, shared_output_candidate] if shared_output_candidate.value == btc => {
                 shared_output_candidate
             }
             // A single output is possible if Bob funds without any change necessary
-            [shared_output_candidate] if shared_output_candidate.value == btc.to_sat() => {
+            [shared_output_candidate] if shared_output_candidate.value == btc => {
                 shared_output_candidate
             }
             [_, _] => {
@@ -98,20 +98,21 @@ impl TxLock {
     }
 
     pub fn lock_amount(&self) -> Amount {
-        Amount::from_sat(self.inner.clone().extract_tx().output[self.lock_output_vout()].value)
+        self.inner.clone().extract_tx_unchecked_fee_rate().output[self.lock_output_vout()].value
     }
 
     pub fn fee(&self) -> Result<Amount> {
-        Ok(Amount::from_sat(
-            self.inner
-                .clone()
-                .fee_amount()
-                .context("The PSBT is missing a TxOut for an input")?,
-        ))
+        self.inner
+            .clone()
+            .fee_amount()
+            .context("The PSBT is missing a TxOut for an input")
     }
 
     pub fn txid(&self) -> Txid {
-        self.inner.clone().extract_tx().txid()
+        self.inner
+            .clone()
+            .extract_tx_unchecked_fee_rate()
+            .compute_txid()
     }
 
     pub fn as_outpoint(&self) -> OutPoint {
@@ -126,7 +127,7 @@ impl TxLock {
         SCRIPT_SIZE
     }
 
-    pub fn script_pubkey(&self) -> Script {
+    pub fn script_pubkey(&self) -> ScriptBuf {
         self.output_descriptor.script_pubkey()
     }
 
@@ -135,7 +136,7 @@ impl TxLock {
     fn lock_output_vout(&self) -> usize {
         self.inner
             .clone()
-            .extract_tx()
+            .extract_tx_unchecked_fee_rate()
             .output
             .iter()
             .position(|output| output.script_pubkey == self.output_descriptor.script_pubkey())
@@ -158,17 +159,19 @@ impl TxLock {
             witness: Default::default(),
         };
 
-        let fee = spending_fee.to_sat();
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - fee,
+            value: self.inner.clone().extract_tx_unchecked_fee_rate().output
+                [self.lock_output_vout()]
+            .value
+                - spending_fee,
             script_pubkey: spend_address.script_pubkey(),
         };
 
-        tracing::debug!(%fee, "Constructed Bitcoin spending transaction");
+        tracing::debug!(fee=%spending_fee.to_sat(), "Constructed Bitcoin spending transaction");
 
         Transaction {
-            version: 2,
-            lock_time: PackedLockTime(0),
+            version: bitcoin::transaction::Version(2),
+            lock_time: PackedLockTime::from_height(0).expect("0 to be below lock time threshold"),
             input: vec![tx_in],
             output: vec![tx_out],
         }
@@ -190,7 +193,7 @@ impl Watchable for TxLock {
         self.txid()
     }
 
-    fn script(&self) -> Script {
+    fn script(&self) -> ScriptBuf {
         self.output_descriptor.script_pubkey()
     }
 }
@@ -198,13 +201,12 @@ impl Watchable for TxLock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bitcoin::wallet::StaticFeeRate;
-    use crate::bitcoin::WalletBuilder;
+    use crate::bitcoin::TestWalletBuilder;
 
     #[tokio::test]
     async fn given_bob_sends_good_psbt_when_reconstructing_then_succeeeds() {
         let (A, B) = alice_and_bob();
-        let wallet = WalletBuilder::new(50_000).build();
+        let wallet = TestWalletBuilder::new(50_000).build().await;
         let agreed_amount = Amount::from_sat(10000);
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
@@ -219,7 +221,7 @@ mod tests {
         let fees = 300;
         let agreed_amount = Amount::from_sat(10000);
         let amount = agreed_amount.to_sat() + fees;
-        let wallet = WalletBuilder::new(amount).build();
+        let wallet = TestWalletBuilder::new(amount).build().await;
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
         assert_eq!(
@@ -235,7 +237,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_less_than_agreed_when_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = WalletBuilder::new(50_000).build();
+        let wallet = TestWalletBuilder::new(50_000).build().await;
         let agreed_amount = Amount::from_sat(10000);
 
         let bad_amount = Amount::from_sat(5000);
@@ -248,7 +250,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_to_a_bad_output_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = WalletBuilder::new(50_000).build();
+        let wallet = TestWalletBuilder::new(50_000).build().await;
         let agreed_amount = Amount::from_sat(10000);
 
         let E = eve();
@@ -275,7 +277,10 @@ mod tests {
     async fn bob_make_psbt(
         A: PublicKey,
         B: PublicKey,
-        wallet: &Wallet<bdk::database::MemoryDatabase, StaticFeeRate>,
+        wallet: &Wallet<
+            bdk_wallet::rusqlite::Connection,
+            impl EstimateFeeRate + Send + Sync + 'static,
+        >,
         amount: Amount,
     ) -> PartiallySignedTransaction {
         let change = wallet.new_address().await.unwrap();

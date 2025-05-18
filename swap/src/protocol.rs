@@ -34,10 +34,11 @@ pub struct Message0 {
     S_b_bitcoin: bitcoin::PublicKey,
     dleq_proof_s_b: CrossCurveDLEQProof,
     v_b: monero::PrivateViewKey,
+    #[serde(with = "crate::bitcoin::address_serde")]
     refund_address: bitcoin::Address,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_cancel_fee: bitcoin::Amount,
 }
 
@@ -48,11 +49,13 @@ pub struct Message1 {
     S_a_bitcoin: bitcoin::PublicKey,
     dleq_proof_s_a: CrossCurveDLEQProof,
     v_a: monero::PrivateViewKey,
+    #[serde(with = "crate::bitcoin::address_serde")]
     redeem_address: bitcoin::Address,
+    #[serde(with = "crate::bitcoin::address_serde")]
     punish_address: bitcoin::Address,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_punish_fee: bitcoin::Amount,
 }
 

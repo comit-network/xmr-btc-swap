@@ -17,6 +17,10 @@ use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install default rustls provider");
+
     match parse_args_and_apply_defaults(env::args_os()).await? {
         ParseResult::Success(context) => {
             context.tasks.wait_for_tasks().await?;
@@ -34,6 +38,8 @@ pub async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use ::bitcoin::Amount;
+    use bitcoin::address::NetworkUnchecked;
+    use bitcoin::Address;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use swap::cli::api::request::determine_btc_to_swap;
@@ -422,12 +428,14 @@ mod tests {
     fn quote_with_min(btc: f64) -> BidQuote {
         BidQuote {
             price: Amount::from_btc(0.001).unwrap(),
-            max_quantity: Amount::max_value(),
+            max_quantity: Amount::MAX,
             min_quantity: Amount::from_btc(btc).unwrap(),
         }
     }
 
     async fn get_dummy_address() -> Result<bitcoin::Address> {
-        Ok("1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6".parse()?)
+        Ok("1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6"
+            .parse::<Address<NetworkUnchecked>>()?
+            .assume_checked())
     }
 }

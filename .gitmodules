@@ -1,0 +1,6 @@
+# Explicitly declare submodules that no longer exist
+# This prevents Docker build errors when trying to clone missing submodules
+[submodule "monero-sys/monero"]
+path = monero-sys/monero
+url = https://github.com/monero-project/monero.git
+ignore = all

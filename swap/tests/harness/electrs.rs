@@ -114,6 +114,7 @@ impl IntoIterator for ElectrsArgs {
             Network::Regtest => args.push("--network=regtest".to_string()),
             Network::Bitcoin => {}
             Network::Signet => panic!("signet not yet supported"),
+            otherwise => panic!("unsupported network: {:?}", otherwise),
         }
 
         args.push("-vvvvv".to_string());

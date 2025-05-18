@@ -318,6 +318,9 @@ async fn initialize_context(
     // Get app handle and create a Tauri handle
     let tauri_handle = TauriHandle::new(app_handle.clone());
 
+    // Notify frontend that the context is being initialized
+    tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Initializing);
+
     let context_result = ContextBuilder::new(testnet)
         .with_bitcoin(Bitcoin {
             bitcoin_electrum_rpc_url: settings.electrum_rpc_url.clone(),

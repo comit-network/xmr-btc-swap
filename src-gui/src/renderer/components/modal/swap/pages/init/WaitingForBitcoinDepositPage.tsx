@@ -40,7 +40,7 @@ export default function WaitingForBtcDepositPage({
               <ul>
                 {max_giveable > 0 ? (
                   <li>
-                    You have already deposited enough funds to swap
+                    You have already deposited enough funds to swap{' '}
                     <SatsAmount amount={max_giveable} />. However, that is below the minimum amount required to start the swap.
                   </li>
                 ) : null}

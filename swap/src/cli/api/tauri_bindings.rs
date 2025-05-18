@@ -16,23 +16,30 @@ use uuid::Uuid;
 
 use super::request::BalanceResponse;
 
-const CLI_LOG_EMITTED_EVENT_NAME: &str = "cli-log-emitted";
-const SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
-const SWAP_STATE_CHANGE_EVENT_NAME: &str = "swap-database-state-update";
-const TIMELOCK_CHANGE_EVENT_NAME: &str = "timelock-change";
-const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
-const BALANCE_CHANGE_EVENT_NAME: &str = "balance-change";
-const BACKGROUND_REFUND_EVENT_NAME: &str = "background-refund";
-const APPROVAL_EVENT_NAME: &str = "approval_event";
+#[typeshare]
+#[derive(Clone, Serialize)]
+#[serde(tag = "channelName", content = "event")]
+pub enum TauriEvent {
+    SwapProgress(TauriSwapProgressEventWrapper),
+    ContextInitProgress(TauriContextStatusEvent),
+    CliLog(TauriLogEvent),
+    BalanceChange(BalanceResponse),
+    SwapDatabaseStateUpdate(TauriDatabaseStateEvent),
+    TimelockChange(TauriTimelockChangeEvent),
+    Approval(ApprovalRequest),
+    BackgroundProgress(TauriBackgroundProgressWrapper),
+}
+
+const TAURI_UNIFIED_EVENT_NAME: &str = "tauri-unified-event";
 
 #[typeshare]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LockBitcoinDetails {
     #[typeshare(serialized_as = "number")]
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub btc_lock_amount: bitcoin::Amount,
     #[typeshare(serialized_as = "number")]
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     pub btc_network_fee: bitcoin::Amount,
     #[typeshare(serialized_as = "number")]
     pub xmr_receive_amount: monero::Amount,
@@ -76,6 +83,14 @@ struct PendingApproval {
     expiration_ts: u64,
 }
 
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TorBootstrapStatus {
+    pub frac: f32,
+    pub ready_for_traffic: bool,
+    pub blockage: Option<String>,
+}
+
 #[cfg(feature = "tauri")]
 struct TauriHandleInner {
     app_handle: tauri::AppHandle,
@@ -92,6 +107,8 @@ pub struct TauriHandle(
 impl TauriHandle {
     #[cfg(feature = "tauri")]
     pub fn new(tauri_handle: tauri::AppHandle) -> Self {
+        use std::collections::HashMap;
+
         Self(
             #[cfg(feature = "tauri")]
             Arc::new(TauriHandleInner {
@@ -113,8 +130,8 @@ impl TauriHandle {
     }
 
     /// Helper to emit a approval event via the unified event name
-    fn emit_approval(&self, event: ApprovalRequest) -> Result<()> {
-        self.emit_tauri_event(APPROVAL_EVENT_NAME, event)
+    fn emit_approval(&self, event: ApprovalRequest) {
+        self.emit_unified_event(TauriEvent::Approval(event))
     }
 
     pub async fn request_approval(
@@ -146,7 +163,7 @@ impl TauriHandle {
             };
 
             // Emit the creation of the approval request to the frontend
-            self.emit_approval(pending_event.clone())?;
+            self.emit_approval(pending_event.clone());
 
             tracing::debug!(%request_id, request=?pending_event, "Emitted approval request event");
 
@@ -190,7 +207,7 @@ impl TauriHandle {
                     }
                 };
 
-                self.emit_approval(event)?;
+                self.emit_approval(event);
                 tracing::debug!(%request_id, %accepted, "Resolved approval request");
             }
 
@@ -236,52 +253,62 @@ pub trait TauriEmitter {
 
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()>;
 
+    fn emit_unified_event(&self, event: TauriEvent) {
+        let _ = self.emit_tauri_event(TAURI_UNIFIED_EVENT_NAME, event);
+    }
+
+    // Restore default implementations below
     fn emit_swap_progress_event(&self, swap_id: Uuid, event: TauriSwapProgressEvent) {
-        let _ = self.emit_tauri_event(
-            SWAP_PROGRESS_EVENT_NAME,
-            TauriSwapProgressEventWrapper { swap_id, event },
-        );
+        self.emit_unified_event(TauriEvent::SwapProgress(TauriSwapProgressEventWrapper {
+            swap_id,
+            event,
+        }));
     }
 
     fn emit_context_init_progress_event(&self, event: TauriContextStatusEvent) {
-        let _ = self.emit_tauri_event(CONTEXT_INIT_PROGRESS_EVENT_NAME, event);
+        self.emit_unified_event(TauriEvent::ContextInitProgress(event));
     }
 
     fn emit_cli_log_event(&self, event: TauriLogEvent) {
-        let _ = self
-            .emit_tauri_event(CLI_LOG_EMITTED_EVENT_NAME, event)
-            .ok();
+        self.emit_unified_event(TauriEvent::CliLog(event));
     }
 
     fn emit_swap_state_change_event(&self, swap_id: Uuid) {
-        let _ = self.emit_tauri_event(
-            SWAP_STATE_CHANGE_EVENT_NAME,
+        self.emit_unified_event(TauriEvent::SwapDatabaseStateUpdate(
             TauriDatabaseStateEvent { swap_id },
-        );
+        ));
     }
 
     fn emit_timelock_change_event(&self, swap_id: Uuid, timelock: Option<ExpiredTimelocks>) {
-        let _ = self.emit_tauri_event(
-            TIMELOCK_CHANGE_EVENT_NAME,
-            TauriTimelockChangeEvent { swap_id, timelock },
-        );
+        self.emit_unified_event(TauriEvent::TimelockChange(TauriTimelockChangeEvent {
+            swap_id,
+            timelock,
+        }));
     }
 
     fn emit_balance_update_event(&self, new_balance: bitcoin::Amount) {
-        let _ = self.emit_tauri_event(
-            BALANCE_CHANGE_EVENT_NAME,
-            BalanceResponse {
-                balance: new_balance,
-            },
-        );
+        self.emit_unified_event(TauriEvent::BalanceChange(BalanceResponse {
+            balance: new_balance,
+        }));
     }
 
-    fn emit_background_refund_event(&self, swap_id: Uuid, state: BackgroundRefundState) {
-        let _ = self.emit_tauri_event(
-            BACKGROUND_REFUND_EVENT_NAME,
-            TauriBackgroundRefundEvent { swap_id, state },
-        );
+    fn emit_background_progress(&self, id: Uuid, event: TauriBackgroundProgress) {
+        self.emit_unified_event(TauriEvent::BackgroundProgress(
+            TauriBackgroundProgressWrapper { id, event },
+        ));
     }
+
+    /// Create a new background progress handle for tracking a specific type of progress
+    fn new_background_process<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+    ) -> TauriBackgroundProgressHandle<T>;
+
+    fn new_background_process_with_initial_progress<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+        initial_progress: T,
+    ) -> TauriBackgroundProgressHandle<T>;
 }
 
 impl TauriEmitter for TauriHandle {
@@ -299,6 +326,30 @@ impl TauriEmitter for TauriHandle {
 
     fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         self.emit_tauri_event(event, payload)
+    }
+
+    fn new_background_process<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+    ) -> TauriBackgroundProgressHandle<T> {
+        let id = Uuid::new_v4();
+
+        TauriBackgroundProgressHandle {
+            id,
+            component,
+            emitter: Some(self.clone()),
+            is_finished: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    fn new_background_process_with_initial_progress<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+        initial_progress: T,
+    ) -> TauriBackgroundProgressHandle<T> {
+        let background_process_handle = self.new_background_process(component);
+        background_process_handle.update(initial_progress);
+        background_process_handle
     }
 }
 
@@ -328,6 +379,101 @@ impl TauriEmitter for Option<TauriHandle> {
             }
         })
     }
+
+    fn new_background_process<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+    ) -> TauriBackgroundProgressHandle<T> {
+        let id = Uuid::new_v4();
+
+        TauriBackgroundProgressHandle {
+            id,
+            component,
+            emitter: self.clone(),
+            is_finished: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    fn new_background_process_with_initial_progress<T: Clone>(
+        &self,
+        component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+        initial_progress: T,
+    ) -> TauriBackgroundProgressHandle<T> {
+        let background_process_handle = self.new_background_process(component);
+        background_process_handle.update(initial_progress);
+        background_process_handle
+    }
+}
+
+/// A handle for updating a specific background process's progress
+///
+/// # Examples
+///
+/// ```
+/// // For Tor bootstrap progress
+/// use self::{TauriHandle, TauriBackgroundProgress, TorBootstrapStatus};
+///
+/// // In a real scenario, tauri_handle would be properly initialized.
+/// // For this example, we'll use Option<TauriHandle>::None,
+/// // which allows calling new_background_process.
+/// let tauri_handle: Option<TauriHandle> = None;
+///
+/// let tor_progress = tauri_handle.new_background_process(
+///     |status| TauriBackgroundProgress::EstablishingTorCircuits(status)
+/// );
+///
+/// // Define a sample TorBootstrapStatus
+/// let tor_status = TorBootstrapStatus {
+///     frac: 0.5,
+///     ready_for_traffic: false,
+///     blockage: None,
+/// };
+///
+/// tor_progress.update(tor_status);
+/// tor_progress.finish();
+/// ```
+#[derive(Clone)]
+pub struct TauriBackgroundProgressHandle<T: Clone> {
+    id: Uuid,
+    component: fn(PendingCompleted<T>) -> TauriBackgroundProgress,
+    emitter: Option<TauriHandle>,
+    is_finished: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl<T: Clone> TauriBackgroundProgressHandle<T> {
+    /// Update the progress of this background process
+    /// Updates after finish() has been called will be ignored
+    pub fn update(&self, progress: T) {
+        if self.is_finished.load(std::sync::atomic::Ordering::Relaxed) {
+            tracing::trace!(%self.id, "Ignoring update to background progress because it has already been finished");
+            return;
+        }
+
+        if let Some(emitter) = &self.emitter {
+            emitter.emit_background_progress(
+                self.id,
+                (self.component)(PendingCompleted::Pending(progress)),
+            );
+        }
+    }
+
+    /// Mark this background process as completed
+    /// All subsequent update() calls will be ignored
+    pub fn finish(&self) {
+        self.is_finished
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        if let Some(emitter) = &self.emitter {
+            emitter
+                .emit_background_progress(self.id, (self.component)(PendingCompleted::Completed));
+        }
+    }
+}
+
+impl<T: Clone> Drop for TauriBackgroundProgressHandle<T> {
+    fn drop(&mut self) {
+        (*self).finish();
+    }
 }
 
 #[typeshare]
@@ -349,23 +495,68 @@ pub struct DownloadProgress {
     pub size: u64,
 }
 
+#[derive(Clone, Serialize)]
 #[typeshare]
-#[derive(Display, Clone, Serialize)]
-#[serde(tag = "componentName", content = "progress")]
-pub enum TauriPartialInitProgress {
-    OpeningBitcoinWallet(PendingCompleted<()>),
-    DownloadingMoneroWalletRpc(PendingCompleted<DownloadProgress>),
-    OpeningMoneroWallet(PendingCompleted<()>),
-    OpeningDatabase(PendingCompleted<()>),
-    EstablishingTorCircuits(PendingCompleted<()>),
+#[serde(tag = "type", content = "content")]
+pub enum TauriBitcoinSyncProgress {
+    Known {
+        // Number of addresses processed
+        #[typeshare(serialized_as = "number")]
+        consumed: u64,
+        // Total number of addresses to process
+        #[typeshare(serialized_as = "number")]
+        total: u64,
+    },
+    Unknown,
+}
+
+#[derive(Clone, Serialize)]
+#[typeshare]
+#[serde(tag = "type", content = "content")]
+pub enum TauriBitcoinFullScanProgress {
+    Known {
+        #[typeshare(serialized_as = "number")]
+        current_index: u64,
+        #[typeshare(serialized_as = "number")]
+        assumed_total: u64,
+    },
+    Unknown,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+pub struct BackgroundRefundProgress {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
 }
 
 #[typeshare]
 #[derive(Display, Clone, Serialize)]
-#[serde(tag = "type", content = "content")]
+#[serde(tag = "componentName", content = "progress")]
+pub enum TauriBackgroundProgress {
+    OpeningBitcoinWallet(PendingCompleted<()>),
+    DownloadingMoneroWalletRpc(PendingCompleted<DownloadProgress>),
+    OpeningMoneroWallet(PendingCompleted<()>),
+    OpeningDatabase(PendingCompleted<()>),
+    EstablishingTorCircuits(PendingCompleted<TorBootstrapStatus>),
+    SyncingBitcoinWallet(PendingCompleted<TauriBitcoinSyncProgress>),
+    FullScanningBitcoinWallet(PendingCompleted<TauriBitcoinFullScanProgress>),
+    BackgroundRefund(PendingCompleted<BackgroundRefundProgress>),
+}
+
+#[typeshare]
+#[derive(Clone, Serialize)]
+pub struct TauriBackgroundProgressWrapper {
+    #[typeshare(serialized_as = "string")]
+    id: Uuid,
+    event: TauriBackgroundProgress,
+}
+
+#[typeshare]
+#[derive(Display, Clone, Serialize)]
 pub enum TauriContextStatusEvent {
     NotInitialized,
-    Initializing(Vec<TauriPartialInitProgress>),
+    Initializing,
     Available,
     Failed,
 }
@@ -379,8 +570,8 @@ pub struct TauriSwapProgressEventWrapper {
 }
 
 #[derive(Serialize, Clone)]
-#[serde(tag = "type", content = "content")]
 #[typeshare]
+#[serde(tag = "type", content = "content")]
 pub enum TauriSwapProgressEvent {
     RequestingQuote,
     Resuming,
@@ -389,25 +580,25 @@ pub enum TauriSwapProgressEvent {
         #[typeshare(serialized_as = "string")]
         deposit_address: bitcoin::Address,
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         max_giveable: bitcoin::Amount,
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         min_deposit_until_swap_will_start: bitcoin::Amount,
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         max_deposit_until_maximum_amount_is_reached: bitcoin::Amount,
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         min_bitcoin_lock_tx_fee: bitcoin::Amount,
         quote: BidQuote,
     },
     SwapSetupInflight {
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         btc_lock_amount: bitcoin::Amount,
         #[typeshare(serialized_as = "number")]
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        #[serde(with = "::bitcoin::amount::serde::as_sat")]
         btc_tx_lock_fee: bitcoin::Amount,
     },
     BtcLockTxInMempool {
@@ -454,7 +645,6 @@ pub enum TauriSwapProgressEvent {
 /// It contains a json serialized object containing the log message and metadata.
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
-#[typeshare]
 pub struct TauriLogEvent {
     /// The serialized object containing the log message and metadata.
     pub buffer: String,
@@ -482,14 +672,6 @@ pub enum BackgroundRefundState {
     Started,
     Failed { error: String },
     Completed,
-}
-
-#[derive(Serialize, Clone)]
-#[typeshare]
-pub struct TauriBackgroundRefundEvent {
-    #[typeshare(serialized_as = "string")]
-    swap_id: Uuid,
-    state: BackgroundRefundState,
 }
 
 /// This struct contains the settings for the Context

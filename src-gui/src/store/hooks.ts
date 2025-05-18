@@ -1,5 +1,5 @@
-import { sortBy } from "lodash";
-import { BobStateName, GetSwapInfoResponseExt, PendingApprovalRequest, PendingLockBitcoinApprovalRequest } from "models/tauriModelExt";
+import { sortBy, sum } from "lodash";
+import { BobStateName, GetSwapInfoResponseExt, isBitcoinSyncProgress, isPendingBackgroundProcess, isPendingLockBitcoinApprovalEvent, PendingApprovalRequest, PendingLockBitcoinApprovalRequest } from "models/tauriModelExt";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
@@ -9,6 +9,7 @@ import { SettingsState } from "./features/settingsSlice";
 import { NodesSlice } from "./features/nodesSlice";
 import { RatesState } from "./features/ratesSlice";
 import { sortMakerList } from "utils/sortUtils";
+import { TauriBackgroundProgress, TauriBitcoinSyncProgress, TauriContextStatusEvent } from "models/tauriModel";
 
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -47,7 +48,7 @@ export function useIsSwapRunning() {
 }
 
 export function useIsContextAvailable() {
-  return useAppSelector((state) => state.rpc.status?.type === "Available");
+  return useAppSelector((state) => state.rpc.status === TauriContextStatusEvent.Available);
 }
 
 /// We do not use a sanity check here, as opposed to the other useSwapInfo hooks,
@@ -145,7 +146,53 @@ export function usePendingApprovals(): PendingApprovalRequest[] {
 
 export function usePendingLockBitcoinApproval(): PendingLockBitcoinApprovalRequest[] {
   const approvals = usePendingApprovals();
-  return approvals.filter((c) => c.content.details.type === "LockBitcoin");
+  return approvals.filter((c) => isPendingLockBitcoinApprovalEvent(c));
+}
+
+/// Returns all the pending background processes
+/// In the format [id, {componentName, {type: "Pending", content: {consumed, total}}}]
+export function usePendingBackgroundProcesses(): [string, TauriBackgroundProgress][] {
+  const background = useAppSelector((state) => state.rpc.state.background);
+  return Object.entries(background).filter(([_, c]) => isPendingBackgroundProcess(c));
+}
+
+export function useBitcoinSyncProgress(): TauriBitcoinSyncProgress[] {
+  const pendingProcesses = usePendingBackgroundProcesses();
+  const syncingProcesses = pendingProcesses.map(([_, c]) => c).filter(isBitcoinSyncProgress);
+  return syncingProcesses.map((c) => c.progress.content);
+}
+
+export function isSyncingBitcoin(): boolean {
+  const syncProgress = useBitcoinSyncProgress();
+  return syncProgress.length > 0;
+}
+
+/// This function returns the cumulative sync progress of all currently running Bitcoin wallet syncs
+/// If all syncs are unknown, it returns {type: "Unknown"}
+/// If at least one sync is known, it returns {type: "Known", content: {consumed, total}}
+/// where consumed and total are the sum of all the consumed and total values of the syncs
+export function useConservativeBitcoinSyncProgress(): TauriBitcoinSyncProgress | null {
+  const syncingProcesses = useBitcoinSyncProgress();
+  const progressValues = syncingProcesses.map((c) => c.content?.consumed ?? 0);
+  const totalValues = syncingProcesses.map((c) => c.content?.total ?? 0);
+
+  const progress = sum(progressValues);
+  const total = sum(totalValues);
+
+  // If either the progress or the total is 0, we consider the sync to be unknown
+  if (progress === 0 || total === 0) {
+    return {
+      type: "Unknown",
+    };
+  }
+
+  return {
+    type: "Known",
+    content: {
+      consumed: progress,
+      total: total,
+    },
+  };
 }
 
 /**

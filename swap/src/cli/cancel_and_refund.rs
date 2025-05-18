@@ -80,7 +80,7 @@ pub async fn cancel(
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 tracing::info!("Alice has already cancelled the swap");
-                return Ok((tx.txid(), state));
+                return Ok((tx.compute_txid(), state));
             }
 
             // The cancel transaction has not been published yet and we failed to publish it ourselves

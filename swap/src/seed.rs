@@ -1,6 +1,6 @@
 use crate::fs::ensure_directory_exists;
+use ::bitcoin::bip32::Xpriv as ExtendedPrivKey;
 use anyhow::{Context, Result};
-use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
 use bitcoin::secp256k1::{self, SecretKey};
@@ -35,6 +35,20 @@ impl Seed {
     ) -> Result<ExtendedPrivKey> {
         let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
         let private_key = ExtendedPrivKey::new_master(network, &seed)
+            .context("Failed to create new master extended private key")?;
+
+        Ok(private_key)
+    }
+
+    /// Same as `derive_extended_private_key`, but using the legacy BDK API.
+    ///
+    /// This is only used for the migration path from the old wallet format to the new one.
+    pub fn derive_extended_private_key_legacy(
+        &self,
+        network: bdk::bitcoin::Network,
+    ) -> Result<bdk::bitcoin::util::bip32::ExtendedPrivKey> {
+        let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
+        let private_key = bdk::bitcoin::util::bip32::ExtendedPrivKey::new_master(network, &seed)
             .context("Failed to create new master extended private key")?;
 
         Ok(private_key)
@@ -75,7 +89,7 @@ impl Seed {
 
         let hash = sha256::Hash::from_engine(engine);
 
-        Self(hash.into_inner())
+        Self(hash.to_byte_array())
     }
 
     fn bytes(&self) -> [u8; SEED_LENGTH] {

@@ -4,13 +4,14 @@ use crate::bitcoin::{
     TooManyInputs, Transaction, TxCancel,
 };
 use crate::{bitcoin, monero};
-use ::bitcoin::secp256k1;
-use ::bitcoin::util::sighash::SighashCache;
-use ::bitcoin::{EcdsaSighashType, Script, Sighash, Txid};
+use ::bitcoin::sighash::SighashCache;
+use ::bitcoin::{secp256k1, ScriptBuf};
+use ::bitcoin::{sighash::SegwitV0Sighash as Sighash, EcdsaSighashType, Txid};
 use anyhow::{bail, Context, Result};
-use bdk::miniscript::Descriptor;
+use bdk_wallet::miniscript::Descriptor;
 use ecdsa_fun::Signature;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::extract_ecdsa_sig;
 
@@ -19,7 +20,7 @@ pub struct TxRefund {
     inner: Transaction,
     digest: Sighash,
     cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
-    watch_script: Script,
+    watch_script: ScriptBuf,
 }
 
 impl TxRefund {
@@ -27,13 +28,13 @@ impl TxRefund {
         let tx_refund = tx_cancel.build_spend_transaction(refund_address, None, spending_fee);
 
         let digest = SighashCache::new(&tx_refund)
-            .segwit_signature_hash(
+            .p2wsh_signature_hash(
                 0, // Only one input: cancel transaction
                 &tx_cancel
                     .output_descriptor
                     .script_code()
                     .expect("scriptcode"),
-                tx_cancel.amount().to_sat(),
+                tx_cancel.amount(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");
@@ -47,7 +48,7 @@ impl TxRefund {
     }
 
     pub fn txid(&self) -> Txid {
-        self.inner.txid()
+        self.inner.compute_txid()
     }
 
     pub fn digest(&self) -> Sighash {
@@ -76,16 +77,16 @@ impl TxRefund {
             // The order in which these are inserted doesn't matter
             satisfier.insert(
                 A,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_a,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_a,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_b,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_b,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
 
@@ -101,7 +102,7 @@ impl TxRefund {
 
     pub fn extract_monero_private_key(
         &self,
-        published_refund_tx: bitcoin::Transaction,
+        published_refund_tx: Arc<bitcoin::Transaction>,
         s_a: monero::Scalar,
         a: bitcoin::SecretKey,
         S_b_bitcoin: bitcoin::PublicKey,
@@ -125,7 +126,7 @@ impl TxRefund {
 
     fn extract_signature_by_key(
         &self,
-        candidate_transaction: Transaction,
+        candidate_transaction: Arc<Transaction>,
         B: PublicKey,
     ) -> Result<Signature> {
         let input = match candidate_transaction.input.as_slice() {
@@ -161,7 +162,7 @@ impl Watchable for TxRefund {
         self.txid()
     }
 
-    fn script(&self) -> Script {
+    fn script(&self) -> ScriptBuf {
         self.watch_script.clone()
     }
 }

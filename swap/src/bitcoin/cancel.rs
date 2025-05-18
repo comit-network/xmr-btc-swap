@@ -3,13 +3,14 @@ use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
 };
-use ::bitcoin::util::sighash::SighashCache;
+use ::bitcoin::sighash::SighashCache;
+use ::bitcoin::transaction::Version;
 use ::bitcoin::{
-    secp256k1, EcdsaSighashType, OutPoint, PackedLockTime, Script, Sequence, Sighash, TxIn, TxOut,
-    Txid,
+    locktime::absolute::LockTime as PackedLockTime, secp256k1, sighash::SegwitV0Sighash as Sighash,
+    EcdsaSighashType, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Txid,
 };
 use anyhow::Result;
-use bdk::miniscript::Descriptor;
+use bdk_wallet::miniscript::Descriptor;
 use ecdsa_fun::Signature;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -132,22 +133,22 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: tx_lock.lock_amount().to_sat() - spending_fee.to_sat(),
+            value: tx_lock.lock_amount() - spending_fee,
             script_pubkey: cancel_output_descriptor.script_pubkey(),
         };
 
         let transaction = Transaction {
-            version: 2,
-            lock_time: PackedLockTime(0),
+            version: Version(2),
+            lock_time: PackedLockTime::from_height(0).expect("0 to be below lock time threshold"),
             input: vec![tx_in],
             output: vec![tx_out],
         };
 
         let digest = SighashCache::new(&transaction)
-            .segwit_signature_hash(
+            .p2wsh_signature_hash(
                 0, // Only one input: lock_input (lock transaction)
                 &tx_lock.output_descriptor.script_code().expect("scriptcode"),
-                tx_lock.lock_amount().to_sat(),
+                tx_lock.lock_amount(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");
@@ -161,7 +162,7 @@ impl TxCancel {
     }
 
     pub fn txid(&self) -> Txid {
-        self.inner.txid()
+        self.inner.compute_txid()
     }
 
     pub fn digest(&self) -> Sighash {
@@ -169,11 +170,11 @@ impl TxCancel {
     }
 
     pub fn amount(&self) -> Amount {
-        Amount::from_sat(self.inner.output[0].value)
+        self.inner.output[0].value
     }
 
     pub fn as_outpoint(&self) -> OutPoint {
-        OutPoint::new(self.inner.txid(), 0)
+        OutPoint::new(self.inner.compute_txid(), 0)
     }
 
     pub fn complete_as_alice(
@@ -230,16 +231,16 @@ impl TxCancel {
             let sig_b = secp256k1::ecdsa::Signature::from_compact(&sig_b.to_bytes())?;
             satisfier.insert(
                 A,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_a,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_a,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
-                ::bitcoin::EcdsaSig {
-                    sig: sig_b,
-                    hash_ty: EcdsaSighashType::All,
+                ::bitcoin::ecdsa::Signature {
+                    signature: sig_b,
+                    sighash_type: EcdsaSighashType::All,
                 },
             );
 
@@ -270,13 +271,13 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: self.amount().to_sat() - spending_fee.to_sat(),
+            value: self.amount() - spending_fee,
             script_pubkey: spend_address.script_pubkey(),
         };
 
         Transaction {
-            version: 2,
-            lock_time: PackedLockTime(0),
+            version: Version(2),
+            lock_time: PackedLockTime::from_height(0).expect("0 to be below lock time threshold"),
             input: vec![tx_in],
             output: vec![tx_out],
         }
@@ -292,7 +293,7 @@ impl Watchable for TxCancel {
         self.txid()
     }
 
-    fn script(&self) -> Script {
+    fn script(&self) -> ScriptBuf {
         self.output_descriptor.script_pubkey()
     }
 }

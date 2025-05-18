@@ -78,7 +78,7 @@ function WalletDescriptorModal({
   onClose: () => void;
   walletDescriptor: ExportBitcoinWalletResponse;
 }) {
-  const parsedDescriptor = JSON.parse(walletDescriptor.wallet_descriptor.descriptor);
+  const parsedDescriptor = JSON.parse(walletDescriptor.wallet_descriptor["descriptor"]);
   const stringifiedDescriptor = JSON.stringify(parsedDescriptor, null, 4);
 
   return (

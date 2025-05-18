@@ -55,8 +55,7 @@ export async function fetchSellersAtPresetRendezvousPoints() {
     store.dispatch(discoveredMakersByRendezvous(response.sellers));
 
     logger.info(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
-  }),
-  );
+  }));
 }
 
 async function invoke<ARGS, RESPONSE>(
@@ -73,8 +72,22 @@ async function invokeNoArgs<RESPONSE>(command: string): Promise<RESPONSE> {
 }
 
 export async function checkBitcoinBalance() {
+  // If we are already syncing, don't start a new sync
+  if (Object.values(store.getState().rpc?.state.background ?? {}).some(progress => progress.componentName === "SyncingBitcoinWallet" && progress.progress.type === "Pending")) {
+    console.log("checkBitcoinBalance() was called but we are already syncing Bitcoin, skipping");
+    return;
+  }
+
   const response = await invoke<BalanceArgs, BalanceResponse>("get_balance", {
     force_refresh: true,
+  });
+
+  store.dispatch(rpcSetBalance(response.balance));
+}
+
+export async function cheapCheckBitcoinBalance() {
+  const response = await invoke<BalanceArgs, BalanceResponse>("get_balance", {
+    force_refresh: false,
   });
 
   store.dispatch(rpcSetBalance(response.balance));
@@ -108,6 +121,10 @@ export async function withdrawBtc(address: string): Promise<string> {
       amount: null,
     },
   );
+
+  // We check the balance, this is cheap and does not sync the wallet
+  // but instead uses our local cached balance
+  await cheapCheckBitcoinBalance();
 
   return response.txid;
 }
@@ -176,7 +193,6 @@ export async function redactLogs(
     text: logsToRawString(logs)
   })
 
-  console.log(response.text.split("\n").length)
   return parseLogsFromString(response.text);
 }
 

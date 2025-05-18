@@ -26,16 +26,16 @@ impl AsRef<str> for BidQuoteProtocol {
 #[typeshare]
 pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     #[typeshare(serialized_as = "number")]
     pub price: bitcoin::Amount,
     /// The minimum quantity the maker is willing to buy.
     ///     #[typeshare(serialized_as = "number")]
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     #[typeshare(serialized_as = "number")]
     pub min_quantity: bitcoin::Amount,
     /// The maximum quantity the maker is willing to buy.
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[serde(with = "::bitcoin::amount::serde::as_sat")]
     #[typeshare(serialized_as = "number")]
     pub max_quantity: bitcoin::Amount,
 }

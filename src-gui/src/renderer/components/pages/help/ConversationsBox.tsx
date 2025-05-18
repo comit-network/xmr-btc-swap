@@ -239,7 +239,6 @@ function ConversationModal({ open, onClose, feedbackId }: { open: boolean, onClo
       enqueueSnackbar('Message sent successfully!', { variant: 'success' });
       fetchAllConversations();
     } catch (e) {
-      logger.error(e, 'Send failed');
       enqueueSnackbar('Failed to send message. Please try again.', { variant: 'error' });
     } finally {
       setLoading(false);

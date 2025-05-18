@@ -1,7 +1,22 @@
-import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
+import { useConservativeBitcoinSyncProgress, usePendingBackgroundProcesses } from "store/hooks";
+import CircularProgressWithSubtitle, { LinearProgressWithSubtitle } from "../../CircularProgressWithSubtitle";
 
 export default function ReceivedQuotePage() {
-  return (
-    <CircularProgressWithSubtitle description="Syncing local wallet" />
-  );
+  const syncProgress = useConservativeBitcoinSyncProgress();
+
+  if (syncProgress?.type === "Known") {
+    const percentage = Math.round((syncProgress.content.consumed / syncProgress.content.total) * 100);
+
+    return (
+      <LinearProgressWithSubtitle description={`Syncing Bitcoin wallet (${percentage}%)`} value={percentage} />
+    );
+  }
+
+  if (syncProgress?.type === "Unknown") {
+    return (
+      <CircularProgressWithSubtitle description="Syncing Bitcoin wallet" />
+    );
+  }
+
+  return <CircularProgressWithSubtitle description="Processing offer" />;
 }

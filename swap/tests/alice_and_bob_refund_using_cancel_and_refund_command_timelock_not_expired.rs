@@ -58,6 +58,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         let error = asb::cancel(alice_swap.swap_id, alice_swap.bitcoin_wallet, alice_swap.db)
             .await
             .unwrap_err();
+
         assert_eq!(
             parse_rpc_error_code(&error).unwrap(),
             i64::from(RpcErrorCode::RpcVerifyRejected)

@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-VERSION=0.11.1
+VERSION=1.0.0-rc.19
 
 mkdir bdk
 stat ./target/debug/swap || exit 1
@@ -10,7 +10,7 @@ cp ./target/debug/swap bdk/swap-current
 pushd bdk
 
 echo "download swap $VERSION"
-curl -L "https://github.com/comit-network/xmr-btc-swap/releases/download/${VERSION}/swap_${VERSION}_Linux_x86_64.tar" | tar xv
+curl -L "https://github.com/UnstoppableSwap/core/releases/download/${VERSION}/swap_${VERSION}_Linux_x86_64.tar" | tar xv
 
 echo "create testnet wallet with $VERSION"
 ./swap --testnet --data-base-dir . --debug balance || exit 1
