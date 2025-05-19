@@ -12,7 +12,7 @@ name = "unstoppableswap_gui_rs_lib"
 crate-type = [ "lib", "cdylib", "staticlib" ]
 
 [build-dependencies]
-tauri-build = { version = "2.0", features = [ "config-json5" ] }
+tauri-build = { version = "^2.0.0", features = [ "config-json5" ] }
 
 [dependencies]
 anyhow = "1"
@@ -23,11 +23,11 @@ swap = { path = "../swap", features = [ "tauri" ] }
 sysinfo = "=0.32.1"
 tauri = { version = "^2.0.0", features = [ "config-json5" ] }
 tauri-plugin-clipboard-manager = "^2.0.0"
-tauri-plugin-opener = "2.2.5"
+tauri-plugin-opener = "^2.0.0"
 tauri-plugin-process = "^2.0.0"
 tauri-plugin-shell = "^2.0.0"
 tauri-plugin-store = "^2.0.0"
-tauri-plugin-updater = "^2.1.0"
+tauri-plugin-updater = "^2.0.0"
 tracing = "0.1"
 uuid = "1.16.0"
 

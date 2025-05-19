@@ -7,9 +7,9 @@ import {
   SatsAmount,
 } from "renderer/components/other/Units";
 import { getMarkup, satsToBtc, secondsToDays } from "utils/conversionUtils";
-import { isMakerOutdated } from 'utils/multiAddrUtils';
+import { isMakerOutdated, isMakerVersionOutdated } from 'utils/multiAddrUtils';
 import WarningIcon from '@material-ui/icons/Warning';
-import { useAppSelector } from "store/hooks";
+import { useAppSelector, useMakerVersion } from "store/hooks";
 import IdentIcon from "renderer/components/icons/IdentIcon";
 
 const useStyles = makeStyles((theme) => ({

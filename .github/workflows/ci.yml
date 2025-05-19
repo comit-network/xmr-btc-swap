@@ -19,7 +19,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81"
+          toolchain: "1.82"
           components: clippy,rustfmt
 
       - uses: Swatinem/rust-cache@v2.7.3
@@ -127,7 +127,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81"
+          toolchain: "1.82"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Install dependencies required by Tauri v2 (ubuntu only)

@@ -1,31 +1,29 @@
 import { ExtendedMakerStatus } from "models/apiModel";
 import { isMakerOnCorrectNetwork, isMakerOutdated } from "./multiAddrUtils";
+import _ from 'lodash';
 
 export function sortMakerList(list: ExtendedMakerStatus[]) {
-  return list
+  return _(list)
     // Filter out makers that are on the wrong network (testnet / mainnet)
     .filter(isMakerOnCorrectNetwork)
-    .concat()
     // Sort by criteria
-    .sort((firstEl, secondEl) => {
-      // If either provider is outdated, prioritize the one that isn't
-      if (isMakerOutdated(firstEl) && !isMakerOutdated(secondEl)) return 1;
-      if (!isMakerOutdated(firstEl) && isMakerOutdated(secondEl)) return -1;
-
-      // If neither of them have a relevancy score or they are the same, sort by price
-      if (firstEl.relevancy == secondEl.relevancy) {
-        return firstEl.price - secondEl.price;
-      }
-
-      // If only one of the two doesn't have a relevancy score, prioritize the one that does
-      if (firstEl.relevancy == null) return 1;
-      if (secondEl.relevancy == null) return -1;
-
-      // Otherwise, sort by relevancy score
-      return secondEl.relevancy - firstEl.relevancy;
-    })
-    // Remove duplicate makers
-    .filter((provider, index, self) =>
-      index === self.findIndex((p) => p.peerId === provider.peerId)
+    .orderBy(
+      [
+        // Prefer makers that have a 'version' attribute
+        // If we don't have a version, we cannot clarify if it's outdated or not
+        m => (m.version ? 0 : 1),
+        // Prefer makers that are not outdated
+        m => (isMakerOutdated(m) ? 1 : 0),
+        // Prefer makers that have a relevancy score
+        m => (m.relevancy == null ? 1 : 0),
+        // Prefer makers with a higher relevancy score
+        m => -(m.relevancy ?? 0),
+        // Prefer makers with a lower price
+        m => m.price
+      ],
+      ['asc', 'asc', 'asc', 'asc', 'asc']
     )
+    // Remove duplicate makers
+    .uniqBy(m => m.peerId)
+    .value();
 }

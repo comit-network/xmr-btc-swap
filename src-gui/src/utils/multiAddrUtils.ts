@@ -3,7 +3,8 @@ import { Multiaddr } from "multiaddr";
 import semver from "semver";
 import { isTestnet } from "store/config";
 
-const MIN_ASB_VERSION = "1.0.0-alpha.1"
+// const MIN_ASB_VERSION = "1.0.0-alpha.1" // First version to support new libp2p protocol
+const MIN_ASB_VERSION = "1.1.0-rc.3" // First version with support for bdk > 1.0
 
 export function providerToConcatenatedMultiAddr(provider: Maker) {
   return new Multiaddr(provider.multiAddr)
@@ -17,13 +18,19 @@ export function isMakerOnCorrectNetwork(
   return provider.testnet === isTestnet();
 }
 
-export function isMakerOutdated(provider: ExtendedMakerStatus): boolean {
-  if (provider.version != null) {
-    if (semver.satisfies(provider.version, `>=${MIN_ASB_VERSION}`))
-      return false;
-  } else {
-    return false;
+export function isMakerOutdated(maker: ExtendedMakerStatus): boolean {
+  if (maker.version != null) {
+    if (isMakerVersionOutdated(maker.version))
+      return true;
   }
 
-  return true;
+  // Do not mark a maker as outdated if it doesn't have a version
+  return false;
+}
+
+export function isMakerVersionOutdated(version: string): boolean {
+  // This checks if the version is less than the minimum version
+  // we use .compare(...) instead of .satisfies(...) because satisfies(...)
+  // does not work with pre-release versions
+  return semver.compare(version, MIN_ASB_VERSION) === -1;
 }
