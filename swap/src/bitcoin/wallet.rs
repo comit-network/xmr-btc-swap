@@ -290,6 +290,9 @@ impl Wallet {
     /// The number of maximum chunks to use when syncing
     const SCAN_CHUNKS: u32 = 5;
 
+    /// Maximum time we are willing to spend retrying a wallet sync
+    const SYNC_MAX_ELAPSED_TIME: Duration = Duration::from_secs(15);
+
     const WALLET_PARENT_DIR_NAME: &str = "wallet";
     const WALLET_DIR_NAME: &str = "wallet-post-bdk-1.0";
     const WALLET_FILE_NAME: &str = "wallet-db.sqlite";
@@ -863,9 +866,9 @@ impl Wallet {
         Ok(())
     }
 
-    /// Sync the wallet with the blockchain
-    /// and emit progress events to the UI
-    pub async fn sync(&self) -> Result<()> {
+    /// Perform a single sync of the wallet with the blockchain
+    /// and emit progress events to the UI.
+    async fn sync_once(&self) -> Result<()> {
         let background_process_handle = self
             .tauri_handle
             .new_background_process_with_initial_progress(
@@ -894,6 +897,29 @@ impl Wallet {
         background_process_handle.finish();
 
         Ok(())
+    }
+
+    /// Sync the wallet with the blockchain and emit progress events to the UI.
+    /// Retries the sync if it fails using an exponential backoff.
+    pub async fn sync(&self) -> Result<()> {
+        let backoff = backoff::ExponentialBackoffBuilder::new()
+            .with_max_elapsed_time(Some(Self::SYNC_MAX_ELAPSED_TIME))
+            .with_max_interval(Duration::from_secs(1))
+            .build();
+
+        backoff::future::retry_notify(
+            backoff,
+            || async { self.sync_once().await.map_err(backoff::Error::transient) },
+            |err, wait_time: Duration| {
+                tracing::warn!(
+                    ?err,
+                    "Failed to sync Bitcoin wallet. We will retry in {} seconds",
+                    wait_time.as_secs()
+                );
+            },
+        )
+        .await
+        .context("Failed to sync Bitcoin wallet after retries")
     }
 
     /// Calculate the fee for a given transaction.
