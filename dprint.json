@@ -8,8 +8,16 @@
     "rustfmt": "rustfmt --edition 2021",
     "rustfmt.associations": "**/*.rs"
   },
-  "includes": ["**/*.{md}", "**/*.{toml}", "**/*.{rs}"],
-  "excludes": ["target/", "src-tauri/Cargo.toml"],
+  "includes": [
+    "**/*.{md}",
+    "**/*.{toml}",
+    "**/*.{rs}"
+  ],
+  "excludes": [
+    "target/",
+    "src-tauri/Cargo.toml",
+    "monero-sys/monero/"
+  ],
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.13.1.wasm",
     "https://github.com/thomaseizinger/dprint-plugin-cargo-toml/releases/download/0.1.0/cargo-toml-0.1.0.wasm",
