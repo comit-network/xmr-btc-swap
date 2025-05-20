@@ -300,6 +300,13 @@ impl ContextBuilder {
                 data_dir.join("logs"),
                 self.tauri_handle.clone(),
             );
+            tracing::info!(
+                binary = "cli",
+                version = env!("VERGEN_GIT_DESCRIBE"),
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH,
+                "Setting up context"
+            );
         });
 
         // Create the data structure we use to manage the swap lock

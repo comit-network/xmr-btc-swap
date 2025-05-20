@@ -86,6 +86,13 @@ pub async fn main() -> Result<()> {
     let log_dir = config.data.dir.join("logs");
     common::tracing_util::init(LevelFilter::DEBUG, format, log_dir, None)
         .expect("initialize tracing");
+    tracing::info!(
+        binary = "asb",
+        version = env!("VERGEN_GIT_DESCRIBE"),
+        os = std::env::consts::OS,
+        arch = std::env::consts::ARCH,
+        "Setting up context"
+    );
 
     // Check for conflicting env / config values
     if config.monero.network != env_config.monero_network {
