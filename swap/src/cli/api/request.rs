@@ -10,7 +10,7 @@ use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::{bob, State};
-use crate::{bitcoin, cli, monero, rpc};
+use crate::{bitcoin, cli, monero};
 use ::bitcoin::address::NetworkUnchecked;
 use ::bitcoin::Txid;
 use ::monero::Network;
@@ -25,7 +25,6 @@ use serde_json::json;
 use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -188,22 +187,6 @@ impl Request for ListSellersArgs {
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
         list_sellers(self, ctx).await
-    }
-}
-
-// StartDaemon
-#[typeshare]
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct StartDaemonArgs {
-    #[typeshare(serialized_as = "string")]
-    pub server_address: Option<SocketAddr>,
-}
-
-impl Request for StartDaemonArgs {
-    type Response = serde_json::Value;
-
-    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        start_daemon(self, (*ctx).clone()).await
     }
 }
 
@@ -1042,26 +1025,6 @@ pub async fn withdraw_btc(
         txid: signed_tx.compute_txid().to_string(),
         amount,
     })
-}
-
-#[tracing::instrument(fields(method = "start_daemon"), skip(context))]
-pub async fn start_daemon(
-    start_daemon: StartDaemonArgs,
-    context: Context,
-) -> Result<serde_json::Value> {
-    let StartDaemonArgs { server_address } = start_daemon;
-    // Default to 127.0.0.1:1234
-    let server_address = server_address.unwrap_or("127.0.0.1:1234".parse()?);
-
-    let (addr, server_handle) = rpc::run_server(server_address, context).await?;
-
-    tracing::info!(%addr, "Started RPC server");
-
-    server_handle.stopped().await;
-
-    tracing::info!("Stopped RPC server");
-
-    Ok(json!({}))
 }
 
 #[tracing::instrument(fields(method = "get_balance"), skip(context))]

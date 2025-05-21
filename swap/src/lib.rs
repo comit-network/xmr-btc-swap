@@ -29,7 +29,6 @@ pub mod monero;
 mod monero_ext;
 pub mod network;
 pub mod protocol;
-pub mod rpc;
 pub mod seed;
 pub mod tracing_ext;
 

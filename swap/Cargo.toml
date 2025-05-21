@@ -43,8 +43,6 @@ ecdsa_fun = { version = "0.10", default-features = false, features = [
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-jsonrpsee = { version = "0.16.2", features = [ "server" ] }
-jsonrpsee-core = "0.16.2"
 libp2p = { version = "0.53.2", features = [ "tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa" ] }
 libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", branch = "main", features = [ "listen-onion-service" ] }
 moka = { version = "0.12", features = [ "sync", "future" ] }
@@ -129,7 +127,6 @@ zip = "0.5"
 [dev-dependencies]
 bitcoin-harness = { git = "https://github.com/UnstoppableSwap/bitcoin-harness-rs", branch = "master" }
 get-port = "3"
-jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 mockito = "1.4"
 monero-harness = { path = "../monero-harness" }
 proptest = "1"

@@ -262,29 +262,6 @@ jobs:
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --test ${{ matrix.test_name }} -- --nocapture
 
-  rpc_tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4.1.7
-
-      - uses: Swatinem/rust-cache@v2.7.3
-
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
-        run: |
-          sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-
-      - name: Run RPC server tests
-        run: cargo test --package swap --test rpc -- --nocapture
 
   check_stable:
     runs-on: ubuntu-latest

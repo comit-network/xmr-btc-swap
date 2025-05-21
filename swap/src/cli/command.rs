@@ -1,8 +1,7 @@
 use crate::bitcoin::{bitcoin_address, Amount};
 use crate::cli::api::request::{
     BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, ExportBitcoinWalletArgs, GetConfigArgs,
-    GetHistoryArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, StartDaemonArgs,
-    WithdrawBtcArgs,
+    GetHistoryArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, WithdrawBtcArgs,
 };
 use crate::cli::api::Context;
 use crate::monero;
@@ -11,7 +10,6 @@ use anyhow::Result;
 use bitcoin::address::NetworkUnchecked;
 use libp2p::core::Multiaddr;
 use std::ffi::OsString;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -169,30 +167,6 @@ where
             }
             .request(context.clone())
             .await?;
-
-            Ok(context)
-        }
-        CliCommand::StartDaemon {
-            server_address,
-            bitcoin,
-            monero,
-            tor,
-        } => {
-            let context = Arc::new(
-                ContextBuilder::new(is_testnet)
-                    .with_tor(tor.enable_tor)
-                    .with_bitcoin(bitcoin)
-                    .with_monero(monero)
-                    .with_data_dir(data)
-                    .with_debug(debug)
-                    .with_json(json)
-                    .build()
-                    .await?,
-            );
-
-            StartDaemonArgs { server_address }
-                .request(context.clone())
-                .await?;
 
             Ok(context)
         }
@@ -429,23 +403,6 @@ enum CliCommand {
     Balance {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
-    },
-    #[structopt(about = "Starts a JSON-RPC server")]
-    StartDaemon {
-        #[structopt(flatten)]
-        bitcoin: Bitcoin,
-
-        #[structopt(flatten)]
-        monero: Monero,
-
-        #[structopt(
-            long = "server-address",
-            help = "The socket address the server should use"
-        )]
-        server_address: Option<SocketAddr>,
-
-        #[structopt(flatten)]
-        tor: Tor,
     },
     /// Resume a swap
     Resume {
