@@ -395,7 +395,7 @@ mod tests {
     use crate::protocol::alice::AliceState;
     use crate::protocol::bob::BobState;
     use std::fs::File;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
 
     #[tokio::test]
     async fn test_insert_and_load_state() {
@@ -504,10 +504,14 @@ mod tests {
     }
 
     async fn setup_test_db() -> Result<SqliteDatabase> {
-        let temp_db = tempdir().unwrap().into_path().join("tempdb");
+        let dir: TempDir = tempdir().unwrap();
+        let temp_db = dir.path().join("tempdb");
 
         // file has to exist in order to connect with sqlite
-        File::create(temp_db.clone()).unwrap();
+        File::create(&temp_db).unwrap();
+
+        // keep the directory alive for the duration of the test
+        let _db_dir = dir.keep();
 
         let db = SqliteDatabase::open(temp_db, AccessMode::ReadWrite).await?;
 
