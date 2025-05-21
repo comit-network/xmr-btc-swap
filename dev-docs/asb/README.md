@@ -112,9 +112,13 @@ min_buy_btc = 0.0001
 max_buy_btc = 0.0001
 ask_spread = 0.02
 price_ticker_ws_url = "wss://ws.kraken.com"
+external_bitcoin_address = "bc1..."
 ```
 
 The minimum and maximum amount as well as a spread, that is added on top of the price fetched from a central exchange, can be configured.
+
+`external_bitcoin_address` allows to specify the Bitcoin address that the ASB will use to redeem or punish swaps.
+If the option is not set, a new address from the internal wallet is used for every swap.
 
 In order to be able to trade, the ASB must define a price to be able to agree on the amounts to be swapped with a CLI.
 The `XMR<>BTC` price is currently determined by the price from the central exchange Kraken.

@@ -118,6 +118,7 @@ min_buy_btc = 0.001
 max_buy_btc = 0.1
 ask_spread = 0.02
 price_ticker_ws_url = "wss://ws.kraken.com/"
+external_bitcoin_address = "bc1..."
 
 # ...
 ```
@@ -130,6 +131,7 @@ Below an explanation of what each option does:
 | `max_buy_btc` | The maximum amount of Bitcoin the asb will buy from takers, in BTC. |
 | `ask_spread` | The markup the asb will charge compared to the market price, as a factor. The market price is fetched via the `price_ticker_ws_url`. A value of `0.02` means the asb will charge 2% more than the market price. |
 | `price_ticker_ws_url` | The URL of a websocket that provides the market price. The default is the Kraken API, but you can build your own websocket server which mimics the Kraken API. |
+| `external_bitcoin_address` | Bitcoin address used by the asb when redeeming or punishing swaps. If omitted, a new internal address is generated for each swap. |
 
 ### Bitcoin Section
 
@@ -247,6 +249,7 @@ min_buy_btc = 0.001
 max_buy_btc = 0.1
 ask_spread = 0.02
 price_ticker_ws_url = "wss://ws.kraken.com/"
+external_bitcoin_address = "bc1..."
 
 [bitcoin]
 electrum_rpc_url = "tcp://mainnet_electrs:50001"

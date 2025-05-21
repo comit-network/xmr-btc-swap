@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Docs: Document `external_bitcoin_address` option for using a specific
+  Bitcoin address when redeeming or punishing swaps.
+
 ## [1.1.1] - 2025-05-20
 
 - CLI + GUI + ASB: Retry the Bitcoin wallet sync up to 15 seconds to work around transient errors.
