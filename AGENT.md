@@ -36,3 +36,12 @@ Other files such as `swap/src/bin/asb.rs`, `swap/src/cli/api.rs`, and `src-gui/p
 - **src-gui** is the TypeScript/React interface. It communicates with the Rust back end through the commands defined in `src-tauri`.
 - Helper crates like **monero-rpc** and **monero-wallet** provide abstractions over external services. They are used by the swap crate to interact with Monero.
 - Continuous integration and release workflows live in `.github/workflows`. They build binaries, create releases and lint the code base.
+
+## Pull request titles
+
+Use descriptive titles following the `<type>(<scope>): <description>` format. Examples include:
+
+- `feat(gui): New feature`
+- `fix(swap): Issue fixed`
+- `refactor(ci): Ci changes`
+
