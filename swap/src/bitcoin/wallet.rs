@@ -43,9 +43,9 @@ use super::bitcoin_address::revalidate_network;
 use super::BlockHeight;
 use derive_builder::Builder;
 
-/// Assuming we add a spread of 3% we don't want to pay more than 3% of the
-/// amount for tx fees.
-const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.03);
+/// We allow transaction fees of up to 20% of the transferred amount to ensure
+/// that lock transactions can always be published, even when fees are high.
+const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.20);
 const MAX_ABSOLUTE_TX_FEE: Decimal = dec!(100_000);
 const DUST_AMOUNT: Amount = Amount::from_sat(546);
 
@@ -2106,15 +2106,15 @@ mod tests {
         let relay_fee = bitcoin::Amount::ONE_SAT;
         let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
-        // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take max
-        // relative fee.
-        let should_fee = bitcoin::Amount::from_sat(30_000);
+        // weight / 4.0 *  sat_per_vb would be greater than 20% of the transfer
+        // amount, hence we cap the fee at the relative maximum.
+        let should_fee = bitcoin::Amount::from_sat(100_000);
         assert_eq!(is_fee, should_fee);
     }
 
     #[test]
     fn given_1BTC_and_4mio_sats_per_vb_fees_should_hit_total_max() {
-        // even if we send 1BTC we don't want to pay 0.3BTC in fees. This would be
+        // Even if we send 1BTC we don't want to pay 0.2BTC in fees. This would be
         // $1,650 at the moment.
         let weight = 400;
         let amount = bitcoin::Amount::from_sat(100_000_000);
@@ -2125,7 +2125,7 @@ mod tests {
         let relay_fee = bitcoin::Amount::ONE_SAT;
         let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
-        // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take total
+        // weight / 4.0 *  sat_per_vb would be greater than 20% hence we take total
         // max allowed fee.
         assert_eq!(is_fee.to_sat(), MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
     }
