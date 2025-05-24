@@ -49,6 +49,18 @@ const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.20);
 const MAX_ABSOLUTE_TX_FEE: Decimal = dec!(100_000);
 const DUST_AMOUNT: Amount = Amount::from_sat(546);
 
+// We add a safety margin on top of the estimation by the Electrum server
+//
+// If we don't get confirmed in time, the user will have to refund which takes another two
+// Bitcoin transactions (which cost money)
+//
+// Therefore it's worth overpaying a bit to ensure that the transaction is confirmed in time
+// and we don't have to refund.
+//
+// Some of the pre signed transactions won't be published for 6h-36h
+// The mempool might fill up by then which is another reason to overpay here.
+const SAFETY_MARGIN_TX_FEE: Decimal = dec!(0.25);
+
 /// This is our wrapper around a bdk wallet and a corresponding
 /// bdk electrum client.
 /// It unifies all the functionality we need when interacting
@@ -1581,8 +1593,9 @@ fn estimate_fee(
     let weight = Decimal::from(weight);
     let weight_factor = dec!(4.0);
     let fee_rate = Decimal::from_u64(fee_rate_svb).context("Failed to parse fee rate")?;
+    let fee_rate_with_margin = fee_rate * (Decimal::ONE + SAFETY_MARGIN_TX_FEE);
 
-    let sats_per_vbyte = weight / weight_factor * fee_rate;
+    let sats_per_vbyte = weight / weight_factor * fee_rate_with_margin;
 
     tracing::debug!(
         %weight,
