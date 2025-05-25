@@ -10,7 +10,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const GITHUB_ISSUE_URL =
-  "https://github.com/UnstoppableSwap/unstoppableswap-gui/issues/new/choose";
+  "https://github.com/UnstoppableSwap/core/issues/new/choose";
 const MATRIX_ROOM_URL = "https://matrix.to/#/#unstoppableswap:matrix.org";
 export const DISCORD_URL = "https://discord.gg/aqSyyJ35UW";
 
