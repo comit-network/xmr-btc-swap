@@ -152,7 +152,8 @@ impl Wallet {
         // we just try to open it instead
         match result {
             Ok(_) => Ok(()),
-            Err(error) if error.to_string().contains("Wallet already exists") => {
+            // See: https://github.com/monero-project/monero/blob/master/src/wallet/wallet_rpc_server_error_codes.h#L54
+            Err(jsonrpc::Error::JsonRpc(jsonrpc::JsonRpcError { code: -21, .. })) => {
                 tracing::debug!(
                     monero_wallet_name = &file_name,
                     "Cannot create wallet because it already exists, loading instead"
