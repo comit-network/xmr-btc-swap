@@ -44,4 +44,3 @@ Use descriptive titles following the `<type>(<scope>): <description>` format. Ex
 - `feat(gui): New feature`
 - `fix(swap): Issue fixed`
 - `refactor(ci): Ci changes`
-
