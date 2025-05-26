@@ -553,7 +553,19 @@ async fn init_monero_wallet(
 
     const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
-    let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero"), tauri_handle).await?;
+    let monero_dir = data_dir.join("monero");
+
+    // remove monitoring wallet if it exists
+    let wallet_path = monero_dir.join(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME);
+    if wallet_path.exists() {
+        let _ = tokio::fs::remove_file(&wallet_path).await;
+    }
+    let keys_path = wallet_path.with_extension("keys");
+    if keys_path.exists() {
+        let _ = tokio::fs::remove_file(keys_path).await;
+    }
+
+    let monero_wallet_rpc = monero::WalletRpc::new(monero_dir, tauri_handle).await?;
 
     tracing::debug!(
         override_monero_daemon_address = monero_daemon_address.clone().into(),
