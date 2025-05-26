@@ -1,3 +1,8 @@
+> [!CAUTION]
+> # THIS REPO IS UNMAINTAINED <br>PLEASE USE [UNSTOPPABLESWAP]([url](https://github.com/UnstoppableSwap/core)) INSTEAD
+
+**This repository is unmaintained**. The original developers (@comit-network) have moved on to other projects. Community volunteers are continuing development at [UnstoppableSwap/core](https://github.com/UnstoppableSwap/core), which includes a graphical user interface. Please note that the fork has introduced network-level breaking changes, making it incompatible with peers running this repository - you will not be able to initiate swaps with them.
+
 # XMR to BTC Atomic Swap
 
 This repository hosts an MVP for atomically swapping BTC to XMR.
@@ -8,10 +13,6 @@ More information about the protocol in this [presentation](https://youtu.be/Jj8r
 Currently, swaps are only offered in one direction with the `swap` CLI on the buying side (send BTC, receive XMR).
 We are working on implementing a protocol where XMR moves first, but are currently blocked by advances on Monero itself.
 You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-presigning) for more information.
-
-## Maintenance
-
-**This repository is unmaintained**. The original developers (@comit-network) have moved on to other projects. Community volunteers are continuing development at [UnstoppableSwap/core](https://github.com/UnstoppableSwap/core), which includes a graphical user interface. Please note that the fork has introduced network-level breaking changes, making it incompatible with peers running this repository - you will not be able to initiate swaps with them.
 
 ## Quick Start
 
