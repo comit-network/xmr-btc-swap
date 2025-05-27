@@ -39,10 +39,12 @@ impl Swap {
         monero_receive_address: monero::Address,
         bitcoin_change_address: bitcoin::Address,
         btc_amount: bitcoin::Amount,
+        tx_lock_fee: bitcoin::Amount,
     ) -> Self {
         Self {
             state: BobState::Started {
                 btc_amount,
+                tx_lock_fee,
                 change_address: bitcoin_change_address,
             },
             event_loop_handle,

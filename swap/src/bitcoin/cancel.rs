@@ -5,6 +5,7 @@ use crate::bitcoin::{
 };
 use ::bitcoin::sighash::SighashCache;
 use ::bitcoin::transaction::Version;
+use ::bitcoin::Weight;
 use ::bitcoin::{
     locktime::absolute::LockTime as PackedLockTime, secp256k1, sighash::SegwitV0Sighash as Sighash,
     EcdsaSighashType, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Txid,
@@ -283,8 +284,8 @@ impl TxCancel {
         }
     }
 
-    pub fn weight() -> usize {
-        596
+    pub fn weight() -> Weight {
+        Weight::from_wu(596)
     }
 }
 

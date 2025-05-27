@@ -136,6 +136,7 @@ impl Handler {
 pub struct NewSwap {
     pub swap_id: Uuid,
     pub btc: bitcoin::Amount,
+    pub tx_lock_fee: bitcoin::Amount,
     pub tx_refund_fee: bitcoin::Amount,
     pub tx_cancel_fee: bitcoin::Amount,
     pub bitcoin_refund_address: bitcoin::Address,
@@ -211,10 +212,11 @@ impl ConnectionHandler for Handler {
                             xmr,
                             env_config.bitcoin_cancel_timelock,
                             env_config.bitcoin_punish_timelock,
-                            new_swap_request.bitcoin_refund_address,
+                            new_swap_request.bitcoin_refund_address.clone(),
                             env_config.monero_finality_confirmations,
                             new_swap_request.tx_refund_fee,
                             new_swap_request.tx_cancel_fee,
+                            new_swap_request.tx_lock_fee,
                         );
 
                         write_cbor_message(&mut substream, state0.next_message())

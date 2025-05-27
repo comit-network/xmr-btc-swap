@@ -1,3 +1,4 @@
+use super::request::BalanceResponse;
 use crate::bitcoin;
 use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
 use anyhow::{anyhow, Context, Result};
@@ -13,8 +14,6 @@ use tokio::sync::{oneshot, Mutex as TokioMutex};
 use typeshare::typeshare;
 use url::Url;
 use uuid::Uuid;
-
-use super::request::BalanceResponse;
 
 #[typeshare]
 #[derive(Clone, Serialize)]

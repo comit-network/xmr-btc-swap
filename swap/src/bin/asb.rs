@@ -310,19 +310,22 @@ pub async fn main() -> Result<()> {
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
-            let amount = match amount {
-                Some(amount) => amount,
+            let withdraw_tx_unsigned = match amount {
+                Some(amount) => {
+                    bitcoin_wallet
+                        .send_to_address_dynamic_fee(address, amount, None)
+                        .await?
+                }
                 None => {
                     bitcoin_wallet
-                        .max_giveable(address.script_pubkey().len())
+                        .sweep_balance_to_address_dynamic_fee(address)
                         .await?
                 }
             };
 
-            let psbt = bitcoin_wallet
-                .send_to_address(address, amount, None)
+            let signed_tx = bitcoin_wallet
+                .sign_and_finalize(withdraw_tx_unsigned)
                 .await?;
-            let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
 
             bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
         }
@@ -420,6 +423,7 @@ async fn init_bitcoin_wallet(
         })
         .finality_confirmations(env_config.bitcoin_finality_confirmations)
         .target_block(config.bitcoin.target_block)
+        .use_mempool_space_fee_estimation(config.bitcoin.use_mempool_space_fee_estimation)
         .sync_interval(env_config.bitcoin_sync_interval())
         .build()
         .await

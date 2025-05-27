@@ -51,8 +51,8 @@ mod tests {
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::ZERO,
-            Amount::from_btc(0.0009).unwrap(),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::from_btc(0.0009).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -65,7 +65,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -78,10 +77,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
- INFO swap::api::request: Deposit at least 0.00001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.001 BTC max_giveable=0.0009 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.00001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.00001000 BTC max_deposit_until_maximum_amount_is_reached=0.01001000 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.00100000 BTC max_giveable=0.00090000 BTC
 "
         );
     }
@@ -90,8 +89,8 @@ mod tests {
     async fn given_no_balance_and_transfers_more_then_swaps_max_quantity_from_quote() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::ZERO,
-            Amount::from_btc(0.1).unwrap(),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::from_btc(0.1).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -104,7 +103,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -117,10 +115,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
- INFO swap::api::request: Deposit at least 0.00001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.1001 BTC max_giveable=0.1 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.00001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.00001000 BTC max_deposit_until_maximum_amount_is_reached=0.01001000 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.10010000 BTC max_giveable=0.10000000 BTC
 "
         );
     }
@@ -129,8 +127,8 @@ mod tests {
     async fn given_initial_balance_below_max_quantity_swaps_max_giveable() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::from_btc(0.0049).unwrap(),
-            Amount::from_btc(99.9).unwrap(),
+            (Amount::from_btc(0.0049).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(99.9).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -143,7 +141,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -156,7 +153,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            " INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC\n"
+            " INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC\n"
         );
     }
 
@@ -164,8 +161,8 @@ mod tests {
     async fn given_initial_balance_above_max_quantity_swaps_max_quantity() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::from_btc(0.1).unwrap(),
-            Amount::from_btc(99.9).unwrap(),
+            (Amount::from_btc(0.1).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(99.9).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -178,7 +175,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -191,7 +187,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            " INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC\n"
+            " INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0 BTC maximum_amount=0.01000000 BTC\n"
         );
     }
 
@@ -199,8 +195,8 @@ mod tests {
     async fn given_no_initial_balance_then_min_wait_for_sufficient_deposit() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::ZERO,
-            Amount::from_btc(0.01).unwrap(),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -213,7 +209,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -226,10 +221,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Deposit at least 0.01001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.01001 BTC max_giveable=0 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=21000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.01001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.01001000 BTC max_deposit_until_maximum_amount_is_reached=21000000.00001000 BTC max_giveable=0 BTC minimum_amount=0.01000000 BTC maximum_amount=21000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
 "
         );
     }
@@ -238,8 +233,8 @@ mod tests {
     async fn given_balance_less_then_min_wait_for_sufficient_deposit() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::from_btc(0.0001).unwrap(),
-            Amount::from_btc(0.01).unwrap(),
+            (Amount::from_btc(0.0001).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
@@ -252,7 +247,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -265,10 +259,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Deposit at least 0.00991 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00991 BTC max_giveable=0.0001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=21000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.00991000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.00991000 BTC max_deposit_until_maximum_amount_is_reached=20999999.99991000 BTC max_giveable=0.00010000 BTC minimum_amount=0.01000000 BTC maximum_amount=21000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
 "
         );
     }
@@ -277,11 +271,11 @@ mod tests {
     async fn given_no_initial_balance_and_transfers_less_than_min_keep_waiting() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::ZERO,
-            Amount::from_btc(0.01).unwrap(),
-            Amount::from_btc(0.01).unwrap(),
-            Amount::from_btc(0.01).unwrap(),
-            Amount::from_btc(0.01).unwrap(),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let error = tokio::time::timeout(
@@ -296,7 +290,6 @@ mod tests {
                     result.give()
                 },
                 || async { Ok(()) },
-                |_| async { Ok(Amount::from_sat(1000)) },
                 None,
                 None,
             ),
@@ -307,13 +300,13 @@ mod tests {
         assert!(matches!(error, tokio::time::error::Elapsed { .. }));
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Deposit at least 0.10001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001 BTC max_giveable=0 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
- INFO swap::api::request: Deposited amount is less than `min_quantity`
- INFO swap::api::request: Deposit at least 0.09001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.09001 BTC max_giveable=0.01 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=21000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.10001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.10001000 BTC max_deposit_until_maximum_amount_is_reached=21000000.00001000 BTC max_giveable=0 BTC minimum_amount=0.10000000 BTC maximum_amount=21000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+ INFO swap::cli::api::request: Deposited amount is not enough to cover `min_quantity` when accounting for network fees
+ INFO swap::cli::api::request: Deposit at least 0.09001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.09001000 BTC max_deposit_until_maximum_amount_is_reached=20999999.99001000 BTC max_giveable=0.01000000 BTC minimum_amount=0.10000000 BTC maximum_amount=21000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
 "
         );
     }
@@ -322,16 +315,16 @@ mod tests {
     async fn given_longer_delay_until_deposit_should_not_spam_user() {
         let writer = capture_logs(LevelFilter::INFO);
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::ZERO,
-            Amount::from_btc(0.2).unwrap(),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::ZERO, Amount::from_sat(1000)),
+            (Amount::from_btc(0.2).unwrap(), Amount::from_sat(1000)),
         ])));
 
         tokio::time::timeout(
@@ -347,7 +340,6 @@ mod tests {
                     result.give()
                 },
                 || async { Ok(()) },
-                |_| async { Ok(Amount::from_sat(1000)) },
                 None,
                 None,
             ),
@@ -358,10 +350,10 @@ mod tests {
 
         assert_eq!(
             writer.captured(),
-            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Deposit at least 0.10001 BTC to cover the min quantity with fee!
- INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001 BTC max_giveable=0 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap::api::request: Received Bitcoin new_balance=0.21 BTC max_giveable=0.2 BTC
+            r" INFO swap::cli::api::request: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=21000000 BTC
+ INFO swap::cli::api::request: Deposit at least 0.10001000 BTC to cover the min quantity with fee!
+ INFO swap::cli::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit_until_swap_will_start=0.10001000 BTC max_deposit_until_maximum_amount_is_reached=21000000.00001000 BTC max_giveable=0 BTC minimum_amount=0.10000000 BTC maximum_amount=21000000 BTC min_bitcoin_lock_tx_fee=0.00001000 BTC price=0.00100000 BTC
+ INFO swap::cli::api::request: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
 "
         );
     }
@@ -369,8 +361,8 @@ mod tests {
     #[tokio::test]
     async fn given_bid_quote_max_amount_0_return_error() {
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
-            Amount::from_btc(0.0001).unwrap(),
-            Amount::from_btc(0.01).unwrap(),
+            (Amount::from_btc(0.0001).unwrap(), Amount::from_sat(1000)),
+            (Amount::from_btc(0.01).unwrap(), Amount::from_sat(1000)),
         ])));
 
         let determination_error = determine_btc_to_swap(
@@ -383,7 +375,6 @@ mod tests {
                 result.give()
             },
             || async { Ok(()) },
-            |_| async { Ok(Amount::from_sat(1000)) },
             None,
             None,
         )
@@ -396,18 +387,18 @@ mod tests {
     }
 
     struct MaxGiveable {
-        amounts: Vec<Amount>,
+        amounts: Vec<(Amount, Amount)>,
         call_counter: usize,
     }
 
     impl MaxGiveable {
-        fn new(amounts: Vec<Amount>) -> Self {
+        fn new(amounts: Vec<(Amount, Amount)>) -> Self {
             Self {
                 amounts,
                 call_counter: 0,
             }
         }
-        fn give(&mut self) -> Result<Amount> {
+        fn give(&mut self) -> Result<(Amount, Amount)> {
             let amount = self
                 .amounts
                 .get(self.call_counter)
@@ -428,7 +419,7 @@ mod tests {
     fn quote_with_min(btc: f64) -> BidQuote {
         BidQuote {
             price: Amount::from_btc(0.001).unwrap(),
-            max_quantity: Amount::MAX,
+            max_quantity: Amount::MAX_MONEY,
             min_quantity: Amount::from_btc(btc).unwrap(),
         }
     }

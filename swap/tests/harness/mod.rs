@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
-use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
+use swap::bitcoin::{CancelTimelock, PunishTimelock};
 use swap::cli::api;
 use swap::database::{AccessMode, SqliteDatabase};
 use swap::env::{Config, GetConfig};
@@ -486,6 +486,7 @@ impl BobParams {
             self.monero_wallet.lock().await.get_main_address(),
             self.bitcoin_wallet.new_address().await?,
             btc_amount,
+            bitcoin::Amount::from_sat(1000), // Fixed fee of 1000 satoshis for now
         );
 
         Ok((swap, event_loop))
@@ -655,12 +656,16 @@ impl TestContext {
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::BtcPunished { .. }));
+        let (cancel_fee, punish_fee) = match state {
+            AliceState::BtcPunished { state3 } => (state3.tx_cancel_fee, state3.tx_punish_fee),
+            _ => panic!("Alice is not in btc punished state: {:?}", state),
+        };
 
         assert_eventual_balance(
             self.alice_bitcoin_wallet.as_ref(),
             Ordering::Equal,
-            self.alice_punished_btc_balance().await,
+            self.alice_punished_btc_balance(cancel_fee, punish_fee)
+                .await,
         )
         .await
         .unwrap();
@@ -698,10 +703,13 @@ impl TestContext {
     pub async fn assert_bob_refunded(&self, state: BobState) {
         self.bob_bitcoin_wallet.sync().await.unwrap();
 
-        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
-            state4.tx_lock_id()
-        } else {
-            panic!("Bob is not in btc refunded state: {:?}", state);
+        let (lock_tx_id, cancel_fee, refund_fee) = match state {
+            BobState::BtcRefunded(state6) => (
+                state6.tx_lock_id(),
+                state6.tx_cancel_fee,
+                state6.tx_refund_fee,
+            ),
+            _ => panic!("Bob is not in btc refunded state: {:?}", state),
         };
         let lock_tx_bitcoin_fee = self
             .bob_bitcoin_wallet
@@ -710,17 +718,6 @@ impl TestContext {
             .unwrap();
 
         let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
-
-        let cancel_fee = self
-            .alice_bitcoin_wallet
-            .estimate_fee(TxCancel::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
-        let refund_fee = self
-            .alice_bitcoin_wallet
-            .estimate_fee(TxRefund::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
 
         let bob_cancelled_and_refunded = btc_balance_after_swap
             == self.bob_starting_balances.btc - lock_tx_bitcoin_fee - cancel_fee - refund_fee;
@@ -759,11 +756,21 @@ impl TestContext {
     }
 
     async fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
+        // Get the last transaction Alice published
+        // This should be btc_redeem
+        let txid = self
+            .alice_bitcoin_wallet
+            .last_published_txid()
+            .await
+            .unwrap();
+
+        // Get the fee for the last transaction
         let fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxRedeem::weight(), self.btc_amount)
+            .transaction_fee(txid)
             .await
             .expect("To estimate fee correctly");
+
         self.alice_starting_balances.btc + self.btc_amount - fee
     }
 
@@ -801,17 +808,11 @@ impl TestContext {
         self.alice_starting_balances.xmr - self.xmr_amount
     }
 
-    async fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
-        let cancel_fee = self
-            .alice_bitcoin_wallet
-            .estimate_fee(TxCancel::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
-        let punish_fee = self
-            .alice_bitcoin_wallet
-            .estimate_fee(TxPunish::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
+    async fn alice_punished_btc_balance(
+        &self,
+        cancel_fee: bitcoin::Amount,
+        punish_fee: bitcoin::Amount,
+    ) -> bitcoin::Amount {
         self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee
     }
 

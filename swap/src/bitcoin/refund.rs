@@ -5,7 +5,7 @@ use crate::bitcoin::{
 };
 use crate::{bitcoin, monero};
 use ::bitcoin::sighash::SighashCache;
-use ::bitcoin::{secp256k1, ScriptBuf};
+use ::bitcoin::{secp256k1, ScriptBuf, Weight};
 use ::bitcoin::{sighash::SegwitV0Sighash as Sighash, EcdsaSighashType, Txid};
 use anyhow::{bail, Context, Result};
 use bdk_wallet::miniscript::Descriptor;
@@ -152,8 +152,8 @@ impl TxRefund {
         Ok(sig)
     }
 
-    pub fn weight() -> usize {
-        548
+    pub fn weight() -> Weight {
+        Weight::from_wu(548)
     }
 }
 

@@ -107,6 +107,7 @@ async fn next_state(
         BobState::Started {
             btc_amount,
             change_address,
+            tx_lock_fee,
         } => {
             let tx_refund_fee = bitcoin_wallet
                 .estimate_fee(TxRefund::weight(), btc_amount)
@@ -129,6 +130,7 @@ async fn next_state(
                 .setup_swap(NewSwap {
                     swap_id,
                     btc: btc_amount,
+                    tx_lock_fee,
                     tx_refund_fee,
                     tx_cancel_fee,
                     bitcoin_refund_address: change_address,

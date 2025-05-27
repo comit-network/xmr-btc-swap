@@ -402,11 +402,11 @@ pub struct State3 {
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
-    tx_punish_fee: bitcoin::Amount,
+    pub tx_punish_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
-    tx_refund_fee: bitcoin::Amount,
+    pub tx_refund_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
-    tx_cancel_fee: bitcoin::Amount,
+    pub tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State3 {

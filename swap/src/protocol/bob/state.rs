@@ -27,6 +27,7 @@ pub enum BobState {
     Started {
         #[serde(with = "::bitcoin::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
+        tx_lock_fee: bitcoin::Amount,
         #[serde(with = "address_serde")]
         change_address: bitcoin::Address,
     },
@@ -124,6 +125,7 @@ pub struct State0 {
     min_monero_confirmations: u64,
     tx_refund_fee: bitcoin::Amount,
     tx_cancel_fee: bitcoin::Amount,
+    tx_lock_fee: bitcoin::Amount,
 }
 
 impl State0 {
@@ -139,6 +141,7 @@ impl State0 {
         min_monero_confirmations: u64,
         tx_refund_fee: bitcoin::Amount,
         tx_cancel_fee: bitcoin::Amount,
+        tx_lock_fee: bitcoin::Amount,
     ) -> Self {
         let b = bitcoin::SecretKey::new_random(rng);
 
@@ -165,6 +168,7 @@ impl State0 {
             min_monero_confirmations,
             tx_refund_fee,
             tx_cancel_fee,
+            tx_lock_fee,
         }
     }
 
@@ -208,6 +212,7 @@ impl State0 {
         let tx_lock = bitcoin::TxLock::new(
             wallet,
             self.btc,
+            self.tx_lock_fee,
             msg.A,
             self.b.public(),
             self.refund_address.clone(),

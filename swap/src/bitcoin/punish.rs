@@ -1,8 +1,8 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
 use ::bitcoin::sighash::SighashCache;
-use ::bitcoin::ScriptBuf;
 use ::bitcoin::{secp256k1, sighash::SegwitV0Sighash as Sighash, EcdsaSighashType};
+use ::bitcoin::{ScriptBuf, Weight};
 use anyhow::{Context, Result};
 use bdk_wallet::miniscript::Descriptor;
 use std::collections::HashMap;
@@ -93,8 +93,8 @@ impl TxPunish {
         Ok(tx_punish)
     }
 
-    pub fn weight() -> usize {
-        548
+    pub fn weight() -> Weight {
+        Weight::from_wu(548)
     }
 }
 

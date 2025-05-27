@@ -12,6 +12,7 @@ pub enum Bob {
         btc_amount: bitcoin::Amount,
         #[serde(with = "crate::bitcoin::address_serde")]
         change_address: bitcoin::Address,
+        tx_lock_fee: bitcoin::Amount,
     },
     ExecutionSetupDone {
         state2: bob::State2,
@@ -54,9 +55,11 @@ impl From<BobState> for Bob {
             BobState::Started {
                 btc_amount,
                 change_address,
+                tx_lock_fee,
             } => Bob::Started {
                 btc_amount,
                 change_address,
+                tx_lock_fee,
             },
             BobState::SwapSetupCompleted(state2) => Bob::ExecutionSetupDone { state2 },
             BobState::BtcLocked {
@@ -96,9 +99,11 @@ impl From<Bob> for BobState {
             Bob::Started {
                 btc_amount,
                 change_address,
+                tx_lock_fee,
             } => BobState::Started {
                 btc_amount,
                 change_address,
+                tx_lock_fee,
             },
             Bob::ExecutionSetupDone { state2 } => BobState::SwapSetupCompleted(state2),
             Bob::BtcLocked {

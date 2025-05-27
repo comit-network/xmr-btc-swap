@@ -729,8 +729,10 @@ pub async fn buy_xmr(
                 }
             },
             swap_result = async {
-                let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
-                let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
+                let max_givable = || async {
+                    let (amount, fee) = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
+                    Ok((amount, fee))
+                };
 
                 let determine_amount = determine_btc_to_swap(
                     context.config.json,
@@ -739,12 +741,11 @@ pub async fn buy_xmr(
                     || bitcoin_wallet.balance(),
                     max_givable,
                     || bitcoin_wallet.sync(),
-                    estimate_fee,
                     context.tauri_handle.clone(),
                     Some(swap_id)
                 );
 
-                let (amount, fees) = match determine_amount.await {
+                let (tx_lock_amount, tx_lock_fee) = match determine_amount.await {
                     Ok(val) => val,
                     Err(error) => match error.downcast::<ZeroQuoteReceived>() {
                         Ok(_) => {
@@ -754,7 +755,7 @@ pub async fn buy_xmr(
                     },
                 };
 
-                tracing::info!(%amount, %fees,  "Determined swap amount");
+                tracing::info!(%tx_lock_amount, %tx_lock_fee, "Determined swap amount");
 
                 context.db.insert_peer_id(swap_id, seller_peer_id).await?;
 
@@ -767,7 +768,8 @@ pub async fn buy_xmr(
                     event_loop_handle,
                     monero_receive_address,
                     bitcoin_change_address,
-                    amount,
+                    tx_lock_amount,
+                    tx_lock_fee
                 ).with_event_emitter(context.tauri_handle.clone());
 
                 bob::run(swap).await
@@ -1004,25 +1006,39 @@ pub async fn withdraw_btc(
         .as_ref()
         .context("Could not get Bitcoin wallet")?;
 
-    let amount = match amount {
-        Some(amount) => amount,
+    let (withdraw_tx_unsigned, amount) = match amount {
+        Some(amount) => {
+            let withdraw_tx_unsigned = bitcoin_wallet
+                .send_to_address_dynamic_fee(address, amount, None)
+                .await?;
+
+            (withdraw_tx_unsigned, amount)
+        }
         None => {
-            bitcoin_wallet
+            let (max_giveable, spending_fee) = bitcoin_wallet
                 .max_giveable(address.script_pubkey().len())
-                .await?
+                .await?;
+
+            let withdraw_tx_unsigned = bitcoin_wallet
+                .send_to_address(address, max_giveable, spending_fee, None)
+                .await?;
+
+            (withdraw_tx_unsigned, max_giveable)
         }
     };
-    let psbt = bitcoin_wallet
-        .send_to_address(address, amount, None)
+
+    let withdraw_tx = bitcoin_wallet
+        .sign_and_finalize(withdraw_tx_unsigned)
         .await?;
-    let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
 
     bitcoin_wallet
-        .broadcast(signed_tx.clone(), "withdraw")
+        .broadcast(withdraw_tx.clone(), "withdraw")
         .await?;
 
+    let txid = withdraw_tx.compute_txid();
+
     Ok(WithdrawBtcResponse {
-        txid: signed_tx.compute_txid().to_string(),
+        txid: txid.to_string(),
         amount,
     })
 }
@@ -1175,26 +1191,23 @@ fn qr_code(value: &impl ToString) -> Result<String> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
+pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS>(
     json: bool,
     bid_quote: BidQuote,
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
     balance: FB,
     max_giveable_fn: FMG,
     sync: FS,
-    estimate_fee: FFE,
     event_emitter: Option<TauriHandle>,
     swap_id: Option<Uuid>,
 ) -> Result<(bitcoin::Amount, bitcoin::Amount)>
 where
     TB: Future<Output = Result<bitcoin::Amount>>,
     FB: Fn() -> TB,
-    TMG: Future<Output = Result<bitcoin::Amount>>,
+    TMG: Future<Output = Result<(bitcoin::Amount, bitcoin::Amount)>>,
     FMG: Fn() -> TMG,
     TS: Future<Output = Result<()>>,
     FS: Fn() -> TS,
-    FFE: Fn(bitcoin::Amount) -> TFE,
-    TFE: Future<Output = Result<bitcoin::Amount>>,
 {
     if bid_quote.max_quantity == bitcoin::Amount::ZERO {
         bail!(ZeroQuoteReceived)
@@ -1208,12 +1221,16 @@ where
     );
 
     sync().await.context("Failed to sync of Bitcoin wallet")?;
-    let mut max_giveable = max_giveable_fn().await?;
+    let (mut max_giveable, mut spending_fee) = max_giveable_fn().await?;
 
     if max_giveable == bitcoin::Amount::ZERO || max_giveable < bid_quote.min_quantity {
         let deposit_address = get_new_address.await?;
         let minimum_amount = bid_quote.min_quantity;
         let maximum_amount = bid_quote.max_quantity;
+
+        // To avoid any issus, we clip maximum_amount to never go above the
+        // total maximim Bitcoin supply
+        let maximum_amount = maximum_amount.min(bitcoin::Amount::MAX_MONEY);
 
         if !json {
             eprintln!("{}", qr_code(&deposit_address)?);
@@ -1221,10 +1238,13 @@ where
 
         loop {
             let min_outstanding = bid_quote.min_quantity - max_giveable;
-            let min_bitcoin_lock_tx_fee = estimate_fee(min_outstanding).await?;
+            let min_bitcoin_lock_tx_fee = spending_fee; // Use the fee from max_giveable
             let min_deposit_until_swap_will_start = min_outstanding + min_bitcoin_lock_tx_fee;
-            let max_deposit_until_maximum_amount_is_reached =
-                maximum_amount - max_giveable + min_bitcoin_lock_tx_fee;
+            let max_deposit_until_maximum_amount_is_reached = maximum_amount
+                .checked_sub(max_giveable)
+                .context("Overflow when subtracting max_giveable from maximum_amount")?
+                .checked_add(min_bitcoin_lock_tx_fee)
+                .context(format!("Overflow when adding min_bitcoin_lock_tx_fee ({min_bitcoin_lock_tx_fee}) to max_giveable ({max_giveable}) with maximum_amount ({maximum_amount})"))?;
 
             tracing::info!(
                 "Deposit at least {} to cover the min quantity with fee!",
@@ -1256,14 +1276,14 @@ where
                 );
             }
 
-            max_giveable = loop {
+            (max_giveable, spending_fee) = loop {
                 sync()
                     .await
                     .context("Failed to sync Bitcoin wallet while waiting for deposit")?;
-                let new_max_givable = max_giveable_fn().await?;
+                let (new_max_givable, new_fee) = max_giveable_fn().await?;
 
                 if new_max_givable > max_giveable {
-                    break new_max_givable;
+                    break (new_max_givable, new_fee);
                 }
 
                 tokio::time::sleep(Duration::from_secs(1)).await;

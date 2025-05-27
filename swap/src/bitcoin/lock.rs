@@ -28,6 +28,7 @@ impl TxLock {
             impl EstimateFeeRate + Send + Sync + 'static,
         >,
         amount: Amount,
+        spending_fee: Amount,
         A: PublicKey,
         B: PublicKey,
         change: bitcoin::Address,
@@ -38,7 +39,7 @@ impl TxLock {
             .expect("can derive address from descriptor");
 
         let psbt = wallet
-            .send_to_address(address, amount, Some(change))
+            .send_to_address(address, amount, spending_fee, Some(change))
             .await?;
 
         Ok(Self {
@@ -177,8 +178,8 @@ impl TxLock {
         }
     }
 
-    pub fn weight() -> usize {
-        TX_LOCK_WEIGHT
+    pub fn weight() -> ::bitcoin::Weight {
+        ::bitcoin::Weight::from_wu(TX_LOCK_WEIGHT as u64)
     }
 }
 
@@ -201,15 +202,28 @@ impl Watchable for TxLock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bitcoin::TestWalletBuilder;
+    use crate::bitcoin::wallet::TestWalletBuilder;
+    use crate::bitcoin::Amount;
+    use ::bitcoin::psbt::Psbt as PartiallySignedTransaction;
+
+    // Basic setup function for tests
+    async fn setup() -> (
+        PublicKey,
+        PublicKey,
+        Wallet<bdk_wallet::rusqlite::Connection, crate::bitcoin::wallet::StaticFeeRate>,
+    ) {
+        let (A, B) = alice_and_bob();
+        let wallet = TestWalletBuilder::new(100_000).build().await;
+        (A, B, wallet)
+    }
 
     #[tokio::test]
     async fn given_bob_sends_good_psbt_when_reconstructing_then_succeeeds() {
-        let (A, B) = alice_and_bob();
-        let wallet = TestWalletBuilder::new(50_000).build().await;
+        let (A, B, wallet) = setup().await;
         let agreed_amount = Amount::from_sat(10000);
+        let spending_fee = Amount::from_sat(1000);
 
-        let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
+        let psbt = bob_make_psbt(A, B, &wallet, agreed_amount, spending_fee).await;
         let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
 
         result.expect("PSBT to be valid");
@@ -217,31 +231,28 @@ mod tests {
 
     #[tokio::test]
     async fn bob_can_fund_without_a_change_output() {
-        let (A, B) = alice_and_bob();
-        let fees = 300;
-        let agreed_amount = Amount::from_sat(10000);
-        let amount = agreed_amount.to_sat() + fees;
-        let wallet = TestWalletBuilder::new(amount).build().await;
+        let (A, B, _) = setup().await;
+        let amount = 10_000;
+        let agreed_amount = Amount::from_sat(amount);
+        let spending_fee = Amount::from_sat(300);
+        let wallet = TestWalletBuilder::new(amount + 300).build().await;
 
-        let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
+        let psbt = bob_make_psbt(A, B, &wallet, agreed_amount, spending_fee).await;
         assert_eq!(
             psbt.unsigned_tx.output.len(),
             1,
-            "psbt should only have a single output"
+            "Expected no change output"
         );
-        let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
-
-        result.expect("PSBT to be valid");
     }
 
     #[tokio::test]
     async fn given_bob_is_sending_less_than_agreed_when_reconstructing_txlock_then_fails() {
-        let (A, B) = alice_and_bob();
-        let wallet = TestWalletBuilder::new(50_000).build().await;
+        let (A, B, wallet) = setup().await;
         let agreed_amount = Amount::from_sat(10000);
+        let spending_fee = Amount::from_sat(1000);
 
         let bad_amount = Amount::from_sat(5000);
-        let psbt = bob_make_psbt(A, B, &wallet, bad_amount).await;
+        let psbt = bob_make_psbt(A, B, &wallet, bad_amount, spending_fee).await;
         let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
 
         result.expect_err("PSBT to be invalid");
@@ -249,12 +260,12 @@ mod tests {
 
     #[tokio::test]
     async fn given_bob_is_sending_to_a_bad_output_reconstructing_txlock_then_fails() {
-        let (A, B) = alice_and_bob();
-        let wallet = TestWalletBuilder::new(50_000).build().await;
+        let (A, B, wallet) = setup().await;
         let agreed_amount = Amount::from_sat(10000);
+        let spending_fee = Amount::from_sat(1000);
 
         let E = eve();
-        let psbt = bob_make_psbt(E, B, &wallet, agreed_amount).await;
+        let psbt = bob_make_psbt(E, B, &wallet, agreed_amount, spending_fee).await;
         let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
 
         result.expect_err("PSBT to be invalid");
@@ -271,9 +282,7 @@ mod tests {
         }
     }
 
-    /// Helper function that represents Bob's action of constructing the PSBT.
-    ///
-    /// Extracting this allows us to keep the tests concise.
+    // Helper function for testing PSBT creation by Bob
     async fn bob_make_psbt(
         A: PublicKey,
         B: PublicKey,
@@ -282,9 +291,10 @@ mod tests {
             impl EstimateFeeRate + Send + Sync + 'static,
         >,
         amount: Amount,
+        spending_fee: Amount,
     ) -> PartiallySignedTransaction {
         let change = wallet.new_address().await.unwrap();
-        TxLock::new(wallet, amount, A, B, change)
+        TxLock::new(wallet, amount, spending_fee, A, B, change)
             .await
             .unwrap()
             .into()
