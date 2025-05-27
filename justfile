@@ -31,11 +31,15 @@ gui:
 
 # Build the GUI
 gui_build:
-	cd src-gui && yarn build
+        cd src-gui && yarn build
+
+# Run the Rust tests
+tests:
+        cargo nextest run
 
 # Tests the Rust bindings for Monero
 test_monero_sys:
-	cd monero-sys && cargo test
+        cd monero-sys && cargo nextest run
 
 # Builds the ASB and Swap binaries
 swap:

@@ -9,12 +9,14 @@ There are a couple of things we are going to look out for in PRs and knowing the
 1. We have CI checks in place that validate formatting and code style.
    Make sure `dprint check` and `cargo clippy` both finish without any warnings or errors.
    If you don't already have it installed, you can obtain in [various ways](https://dprint.dev/install/).
-2. All text document (`CHANGELOG.md`, `README.md`, etc) should follow the [semantic linebreaks](https://sembr.org/) specification.
-3. We strive for atomic commits with good commit messages.
+2. Run the test suite with [cargo-nextest](https://nexte.st/docs/running/).
+   Install it using `cargo install cargo-nextest` and execute `cargo nextest run`.
+3. All text document (`CHANGELOG.md`, `README.md`, etc) should follow the [semantic linebreaks](https://sembr.org/) specification.
+4. We strive for atomic commits with good commit messages.
    As an inspiration, read [this](https://chris.beams.io/posts/git-commit/) blogpost.
    An atomic commit is a cohesive diff with formatting checks, linter and build passing.
    Ideally, all tests are passing as well but we acknowledge that this is not always possible depending on the change you are making.
-4. If you are making any user visible changes, include a changelog entry.
+5. If you are making any user visible changes, include a changelog entry.
 
 ## Contributing issues
 
