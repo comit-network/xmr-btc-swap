@@ -1,4 +1,6 @@
 use anyhow::Context as AnyhowContext;
+use std::collections::HashMap;
+use std::io::Write;
 use std::result::Result;
 use std::sync::Arc;
 use swap::cli::{
@@ -18,6 +20,8 @@ use swap::cli::{
     command::{Bitcoin, Monero},
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
+use tauri_plugin_dialog::DialogExt;
+use zip::{write::SimpleFileOptions, ZipWriter};
 
 /// Trait to convert Result<T, E> to Result<T, String>
 /// Tauri commands require the error type to be a string
@@ -165,6 +169,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_balance,
             get_monero_addresses,
@@ -186,7 +191,8 @@ pub fn run() {
             get_wallet_descriptor,
             get_data_dir,
             resolve_approval_request,
-            redact
+            redact,
+            save_txt_files
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -273,6 +279,51 @@ async fn get_data_dir(
         .to_string_result()?
         .to_string_lossy()
         .to_string())
+}
+
+#[tauri::command]
+async fn save_txt_files(
+    app: tauri::AppHandle,
+    zip_file_name: String,
+    content: HashMap<String, String>,
+) -> Result<(), String> {
+    // Step 1: Get the owned PathBuf from the dialog
+    let path_buf_from_dialog: tauri_plugin_dialog::FilePath = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.zip", &zip_file_name).as_str())
+        .add_filter(&zip_file_name, &["zip"])
+        .blocking_save_file() // This returns Option<PathBuf>
+        .ok_or_else(|| "Dialog cancelled or file path not selected".to_string())?; // Converts to Result<PathBuf, String> and unwraps to PathBuf
+
+    // Step 2: Now get a &Path reference from the owned PathBuf.
+    // The user's code structure implied an .as_path().ok_or_else(...) chain which was incorrect for &Path.
+    // We'll directly use the PathBuf, or if &Path is strictly needed:
+    let selected_file_path: &std::path::Path = path_buf_from_dialog
+        .as_path()
+        .ok_or_else(|| "Could not convert file path".to_string())?;
+
+    let zip_file = std::fs::File::create(selected_file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    let mut zip = ZipWriter::new(zip_file);
+
+    for (filename, file_content_str) in content.iter() {
+        zip.start_file(
+            format!("{}.txt", filename).as_str(),
+            SimpleFileOptions::default(),
+        ) // Pass &str to start_file
+        .map_err(|e| format!("Failed to start file {}: {}", &filename, e))?; // Use &filename
+
+        zip.write_all(file_content_str.as_bytes())
+            .map_err(|e| format!("Failed to write to file {}: {}", &filename, e))?;
+        // Use &filename
+    }
+
+    zip.finish()
+        .map_err(|e| format!("Failed to finish zip: {}", e))?;
+
+    Ok(())
 }
 
 /// Tauri command to initialize the Context

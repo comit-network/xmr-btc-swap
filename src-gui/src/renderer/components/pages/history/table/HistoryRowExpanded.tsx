@@ -21,6 +21,7 @@ import {
 import { isTestnet } from "store/config";
 import { getBitcoinTxExplorerUrl } from "utils/conversionUtils";
 import SwapLogFileOpenButton from "./SwapLogFileOpenButton";
+import ExportLogsButton from "./ExportLogsButton";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -128,6 +129,8 @@ export default function HistoryRowExpanded({
           variant="outlined"
           size="small"
         />
+        <ExportLogsButton swap_id={swap.swap_id} variant="outlined"
+          size="small"/>
       </Box>
     </Box>
   );
