@@ -110,10 +110,10 @@ async fn next_state(
             tx_lock_fee,
         } => {
             let tx_refund_fee = bitcoin_wallet
-                .estimate_fee(TxRefund::weight(), btc_amount)
+                .estimate_fee(TxRefund::weight(), Some(btc_amount))
                 .await?;
             let tx_cancel_fee = bitcoin_wallet
-                .estimate_fee(TxCancel::weight(), btc_amount)
+                .estimate_fee(TxCancel::weight(), Some(btc_amount))
                 .await?;
 
             // Emit an event to tauri that we are negotiating with the maker to lock the Bitcoin

@@ -1238,7 +1238,7 @@ where
 
         loop {
             let min_outstanding = bid_quote.min_quantity - max_giveable;
-            let min_bitcoin_lock_tx_fee = spending_fee; // Use the fee from max_giveable
+            let min_bitcoin_lock_tx_fee = spending_fee;
             let min_deposit_until_swap_will_start = min_outstanding + min_bitcoin_lock_tx_fee;
             let max_deposit_until_maximum_amount_is_reached = maximum_amount
                 .checked_sub(max_giveable)

@@ -1227,7 +1227,7 @@ where
         let psbt = tx_builder.finish()?;
 
         let weight = psbt.unsigned_tx.weight();
-        let fee = self.estimate_fee(weight, amount).await?;
+        let fee = self.estimate_fee(weight, Some(amount)).await?;
 
         self.send_to_address(address, amount, fee, change_override)
             .await
@@ -1318,12 +1318,6 @@ where
     /// Returns a tuple of (max_giveable_amount, spending_fee).
     pub async fn max_giveable(&self, locking_script_size: usize) -> Result<(Amount, Amount)> {
         let mut wallet = self.wallet.lock().await;
-        let balance = wallet.balance();
-
-        // If the balance is less than the dust amount, we can't send any funds.
-        if balance.total() < DUST_AMOUNT {
-            return Ok((Amount::ZERO, Amount::ZERO));
-        }
 
         // Construct a dummy drain transaction
         let dummy_script = ScriptBuf::from(vec![0u8; locking_script_size]);
@@ -1334,69 +1328,129 @@ where
         tx_builder.fee_absolute(Amount::ZERO);
         tx_builder.drain_wallet();
 
-        let psbt = tx_builder
-            .finish()
-            .context("Failed to build transaction to figure out max giveable")?;
-
-        // Ensure the dummy transaction only has a single output
-        // We drain to a single script so this should always be true
-        if psbt.unsigned_tx.output.len() != 1 {
-            bail!("Expected a single output in the dummy transaction");
-        }
-
-        // Extract the amount from the drain transaction.
-        let dummy_max_giveable = psbt
-            .unsigned_tx
-            .output
-            .first()
-            .expect("Expected a single output in the dummy transaction")
-            .value;
-
         // The weight WILL NOT change, even if we change the fee
         // because we are draining the wallet (using all inputs) and
         // always have one output of constant size
         //
         // The only changable part is the amount of the output.
-        // If we increase the fee, the output amount will decrease because
-        // Bitcoin fees are defined by the difference between the input and outputs.
+        // If we increase the fee, the output amount simply will decrease
         //
         // The inputs are constant, so only the output amount changes.
-        let dummy_weight = psbt.unsigned_tx.weight();
+        let (dummy_max_giveable, dummy_weight) = match tx_builder.finish() {
+            Ok(psbt) => {
+                if psbt.unsigned_tx.output.len() != 1 {
+                    bail!("Expected a single output in the dummy transaction");
+                }
+
+                let max_giveable = psbt.unsigned_tx.output.first().expect("Expected a single output in the dummy transaction").value;
+                let weight = psbt.unsigned_tx.weight();
+
+                Ok((Some(max_giveable), weight))
+            },
+            Err(bdk_wallet::error::CreateTxError::CoinSelection(_)) => {
+                // We don't have enough funds to create a transaction (below dust limit)
+                //
+                // We still want to to return a valid fee.
+                // Callers of this function might want to calculate *how* large
+                // the next UTXO needs to be such that we can spend any funds
+                //
+                // To be able to calculate an accurate fee, we need to figure out
+                // the weight our drain transaction if we received another UTXO
+
+                // We create fake deposit UTXO
+                // Our dummy drain transaction will spend this deposit UTXO
+                let mut fake_deposit_input = bitcoin::psbt::Input::default();
+
+                let dummy_deposit_address = wallet.peek_address(KeychainKind::External, 0);
+                let fake_deposit_script = dummy_deposit_address.script_pubkey();
+                let fake_deposit_txout = bitcoin::blockdata::transaction::TxOut {
+                    // The exact deposit amount does not matter
+                    // because we only care about the weight of the transaction
+                    // which does not depend on the amount of the input
+                    value: DUST_AMOUNT * 5,
+                    script_pubkey: fake_deposit_script,
+                };
+                let fake_deposit_tx = bitcoin::Transaction {
+                    version: bitcoin::blockdata::transaction::Version::TWO,
+                    lock_time: bitcoin::blockdata::locktime::absolute::LockTime::ZERO,
+                    input: vec![bitcoin::TxIn {
+                        previous_output: bitcoin::OutPoint::null(), // or some dummy outpoint
+                        script_sig: Default::default(),
+                        sequence: bitcoin::Sequence::ENABLE_RBF_NO_LOCKTIME,
+                        witness: Default::default(),
+                    }],
+                    output: vec![fake_deposit_txout.clone()],
+                };
+
+                let fake_deposit_txid = fake_deposit_tx.compute_txid();
+
+                fake_deposit_input.witness_utxo = Some(fake_deposit_txout);
+                fake_deposit_input.non_witness_utxo = Some(fake_deposit_tx);
+
+                // Create outpoint that points to our fake transaction's output 0
+                let fake_deposit_outpoint = bitcoin::OutPoint {
+                    txid: fake_deposit_txid,
+                    vout: 0,
+                };
+
+                // Worst-case witness weight for our script type.
+                const DUMMY_SATISFACTION_WEIGHT: Weight = Weight::from_wu(107 * 10);
+
+                let mut tx_builder = wallet.build_tx();
+
+                tx_builder.drain_to(dummy_script.clone());
+                tx_builder.fee_absolute(Amount::ZERO);
+                tx_builder.drain_wallet();
+
+                tx_builder
+                    .add_foreign_utxo(
+                        fake_deposit_outpoint,
+                        fake_deposit_input,
+                        DUMMY_SATISFACTION_WEIGHT,
+                    ).context("Failed to add dummy foreign utxo to calculate fee for max_giveable if we had one more utxo")?;
+
+                // Try building the dummy drain transaction with the new fake UTXO
+                // If we fail now, we propagate the error to the caller
+                let psbt = tx_builder.finish()?;
+                let weight = psbt.unsigned_tx.weight();
+
+                tracing::trace!(
+                    weight = weight.to_wu(),
+                    "Built dummy drain transaction with fake UTXO, max giveable is 0"
+                );
+
+                Ok((None, weight))
+            }
+            Err(e) => Err(e)
+        }.context("Failed to build transaction to figure out max giveable")?;
 
         // Estimate the fee rate using our real fee rate estimation
-        let fee_rate_estimation = self.combined_fee_rate().await?;
-        let min_relay_fee_rate = self.combined_min_relay_fee().await?;
+        let fee = self.estimate_fee(dummy_weight, dummy_max_giveable).await?;
 
-        let fee = estimate_fee(
-            dummy_weight,
-            dummy_max_giveable,
-            fee_rate_estimation,
-            min_relay_fee_rate,
-        )?;
-
-        let max_giveable = match dummy_max_giveable.checked_sub(fee) {
-            Some(max_giveable) => max_giveable,
-            // Let's say we have 2000 sats in the wallet
-            // The dummy script choses 0 sats as a fee
-            // and drains the 2000 sats
-            //
-            // Our smart fee estimation says we need 2500 sats to get the transaction confirmed
-            // fee = 2500
-            // dummy_max_giveable = 2000
-            // max_giveable is < 0, so we return 0 since we don't have enough funds to cover the fee
-            None => Amount::ZERO,
-        };
-
-        if max_giveable < DUST_AMOUNT {
-            return Ok((Amount::ZERO, fee));
-        }
-
-        tracing::trace!(
-            inputs_count = psbt.unsigned_tx.input.len(),
-            "Calculated max giveable"
-        );
-
-        Ok((max_giveable, fee))
+        Ok(match dummy_max_giveable {
+            // If the max giveable is less than the dust amount, we return 0
+            Some(max_giveable) if max_giveable < DUST_AMOUNT => (Amount::ZERO, fee),
+            Some(max_giveable) => {
+                // If we have enough funds, we subtract the fee from the max giveable
+                // and return the resul
+                match max_giveable.checked_sub(fee) {
+                    Some(max_giveable) => (max_giveable, fee),
+                    // Let's say we have 2000 sats in the wallet
+                    // The dummy script choses 0 sats as a fee
+                    // and drains the 2000 sats
+                    //
+                    // Our smart fee estimation says we need 2500 sats to get the transaction confirmed
+                    // fee = 2500
+                    // dummy_max_giveable = 2000
+                    // max_giveable is < 0, so we return 0 since we don't have enough funds to cover the fee
+                    None => (Amount::ZERO, fee),
+                }
+            }
+            // If we don't know the max giveable, we return 0
+            // This happens if we don't have enough funds to create a transaction
+            // (below dust limit)
+            None => (Amount::ZERO, fee),
+        })
     }
 
     /// Estimate total tx fee for a pre-defined target block based on the
@@ -1415,7 +1469,7 @@ where
     pub async fn estimate_fee(
         &self,
         weight: Weight,
-        transfer_amount: bitcoin::Amount,
+        transfer_amount: Option<bitcoin::Amount>,
     ) -> Result<bitcoin::Amount> {
         let fee_rate = self.combined_fee_rate().await?;
         let min_relay_fee = self.combined_min_relay_fee().await?;
@@ -1989,7 +2043,8 @@ impl Subscription {
 ///
 /// This function takes the following parameters:
 /// - `weight`: The weight of the transaction
-/// - `transfer_amount`: The amount of the transfer
+/// - `transfer_amount`: The amount of the transfer. Can be `None` if we don't know the transfer amount yet.
+///    If the transfer amount is `None`, we will not check the relative fee bound.
 /// - `fee_rate_estimation`: The fee rate provided by the user (from fee estimation source)
 /// - `min_relay_fee_rate`: The minimum relay fee rate (from fee estimation source, might vary depending on mempool congestion)
 ///
@@ -2006,13 +2061,18 @@ impl Subscription {
 /// We also add a constant safety margin to the fee
 fn estimate_fee(
     weight: Weight,
-    transfer_amount: Amount,
+    transfer_amount: Option<Amount>,
     fee_rate_estimation: FeeRate,
     min_relay_fee_rate: FeeRate,
 ) -> Result<Amount> {
-    // We cannot transfer less than the dust amount
-    if transfer_amount <= DUST_AMOUNT {
-        bail!("Transfer amount needs to be greater than Bitcoin dust amount.")
+    if let Some(transfer_amount) = transfer_amount {
+        // We cannot transfer less than the dust amount
+        if transfer_amount <= DUST_AMOUNT {
+            bail!(
+                "Transfer amount needs to be greater than Bitcoin dust amount. Got: {} sats",
+                transfer_amount.to_sat()
+            );
+        }
     }
 
     // Sanity checks
@@ -2047,18 +2107,8 @@ fn estimate_fee(
         .checked_mul_by_weight(weight)
         .context("Failed to compute recommended fee rate")?;
 
-    // We never want to spend more than specific percentage of the transfer amount
-    // on fees
-    let absolute_max_allowed_fee = Amount::from_sat(
-        MAX_RELATIVE_TX_FEE
-            .saturating_mul(Decimal::from(transfer_amount.to_sat()))
-            .ceil()
-            .to_u64()
-            .expect("Max relative tx fee to fit into u64"),
-    );
-
     tracing::debug!(
-        %transfer_amount,
+        ?transfer_amount,
         %weight,
         %fee_rate_estimation,
         recommended_fee_rate = %recommended_fee_rate.to_sat_per_vb_ceil(),
@@ -2067,24 +2117,37 @@ fn estimate_fee(
     );
 
     // If the recommended fee is above the absolute max allowed fee, we fall back to the absolute max allowed fee
-    if recommended_fee_absolute_sats > absolute_max_allowed_fee {
-        let max_relative_tx_fee_percentage = MAX_RELATIVE_TX_FEE
-            .saturating_mul(Decimal::from(100))
-            .ceil()
-            .to_u64()
-            .expect("Max relative tx fee to fit into u64");
-
-        tracing::warn!(
-            "Relative bound of transaction fees reached. We don't want to spend more than {}% of our transfer amount on fees. Falling back to: {} sats",
-            max_relative_tx_fee_percentage,
-            absolute_max_allowed_fee.to_sat()
+    //
+    // We only care about this if the transfer amount is known
+    if let Some(transfer_amount) = transfer_amount {
+        // We never want to spend more than specific percentage of the transfer amount
+        // on fees
+        let absolute_max_allowed_fee = Amount::from_sat(
+            MAX_RELATIVE_TX_FEE
+                .saturating_mul(Decimal::from(transfer_amount.to_sat()))
+                .ceil()
+                .to_u64()
+                .expect("Max relative tx fee to fit into u64"),
         );
 
-        return Ok(absolute_max_allowed_fee);
+        if recommended_fee_absolute_sats > absolute_max_allowed_fee {
+            let max_relative_tx_fee_percentage = MAX_RELATIVE_TX_FEE
+                .saturating_mul(Decimal::from(100))
+                .ceil()
+                .to_u64()
+                .expect("Max relative tx fee to fit into u64");
+
+            tracing::warn!(
+                "Relative bound of transaction fees reached. We don't want to spend more than {}% of our transfer amount on fees. Falling back to: {} sats",
+                max_relative_tx_fee_percentage,
+                absolute_max_allowed_fee.to_sat()
+            );
+
+            return Ok(absolute_max_allowed_fee);
+        }
     }
 
-    // Bitcoin Core has a minimum relay fee of 1000 sats
-    // regardless of the transaction size
+    // Bitcoin Core has a minimum relay fee of 1000 sats, regardless of the transaction size
     // Essentially this is an extension of the minimum relay fee rate
     // but some nodes ceil the transaction size to 1000 vbytes
     if recommended_fee_absolute_sats < MIN_ABSOLUTE_TX_FEE {
@@ -2641,7 +2704,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
         let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+        let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
         // weight / 4.0 *  sat_per_vb
         let should_fee = bitcoin::Amount::from_sat(10_000);
@@ -2658,7 +2721,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
         let relay_fee = FeeRate::from_sat_per_vb(250_000).unwrap(); // 100k sats for 400 weight units
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+        let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
         // The function now uses the higher of fee_rate and relay_fee, then multiplies by weight
         // relay_fee (250_000 sat/vb) is higher than fee_rate (1 sat/vb)
@@ -2678,7 +2741,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
         let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+        let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
         // fee_rate (1000 sat/vb) * 100 vbytes = 100_000 sats
         // This equals exactly our MAX_ABSOLUTE_TX_FEE
@@ -2696,7 +2759,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
         let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+        let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
         // With such a high fee rate (4M sat/vb), the calculated fee would be enormous
         // But it gets capped by the relative maximum (20% of transfer amount)
@@ -2718,7 +2781,7 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
             let relay_fee = FeeRate::from_sat_per_vb(relay_fee.min(1_000_000)).unwrap();
-            let _is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+            let _is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
         }
     }
@@ -2735,7 +2798,7 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
             let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+            let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 100 = 10,000 sats which is always lower than MAX_ABSOLUTE_TX_FEE
             assert!(is_fee <= MAX_ABSOLUTE_TX_FEE);
@@ -2754,7 +2817,7 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
             let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
+            let is_fee = estimate_fee(weight, Some(amount), fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 1_000 = 100_000 sats which hits our MAX_ABSOLUTE_TX_FEE
             assert_eq!(is_fee, MAX_ABSOLUTE_TX_FEE);
@@ -2772,7 +2835,7 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb).unwrap();
 
             let relay_fee = FeeRate::from_sat_per_vb(1).unwrap();
-            assert!(estimate_fee(weight, amount, fee_rate, relay_fee).is_err());
+            assert!(estimate_fee(weight, Some(amount), fee_rate, relay_fee).is_err());
 
         }
     }
@@ -2791,7 +2854,7 @@ mod tests {
             // The function now has a sanity check that errors if fee rates > 100M sat/vb
             // Since we're capping relay_fee at 1M, it should not error
             // Instead, it should succeed and return a reasonable fee
-            assert!(estimate_fee(weight, amount, fee_rate, relay_fee).is_ok());
+            assert!(estimate_fee(weight, Some(amount), fee_rate, relay_fee).is_ok());
         }
     }
 
@@ -2821,6 +2884,15 @@ mod tests {
         let (amount, _fee) = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert!(amount.to_sat() > 0);
+    }
+
+    #[tokio::test]
+    async fn given_balance_below_dust_returns_amount_0_but_with_sensible_fee() {
+        let wallet = TestWalletBuilder::new(0).build().await;
+        let (amount, fee) = wallet.max_giveable(TxLock::script_size()).await.unwrap();
+
+        assert_eq!(amount, Amount::ZERO);
+        assert!(fee.to_sat() > 0);
     }
 
     /// This test ensures that the relevant script output of the transaction
