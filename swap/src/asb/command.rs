@@ -20,6 +20,7 @@ where
     let args = RawArguments::from_clap(&matches);
 
     let json = args.json;
+    let trace = args.trace;
     let testnet = args.testnet;
     let config = args.config;
     let command: RawCommand = args.cmd;
@@ -28,6 +29,7 @@ where
         RawCommand::Start { resume_only } => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
@@ -35,6 +37,7 @@ where
         RawCommand::History { only_unfinished } => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::History { only_unfinished },
@@ -46,6 +49,7 @@ where
         } => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Logs {
@@ -57,6 +61,7 @@ where
         RawCommand::WithdrawBtc { amount, address } => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
@@ -67,6 +72,7 @@ where
         RawCommand::Balance => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Balance,
@@ -74,6 +80,7 @@ where
         RawCommand::Config => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Config,
@@ -81,6 +88,7 @@ where
         RawCommand::ExportBitcoinWallet => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::ExportBitcoinWallet,
@@ -91,6 +99,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Redeem {
@@ -104,6 +113,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Cancel { swap_id },
@@ -113,6 +123,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Refund { swap_id },
@@ -122,6 +133,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Punish { swap_id },
@@ -129,6 +141,7 @@ where
         RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
             testnet,
             json,
+            trace,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::SafelyAbort { swap_id },
@@ -171,6 +184,7 @@ pub struct BitcoinAddressNetworkMismatch {
 pub struct Arguments {
     pub testnet: bool,
     pub json: bool,
+    pub trace: bool,
     pub config_path: PathBuf,
     pub env_config: env::Config,
     pub cmd: Command,
@@ -231,6 +245,9 @@ pub struct RawArguments {
         help = "Changes the log messages to json vs plain-text. If you run ASB as a service, it is recommended to set this to true to simplify log analyses."
     )]
     pub json: bool,
+
+    #[structopt(long = "trace", help = "Also output verbose tracing logs to stdout")]
+    pub trace: bool,
 
     #[structopt(
         short,
@@ -381,6 +398,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Start { resume_only: false },
@@ -398,6 +416,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::History {
@@ -417,6 +436,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Balance,
@@ -438,6 +458,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::WithdrawBtc {
@@ -465,6 +486,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Cancel {
@@ -490,6 +512,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Refund {
@@ -515,6 +538,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Punish {
@@ -540,6 +564,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::SafelyAbort {
@@ -559,6 +584,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Start { resume_only: false },
@@ -576,6 +602,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::History {
@@ -595,6 +622,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Balance,
@@ -618,6 +646,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::WithdrawBtc {
@@ -645,6 +674,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Cancel {
@@ -671,6 +701,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Refund {
@@ -697,6 +728,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Punish {
@@ -723,6 +755,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            trace: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::SafelyAbort {
@@ -742,6 +775,25 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            trace: false,
+            config_path: default_mainnet_conf_path,
+            env_config: mainnet_env_config,
+            cmd: Command::Start { resume_only: false },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_trace_mapping() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
+
+        let raw_ars = vec![BINARY_NAME, "--trace", "start"];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            trace: true,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Start { resume_only: false },

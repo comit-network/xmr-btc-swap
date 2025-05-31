@@ -24,12 +24,14 @@ pub enum Format {
 /// Initialize tracing and enable logging messages according to these options.
 /// Besides printing to `stdout`, this will append to a log file.
 /// Said file will contain JSON-formatted logs of all levels,
-/// disregarding the arguments to this function.
+/// disregarding the arguments to this function. When `trace_stdout` is `true`,
+/// all tracing logs are also emitted to stdout.
 pub fn init(
     level_filter: LevelFilter,
     format: Format,
     dir: impl AsRef<Path>,
     tauri_handle: Option<TauriHandle>,
+    trace_stdout: bool,
 ) -> Result<()> {
     let ALL_CRATES: Vec<&str> = vec![
         "swap",
@@ -95,23 +97,29 @@ pub fn init(
         .json()
         .with_filter(env_filter(level_filter, ALL_CRATES.clone())?);
 
-    // We only log the bare minimum to the terminal
-    // Crates: swap, asb
-    // Level: Passed in
-    let env_filtered = env_filter(level_filter, OUR_CRATES.clone())?;
-
-    // Apply the environment filter and box the layer for the terminal
+    // If trace_stdout is true, we log all messages to the terminal
+    // Otherwise, we only log the bare minimum
+    let terminal_layer_env_filter = match trace_stdout {
+        true => env_filter(LevelFilter::TRACE, ALL_CRATES.clone())?,
+        false => env_filter(level_filter, OUR_CRATES.clone())?,
+    };
     let final_terminal_layer = match format {
-        Format::Json => terminal_layer.json().with_filter(env_filtered).boxed(),
-        Format::Raw => terminal_layer.with_filter(env_filtered).boxed(),
+        Format::Json => terminal_layer
+            .json()
+            .with_filter(terminal_layer_env_filter)
+            .boxed(),
+        Format::Raw => terminal_layer
+            .with_filter(terminal_layer_env_filter)
+            .boxed(),
     };
 
-    tracing_subscriber::registry()
+    let subscriber = tracing_subscriber::registry()
         .with(file_layer)
         .with(tracing_file_layer)
         .with(final_terminal_layer)
-        .with(tauri_layer)
-        .try_init()?;
+        .with(tauri_layer);
+
+    subscriber.try_init()?;
 
     // Now we can use the tracing macros to log messages
     tracing::info!(%level_filter, logs_dir=%dir.as_ref().display(), "Initialized tracing. General logs will be written to swap-all.log, and verbose logs to tracing*.log");

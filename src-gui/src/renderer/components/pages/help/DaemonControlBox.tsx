@@ -9,6 +9,7 @@ import { getDataDir, initializeContext } from "renderer/rpc";
 import { relaunch } from "@tauri-apps/plugin-process";
 import RotateLeftIcon from "@material-ui/icons/RotateLeft";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { TauriContextStatusEvent } from "models/tauriModel";
 
 const useStyles = makeStyles((theme) => ({
   actionsOuter: {
@@ -24,13 +25,13 @@ export default function DaemonControlBox() {
 
   // The daemon can be manually started if it has failed or if it has not been started yet
   const canContextBeManuallyStarted = useAppSelector(
-    (s) => s.rpc.status?.type === "Failed" || s.rpc.status === null,
+    (s) => s.rpc.status === TauriContextStatusEvent.Failed || s.rpc.status === null,
   );
   const isContextInitializing = useAppSelector(
-    (s) => s.rpc.status?.type === "Initializing",
+    (s) => s.rpc.status === TauriContextStatusEvent.Initializing,
   );
 
-  const stringifiedDaemonStatus = useAppSelector((s) => s.rpc.status?.type ?? "not started");
+  const stringifiedDaemonStatus = useAppSelector((s) => s.rpc.status ?? "not started");
 
   return (
     <InfoBox

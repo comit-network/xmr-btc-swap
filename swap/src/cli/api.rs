@@ -299,6 +299,7 @@ impl ContextBuilder {
                 format,
                 data_dir.join("logs"),
                 self.tauri_handle.clone(),
+                false,
             );
             tracing::info!(
                 binary = "cli",

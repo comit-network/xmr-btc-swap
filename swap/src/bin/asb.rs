@@ -52,6 +52,7 @@ pub async fn main() -> Result<()> {
     let Arguments {
         testnet,
         json,
+        trace,
         config_path,
         env_config,
         cmd,
@@ -84,7 +85,7 @@ pub async fn main() -> Result<()> {
     // Initialize tracing
     let format = if json { Format::Json } else { Format::Raw };
     let log_dir = config.data.dir.join("logs");
-    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir, None)
+    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir, None, trace)
         .expect("initialize tracing");
     tracing::info!(
         binary = "asb",
