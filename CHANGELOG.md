@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - The Bitcoin fee estimation is now more accurate. It uses a combination of `estimatesmartfee` from Bitcoin Core and `mempool.get_fee_histogram` from Electrum to ensure our distance from the mempool tip is appropriate. If our Electrum server doesn't support fee estimation, we use the mempool.space API. The mempool space API can be disabled using the `bitcoin.use_mempool_space_fee_estimation` option in the config file. It defaults to `true`.
+- ASB: You can use the `--trace` flag to log all messages to the terminal. This is useful for debugging but shouldn't be used in production because it will log a lot of data, especially related to p2p networking and tor bootstrapping. If you want to debug issues in production, read the tracing-logs inside the data directory instead.
 
 ## [1.1.2] - 2025-05-24
 
