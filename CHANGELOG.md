@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2025-05-31
+
 - The Bitcoin fee estimation is now more accurate. It uses a combination of `estimatesmartfee` from Bitcoin Core and `mempool.get_fee_histogram` from Electrum to ensure our distance from the mempool tip is appropriate. If our Electrum server doesn't support fee estimation, we use the mempool.space API. The mempool space API can be disabled using the `bitcoin.use_mempool_space_fee_estimation` option in the config file. It defaults to `true`.
 - ASB: You can use the `--trace` flag to log all messages to the terminal. This is useful for debugging but shouldn't be used in production because it will log a lot of data, especially related to p2p networking and tor bootstrapping. If you want to debug issues in production, read the tracing-logs inside the data directory instead.
 
@@ -490,7 +492,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.1.2...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.1.3...HEAD
+[1.1.3]: https://github.com/UnstoppableSwap/core/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/UnstoppableSwap/core/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/UnstoppableSwap/core/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/UnstoppableSwap/core/compare/1.1.0-rc.3...1.1.0
