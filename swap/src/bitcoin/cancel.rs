@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Add};
+use std::ops::Add;
 use typeshare::typeshare;
 
 /// Represent a timelock, expressed in relative block height as defined in
