@@ -680,12 +680,25 @@ impl Wallet {
     where
         T: Watchable,
     {
-        self.electrum_client.lock().await.status_of_script(tx)
+        self.electrum_client.lock().await.status_of_script(tx, true)
     }
 
     pub async fn subscribe_to(&self, tx: impl Watchable + Send + 'static) -> Subscription {
         let txid = tx.id();
         let script = tx.script();
+
+        let initial_status = match self
+            .electrum_client
+            .lock()
+            .await
+            .status_of_script(&tx, false)
+        {
+            Ok(status) => Some(status),
+            Err(err) => {
+                tracing::debug!(%txid, %err, "Failed to get initial status for subscription. We won't notify the caller and will try again later.");
+                None
+            }
+        };
 
         let sub = self
             .electrum_client
@@ -698,12 +711,12 @@ impl Wallet {
                 let client = self.electrum_client.clone();
 
                 tokio::spawn(async move {
-                    let mut last_status = None;
+                    let mut last_status = initial_status;
 
                     loop {
                         let new_status = client.lock()
                             .await
-                            .status_of_script(&tx)
+                            .status_of_script(&tx, false)
                             .unwrap_or_else(|error| {
                                 tracing::warn!(%txid, "Failed to get status of script: {:#}", error);
                                 ScriptStatus::Retrying
@@ -1511,6 +1524,18 @@ impl Client {
         Ok(())
     }
 
+    /// Update the client state for a single script.
+    ///
+    /// As opposed to [`update_state`] this function does not
+    /// check the time since the last update before refreshing
+    /// It therefore also does not take a [`force`] parameter
+    pub fn update_state_single(&mut self, script: &impl Watchable) -> Result<()> {
+        self.update_script_history(script)?;
+        self.update_block_height()?;
+
+        Ok(())
+    }
+
     /// Update the block height.
     fn update_block_height(&mut self) -> Result<()> {
         let latest_block = self
@@ -1535,7 +1560,7 @@ impl Client {
     fn update_script_histories(&mut self) -> Result<()> {
         let scripts = self.script_history.keys().map(|s| s.as_script());
 
-        let histories = self
+        let histories: Vec<Vec<GetHistoryRes>> = self
             .electrum
             .inner
             .batch_script_get_history(scripts)
@@ -1555,6 +1580,17 @@ impl Client {
         Ok(())
     }
 
+    /// Update the script history of a single script.
+    pub fn update_script_history(&mut self, script: &impl Watchable) -> Result<()> {
+        let (script, _) = script.script_and_txid();
+
+        let history = self.electrum.inner.script_get_history(script.as_script())?;
+
+        self.script_history.insert(script, history);
+
+        Ok(())
+    }
+
     /// Broadcast a transaction to the network.
     pub fn transaction_broadcast(&self, transaction: &Transaction) -> Result<Arc<Txid>> {
         // Broadcast the transaction to the network.
@@ -1570,21 +1606,29 @@ impl Client {
     }
 
     /// Get the status of a script.
-    pub fn status_of_script(&mut self, script: &impl Watchable) -> Result<ScriptStatus> {
-        let (script, txid) = script.script_and_txid();
+    pub fn status_of_script(
+        &mut self,
+        script: &impl Watchable,
+        force: bool,
+    ) -> Result<ScriptStatus> {
+        let (script_buf, txid) = script.script_and_txid();
 
-        if !self.script_history.contains_key(&script) {
-            self.script_history.insert(script.clone(), vec![]);
+        if !self.script_history.contains_key(&script_buf) {
+            self.script_history.insert(script_buf.clone(), vec![]);
 
             // Immediately refetch the status of the script
             // when we first subscribe to it.
-            self.update_state(true)?;
+            self.update_state_single(script)?;
+        } else if force {
+            // Immediately refetch the status of the script
+            // when [`force`] is set to true
+            self.update_state_single(script)?;
         } else {
             // Otherwise, don't force a refetch.
             self.update_state(false)?;
         }
 
-        let history = self.script_history.entry(script).or_default();
+        let history = self.script_history.entry(script_buf).or_default();
 
         let history_of_tx: Vec<&GetHistoryRes> = history
             .iter()

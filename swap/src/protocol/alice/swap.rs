@@ -74,6 +74,7 @@ where
     Ok(match state {
         AliceState::Started { state3 } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+
             match timeout(
                 env_config.bitcoin_lock_mempool_timeout,
                 tx_lock_status.wait_until_seen(),
@@ -249,11 +250,12 @@ where
             transfer_proof,
             state3,
         } => {
-            let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+            let tx_lock_status_subscription =
+                bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
             select! {
                 biased; // make sure the cancel timelock expiry future is polled first
-                result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
+                result = tx_lock_status_subscription.wait_until_confirmed_with(state3.cancel_timelock) => {
                     result?;
                     AliceState::CancelTimelockExpired {
                         monero_wallet_restore_blockheight,
@@ -262,6 +264,20 @@ where
                     }
                 }
                 enc_sig = event_loop_handle.recv_encrypted_signature() => {
+                    // Fetch the status as early as possible to update the internal cache of our Electurm client
+                    // Prevents redundant network requests later on when we redeem the Bitcoin
+                    let tx_lock_status = bitcoin_wallet.status_of_script(&state3.tx_lock.clone()).await?;
+
+                    if tx_lock_status.is_confirmed_with(state3.cancel_timelock.half()) {
+                        tx_lock_status_subscription.wait_until_confirmed_with(state3.cancel_timelock).await?;
+
+                        return Ok(AliceState::CancelTimelockExpired {
+                            monero_wallet_restore_blockheight,
+                            transfer_proof,
+                            state3,
+                        })
+                    }
+
                     tracing::info!("Received encrypted signature");
 
                     AliceState::EncSigLearned {
@@ -399,8 +415,10 @@ where
             transfer_proof,
             state3,
         } => {
-            let tx_refund_status = bitcoin_wallet.subscribe_to(state3.tx_refund()).await;
-            let tx_cancel_status = bitcoin_wallet.subscribe_to(state3.tx_cancel()).await;
+            let (tx_refund_status, tx_cancel_status) = tokio::join!(
+                bitcoin_wallet.subscribe_to(state3.tx_refund()),
+                bitcoin_wallet.subscribe_to(state3.tx_cancel())
+            );
 
             select! {
                 seen_refund = tx_refund_status.wait_until_seen() => {

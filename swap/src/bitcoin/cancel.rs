@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::Add;
+use std::ops::{Add};
 use typeshare::typeshare;
 
 /// Represent a timelock, expressed in relative block height as defined in
@@ -38,6 +38,10 @@ impl From<CancelTimelock> for u32 {
 impl CancelTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {
         Self(number_of_blocks)
+    }
+
+    pub fn half(&self) -> CancelTimelock {
+        Self(self.0 / 2)
     }
 }
 

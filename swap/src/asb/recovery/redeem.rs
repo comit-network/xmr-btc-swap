@@ -57,6 +57,7 @@ pub async fn redeem(
         }
         AliceState::BtcRedeemTransactionPublished { state3 } => {
             let subscription = bitcoin_wallet.subscribe_to(state3.tx_redeem()).await;
+
             if let Finality::Await = finality {
                 subscription.wait_until_final().await?;
             }
