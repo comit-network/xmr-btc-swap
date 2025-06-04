@@ -90,8 +90,18 @@ pub struct PublicViewKey(PublicKey);
 #[typeshare(serialized_as = "number")]
 pub struct Amount(u64);
 
-// Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_008 * 2 (to be on the safe side)
-pub const MONERO_FEE: Amount = Amount::from_piconero(16_000_000);
+// TX Fees on Monero can be found here:
+// - https://www.monero.how/monero-transaction-fees
+// - https://bitinfocharts.com/comparison/monero-transactionfees.html#1y
+//
+// In the last year the highest avg fee on any given day was around 0.00075 XMR
+// We use a multiplier of 4x to stay safe
+// 0.00075 XMR * 4 = 0.003 XMR (around $1 as of Jun. 4th 2025)
+// We DO NOT use this fee to construct any transactions. It is only to **estimate** how much
+// we need to reserve for the fee when determining our max giveable amount
+// We use a VERY conservative value here to stay on the safe side. We want to avoid not being able
+// to lock as much as we previously estimated.
+pub const CONSERVATIVE_MONERO_FEE: Amount = Amount::from_piconero(3_000_000_000);
 
 impl Amount {
     pub const ZERO: Self = Self(0);
@@ -124,7 +134,9 @@ impl Amount {
     /// Calculate the maximum amount of Bitcoin that can be bought at a given
     /// asking price for this amount of Monero including the median fee.
     pub fn max_bitcoin_for_price(&self, ask_price: bitcoin::Amount) -> Option<bitcoin::Amount> {
-        let pico_minus_fee = self.as_piconero().saturating_sub(MONERO_FEE.as_piconero());
+        let pico_minus_fee = self
+            .as_piconero()
+            .saturating_sub(CONSERVATIVE_MONERO_FEE.as_piconero());
 
         if pico_minus_fee == 0 {
             return Some(bitcoin::Amount::ZERO);
@@ -456,27 +468,27 @@ mod tests {
         // then max BTC we can buy is μ
         let ask = bitcoin::Amount::from_btc(1.0).unwrap();
 
-        let xmr = Amount::parse_monero("1.0").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("1.0").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(1.0).unwrap());
 
-        let xmr = Amount::parse_monero("0.5").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("0.5").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(0.5).unwrap());
 
-        let xmr = Amount::parse_monero("2.5").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("2.5").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(2.5).unwrap());
 
-        let xmr = Amount::parse_monero("420").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("420").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(420.0).unwrap());
 
-        let xmr = Amount::parse_monero("0.00001").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("0.00001").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(0.00001).unwrap());
@@ -484,13 +496,13 @@ mod tests {
         // other ask prices
 
         let ask = bitcoin::Amount::from_btc(0.5).unwrap();
-        let xmr = Amount::parse_monero("2").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("2").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(1.0).unwrap());
 
         let ask = bitcoin::Amount::from_btc(2.0).unwrap();
-        let xmr = Amount::parse_monero("1").unwrap() + MONERO_FEE;
+        let xmr = Amount::parse_monero("1").unwrap() + CONSERVATIVE_MONERO_FEE;
         let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
         assert_eq!(btc, bitcoin::Amount::from_btc(2.0).unwrap());

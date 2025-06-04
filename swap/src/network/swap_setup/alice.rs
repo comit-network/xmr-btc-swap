@@ -77,7 +77,7 @@ impl WalletSnapshot {
 
         Ok(Self {
             balance,
-            lock_fee: monero::MONERO_FEE,
+            lock_fee: monero::CONSERVATIVE_MONERO_FEE,
             redeem_address,
             punish_address,
             redeem_fee,
