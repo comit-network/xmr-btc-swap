@@ -256,8 +256,10 @@ where
                                         tracing::debug!(%peer, "Failed to respond with quote");
                                     }
                                 }
-                                Err(error_arc) => {
-                                    tracing::warn!(%peer, "Failed to make or retrieve quote: {:#}", error_arc);
+                                // The error is already logged in the make_quote_or_use_cached function
+                                // We don't log it here to avoid spamming on each request
+                                Err(_) => {
+                                    // TODO: Respond with the error to Bob. Currently this will timeout on Bob's side.
                                     continue;
                                 }
                             }
@@ -532,6 +534,11 @@ where
         // Insert the computed quote into the cache
         // Need to clone it as insert takes ownership
         self.quote_cache.insert(key, result.clone()).await;
+
+        // If the quote failed, we log the error
+        if let Err(err) = result.clone() {
+            tracing::warn!(%err, "Failed to make quote. We will retry again later.");
+        }
 
         // Return the computed quote
         result
