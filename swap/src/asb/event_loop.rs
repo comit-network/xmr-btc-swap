@@ -6,7 +6,7 @@ use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
 use crate::protocol::alice::swap::has_already_processed_enc_sig;
-use crate::protocol::alice::{AliceState, State3, Swap};
+use crate::protocol::alice::{AliceState, ReservesMonero, State3, Swap};
 use crate::protocol::{Database, State};
 use crate::{bitcoin, env, kraken, monero};
 use anyhow::{anyhow, Context, Result};
@@ -501,7 +501,33 @@ where
 
         // We have a cache miss, so we compute a new quote
         tracing::trace!("Got a request for a quote, computing new quote.");
-        let result = self.make_quote(self.min_buy, self.max_buy).await;
+
+        let rate = self.latest_rate.clone();
+
+        let get_reserved_items = || async {
+            let all_swaps = self.db.all().await?;
+            let alice_states: Vec<_> = all_swaps
+                .into_iter()
+                .filter_map(|(_, state)| match state {
+                    State::Alice(state) => Some(state),
+                    _ => None,
+                })
+                .collect();
+
+            Ok(alice_states)
+        };
+
+        let get_unlocked_balance =
+            || async { unlocked_monero_balance_with_timeout(self.monero_wallet.clone()).await };
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate,
+            get_unlocked_balance,
+            get_reserved_items,
+        )
+        .await;
 
         // Insert the computed quote into the cache
         // Need to clone it as insert takes ownership
@@ -509,78 +535,6 @@ where
 
         // Return the computed quote
         result
-    }
-
-    /// Computes a quote and returns the result wrapped in Arcs.
-    async fn make_quote(
-        &mut self,
-        min_buy: bitcoin::Amount,
-        max_buy: bitcoin::Amount,
-    ) -> Result<Arc<BidQuote>, Arc<anyhow::Error>> {
-        /// This is how long we maximally wait for the wallet lock
-        /// -- else the quote will be out of date and we will return
-        /// an error.
-        const MAX_WAIT_DURATION: Duration = Duration::from_secs(60);
-
-        let ask_price = self
-            .latest_rate
-            .latest_rate()
-            .map_err(|e| Arc::new(anyhow!(e).context("Failed to get latest rate")))?
-            .ask()
-            .map_err(|e| Arc::new(e.context("Failed to compute asking price")))?;
-
-        let balance = timeout(MAX_WAIT_DURATION, self.monero_wallet.lock())
-            .await
-            .context("Timeout while waiting for lock on monero wallet while making quote")?
-            .get_balance()
-            .await
-            .map_err(|e| Arc::new(e.context("Failed to get Monero balance")))?;
-        let xmr_balance = Amount::from_piconero(balance.unlocked_balance);
-
-        let max_bitcoin_for_monero =
-            xmr_balance
-                .max_bitcoin_for_price(ask_price)
-                .ok_or_else(|| {
-                    Arc::new(anyhow!(
-                        "Bitcoin price ({}) x Monero ({}) overflow",
-                        ask_price,
-                        xmr_balance
-                    ))
-                })?;
-
-        tracing::trace!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
-
-        if min_buy > max_bitcoin_for_monero {
-            tracing::trace!(
-                "Your Monero balance is too low to initiate a swap, as your minimum swap amount is {}. You could at most swap {}",
-                min_buy, max_bitcoin_for_monero
-            );
-
-            return Ok(Arc::new(BidQuote {
-                price: ask_price,
-                min_quantity: bitcoin::Amount::ZERO,
-                max_quantity: bitcoin::Amount::ZERO,
-            }));
-        }
-
-        if max_buy > max_bitcoin_for_monero {
-            tracing::trace!(
-                "Your Monero balance is too low to initiate a swap with the maximum swap amount {} that you have specified in your config. You can at most swap {}",
-                max_buy, max_bitcoin_for_monero
-            );
-
-            return Ok(Arc::new(BidQuote {
-                price: ask_price,
-                min_quantity: min_buy,
-                max_quantity: max_bitcoin_for_monero,
-            }));
-        }
-
-        Ok(Arc::new(BidQuote {
-            price: ask_price,
-            min_quantity: min_buy,
-            max_quantity: max_buy,
-        }))
     }
 
     async fn handle_execution_setup_done(
@@ -814,6 +768,123 @@ impl EventLoopHandle {
     }
 }
 
+/// Computes a quote given the provided dependencies
+pub async fn make_quote<LR, F, Fut, I, Fut2, T>(
+    min_buy: bitcoin::Amount,
+    max_buy: bitcoin::Amount,
+    mut latest_rate: LR,
+    get_unlocked_balance: F,
+    get_reserved_items: I,
+) -> Result<Arc<BidQuote>, Arc<anyhow::Error>>
+where
+    LR: LatestRate,
+    F: FnOnce() -> Fut,
+    Fut: futures::Future<Output = Result<Amount, anyhow::Error>>,
+    I: FnOnce() -> Fut2,
+    Fut2: futures::Future<Output = Result<Vec<T>, anyhow::Error>>,
+    T: ReservesMonero,
+{
+    let ask_price = latest_rate
+        .latest_rate()
+        .map_err(|e| Arc::new(anyhow!(e).context("Failed to get latest rate")))?
+        .ask()
+        .map_err(|e| Arc::new(e.context("Failed to compute asking price")))?;
+
+    // Get the unlocked balance
+    let unlocked_balance = get_unlocked_balance()
+        .await
+        .context("Failed to get unlocked Monero balance")
+        .map_err(Arc::new)?;
+
+    // Get the reserved amounts
+    let reserved_amounts: Vec<Amount> = get_reserved_items()
+        .await
+        .context("Failed to get reserved items")
+        .map_err(Arc::new)?
+        .into_iter()
+        .map(|item| item.reserved_monero())
+        .collect();
+
+    let unreserved_xmr_balance =
+        unreserved_monero_balance(unlocked_balance, reserved_amounts.into_iter());
+
+    let max_bitcoin_for_monero = unreserved_xmr_balance
+        .max_bitcoin_for_price(ask_price)
+        .ok_or_else(|| {
+            Arc::new(anyhow!(
+                "Bitcoin price ({}) x Monero ({}) overflow",
+                ask_price,
+                unreserved_xmr_balance
+            ))
+        })?;
+
+    tracing::trace!(%ask_price, %unreserved_xmr_balance, %max_bitcoin_for_monero, "Computed quote");
+
+    if min_buy > max_bitcoin_for_monero {
+        tracing::trace!(
+            "Your Monero balance is too low to initiate a swap, as your minimum swap amount is {}. You could at most swap {}",
+            min_buy, max_bitcoin_for_monero
+        );
+
+        return Ok(Arc::new(BidQuote {
+            price: ask_price,
+            min_quantity: bitcoin::Amount::ZERO,
+            max_quantity: bitcoin::Amount::ZERO,
+        }));
+    }
+
+    if max_buy > max_bitcoin_for_monero {
+        tracing::trace!(
+            "Your Monero balance is too low to initiate a swap with the maximum swap amount {} that you have specified in your config. You can at most swap {}",
+            max_buy, max_bitcoin_for_monero
+        );
+
+        return Ok(Arc::new(BidQuote {
+            price: ask_price,
+            min_quantity: min_buy,
+            max_quantity: max_bitcoin_for_monero,
+        }));
+    }
+
+    Ok(Arc::new(BidQuote {
+        price: ask_price,
+        min_quantity: min_buy,
+        max_quantity: max_buy,
+    }))
+}
+
+/// Calculates the unreserved Monero balance by subtracting reserved amounts from unlocked balance
+pub fn unreserved_monero_balance(
+    unlocked_balance: Amount,
+    reserved_amounts: impl Iterator<Item = Amount>,
+) -> Amount {
+    // Get the sum of all the individual reserved amounts
+    let total_reserved = reserved_amounts.fold(Amount::ZERO, |acc, amount| acc + amount);
+
+    // Check how much of our unlocked balance is left when we
+    // take into account the reserved amounts
+    unlocked_balance
+        .checked_sub(total_reserved)
+        .unwrap_or(Amount::ZERO)
+}
+
+/// Returns the unlocked Monero balance from the wallet
+async fn unlocked_monero_balance_with_timeout(
+    wallet: Arc<Mutex<monero::Wallet>>,
+) -> Result<Amount, anyhow::Error> {
+    /// This is how long we maximally wait to get access to the wallet
+    const MONERO_WALLET_MUTEX_LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+
+    let balance = timeout(MONERO_WALLET_MUTEX_LOCK_TIMEOUT, wallet.lock())
+        .await
+        .context("Timeout while waiting for lock on Monero wallet")?
+        .get_balance()
+        .await
+        .context("Failed to get Monero balance")?;
+
+    Ok(Amount::from_piconero(balance.unlocked_balance))
+}
+
 #[allow(missing_debug_implementations)]
 struct MpscChannels<T> {
     sender: mpsc::Sender<T>,
@@ -824,5 +895,280 @@ impl<T> Default for MpscChannels<T> {
     fn default() -> Self {
         let (sender, receiver) = mpsc::channel(100);
         MpscChannels { sender, receiver }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_with_no_reserved_amounts() {
+        let balance = Amount::from_monero(10.0).unwrap();
+        let reserved_amounts = vec![];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        assert_eq!(result, balance);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_with_reserved_amounts() {
+        let balance = Amount::from_monero(10.0).unwrap();
+        let reserved_amounts = vec![
+            Amount::from_monero(2.0).unwrap(),
+            Amount::from_monero(3.0).unwrap(),
+        ];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        let expected = Amount::from_monero(5.0).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_insufficient_balance() {
+        let balance = Amount::from_monero(5.0).unwrap();
+        let reserved_amounts = vec![
+            Amount::from_monero(3.0).unwrap(),
+            Amount::from_monero(4.0).unwrap(), // Total reserved > balance
+        ];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        // Should return zero when reserved > balance
+        assert_eq!(result, Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_exact_match() {
+        let balance = Amount::from_monero(10.0).unwrap();
+        let reserved_amounts = vec![
+            Amount::from_monero(4.0).unwrap(),
+            Amount::from_monero(6.0).unwrap(), // Exactly equals balance
+        ];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        assert_eq!(result, Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_zero_balance() {
+        let balance = Amount::ZERO;
+        let reserved_amounts = vec![Amount::from_monero(1.0).unwrap()];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        assert_eq!(result, Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_empty_reserved_amounts() {
+        let balance = Amount::from_monero(5.0).unwrap();
+        let reserved_amounts: Vec<Amount> = vec![];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        assert_eq!(result, balance);
+    }
+
+    #[tokio::test]
+    async fn test_unreserved_monero_balance_large_amounts() {
+        let balance = Amount::from_piconero(1_000_000_000);
+        let reserved_amounts = vec![Amount::from_piconero(300_000_000)];
+
+        let result = unreserved_monero_balance(balance, reserved_amounts.into_iter());
+
+        let expected = Amount::from_piconero(700_000_000);
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_successful_within_limits() {
+        let min_buy = bitcoin::Amount::from_sat(100_000);
+        let max_buy = bitcoin::Amount::from_sat(500_000);
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(1.0).unwrap();
+        let reserved_items: Vec<MockReservedItem> = vec![];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.price, rate.value().ask().unwrap());
+        assert_eq!(result.min_quantity, min_buy);
+        assert_eq!(result.max_quantity, max_buy);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_with_reserved_amounts() {
+        let min_buy = bitcoin::Amount::from_sat(50_000);
+        let max_buy = bitcoin::Amount::from_sat(300_000);
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(1.0).unwrap();
+        let reserved_items = vec![
+            MockReservedItem {
+                reserved: Amount::from_monero(0.2).unwrap(),
+            },
+            MockReservedItem {
+                reserved: Amount::from_monero(0.3).unwrap(),
+            },
+        ];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        // With 1.0 XMR balance and 0.5 XMR reserved, we have 0.5 XMR available
+        // At rate 0.01, that's 0.005 BTC = 500,000 sats maximum
+        let expected_max = bitcoin::Amount::from_sat(300_000); // Limited by max_buy
+        assert_eq!(result.min_quantity, min_buy);
+        assert_eq!(result.max_quantity, expected_max);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_insufficient_balance_for_min() {
+        let min_buy = bitcoin::Amount::from_sat(600_000); // More than available
+        let max_buy = bitcoin::Amount::from_sat(800_000);
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(0.5).unwrap(); // Only 0.005 BTC worth at rate 0.01
+        let reserved_items: Vec<MockReservedItem> = vec![];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        // Should return zero quantities when min_buy exceeds available balance
+        assert_eq!(result.min_quantity, bitcoin::Amount::ZERO);
+        assert_eq!(result.max_quantity, bitcoin::Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_limited_by_balance() {
+        let min_buy = bitcoin::Amount::from_sat(100_000);
+        let max_buy = bitcoin::Amount::from_sat(800_000); // More than available
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(0.6).unwrap(); // 0.006 BTC worth at rate 0.01
+        let reserved_items: Vec<MockReservedItem> = vec![];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        // Calculate the actual max bitcoin for the given balance and rate
+        let expected_max = balance
+            .max_bitcoin_for_price(rate.value().ask().unwrap())
+            .unwrap();
+        assert_eq!(result.min_quantity, min_buy);
+        assert_eq!(result.max_quantity, expected_max);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_all_balance_reserved() {
+        let min_buy = bitcoin::Amount::from_sat(100_000);
+        let max_buy = bitcoin::Amount::from_sat(500_000);
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(1.0).unwrap();
+        let reserved_items = vec![MockReservedItem {
+            reserved: Amount::from_monero(1.0).unwrap(), // All balance reserved
+        }];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        // Should return zero quantities when all balance is reserved
+        assert_eq!(result.min_quantity, bitcoin::Amount::ZERO);
+        assert_eq!(result.max_quantity, bitcoin::Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_error_getting_balance() {
+        let min_buy = bitcoin::Amount::from_sat(100_000);
+        let max_buy = bitcoin::Amount::from_sat(500_000);
+        let rate = FixedRate::default();
+        let reserved_items: Vec<MockReservedItem> = vec![];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Err(anyhow::anyhow!("Failed to get balance")) },
+            || async { Ok(reserved_items) },
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to get unlocked Monero balance to construct quote"));
+    }
+
+    #[tokio::test]
+    async fn test_make_quote_empty_reserved_items() {
+        let min_buy = bitcoin::Amount::from_sat(100_000);
+        let max_buy = bitcoin::Amount::from_sat(500_000);
+        let rate = FixedRate::default();
+        let balance = Amount::from_monero(1.0).unwrap();
+        let reserved_items: Vec<MockReservedItem> = vec![];
+
+        let result = make_quote(
+            min_buy,
+            max_buy,
+            rate.clone(),
+            || async { Ok(balance) },
+            || async { Ok(reserved_items) },
+        )
+        .await
+        .unwrap();
+
+        // Should work normally with empty reserved items
+        assert_eq!(result.price, rate.value().ask().unwrap());
+        assert_eq!(result.min_quantity, min_buy);
+        assert_eq!(result.max_quantity, max_buy);
+    }
+
+    // Mock struct for testing
+    #[derive(Debug, Clone)]
+    struct MockReservedItem {
+        reserved: Amount,
+    }
+
+    impl ReservesMonero for MockReservedItem {
+        fn reserved_monero(&self) -> Amount {
+            self.reserved
+        }
     }
 }

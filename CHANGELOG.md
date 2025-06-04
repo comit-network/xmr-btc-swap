@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: The maker will take Monero funds needed for ongoing swaps into consideration when making a quote. A warning will be displayed if the Monero funds do not cover all ongoing swaps.
+
 ## [1.1.7] - 2025-06-04
 
 - ASB: Fix an issue where the asb would quote a max_swap_amount off by a couple of piconeros
@@ -76,7 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0-rc.12] - 2025-01-14
 
 - GUI: Fixed a bug where the CLI wasn't passed the correct Monero node.
--
 
 ## [1.0.0-rc.11] - 2024-12-22
 
