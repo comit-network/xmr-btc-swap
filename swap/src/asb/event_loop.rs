@@ -259,8 +259,17 @@ where
                                 // The error is already logged in the make_quote_or_use_cached function
                                 // We don't log it here to avoid spamming on each request
                                 Err(_) => {
-                                    // TODO: Respond with the error to Bob. Currently this will timeout on Bob's side.
-                                    continue;
+                                    // We respond with a zero quote. This will stop Bob from trying to start a swap but doesn't require
+                                    // a breaking network change by changing the definition of the quote protocol
+                                    if self
+                                        .swarm
+                                        .behaviour_mut()
+                                        .quote
+                                        .send_response(channel, BidQuote::ZERO)
+                                        .is_err()
+                                    {
+                                        tracing::debug!(%peer, "Failed to respond with zero quote");
+                                    }
                                 }
                             }
                         }

@@ -40,6 +40,15 @@ pub struct BidQuote {
     pub max_quantity: bitcoin::Amount,
 }
 
+impl BidQuote {
+    /// A zero quote with all amounts set to zero
+    pub const ZERO: Self = Self {
+        price: bitcoin::Amount::ZERO,
+        min_quantity: bitcoin::Amount::ZERO,
+        max_quantity: bitcoin::Amount::ZERO,
+    };
+}
+
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 #[error("Received quote of 0")]
 pub struct ZeroQuoteReceived;
