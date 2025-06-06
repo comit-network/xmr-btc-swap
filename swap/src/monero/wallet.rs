@@ -342,6 +342,7 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
     wallet_name: String,
 ) -> Result<(), InsufficientFunds> {
     let mut seen_confirmations = 0u64;
+    let mut monero_rpc_retries = 0;
 
     while seen_confirmations < conf_target {
         check_interval.tick().await; // tick() at the beginning of the loop so every `continue` tick()s as well
@@ -363,8 +364,11 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
                 message,
                 data,
             })) => {
+                monero_rpc_retries += 1;
                 tracing::debug!(message, ?data);
-                tracing::warn!(%txid, message, "`monero-wallet-rpc` failed to fetch transaction, may need to be restarted");
+                if monero_rpc_retries > 5 {
+                    tracing::warn!(%txid, message, "`monero-wallet-rpc` failed to fetch transaction, may need to be restarted");
+                }
                 continue;
             }
             // TODO: Implement this using a generic proxy for each function call once https://github.com/thomaseizinger/rust-jsonrpc-client/issues/47 is fixed.
