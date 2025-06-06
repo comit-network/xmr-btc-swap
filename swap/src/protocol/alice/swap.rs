@@ -189,6 +189,8 @@ where
                         )
                     })?;
 
+                monero_wallet.store().await?;
+
                 AliceState::XmrLocked {
                     monero_wallet_restore_blockheight,
                     transfer_proof,
@@ -394,6 +396,8 @@ where
                     transfer_proof,
                 )
                 .await?;
+
+            monero_wallet.store().await?;
 
             AliceState::XmrRefunded
         }
