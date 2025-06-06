@@ -4,7 +4,7 @@ import semver from "semver";
 import { isTestnet } from "store/config";
 
 // const MIN_ASB_VERSION = "1.0.0-alpha.1" // First version to support new libp2p protocol
-const MIN_ASB_VERSION = "1.1.0-rc.3" // First version with support for bdk > 1.0
+const MIN_ASB_VERSION = "1.1.0-rc.3"; // First version with support for bdk > 1.0
 
 export function providerToConcatenatedMultiAddr(provider: Maker) {
   return new Multiaddr(provider.multiAddr)
@@ -20,8 +20,7 @@ export function isMakerOnCorrectNetwork(
 
 export function isMakerOutdated(maker: ExtendedMakerStatus): boolean {
   if (maker.version != null) {
-    if (isMakerVersionOutdated(maker.version))
-      return true;
+    if (isMakerVersionOutdated(maker.version)) return true;
   }
 
   // Do not mark a maker as outdated if it doesn't have a version

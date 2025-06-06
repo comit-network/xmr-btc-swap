@@ -1,7 +1,8 @@
-import { TextFieldProps, TextField } from "@material-ui/core";
+import { TextFieldProps, TextField } from "@mui/material";
 import { useState, useEffect, useCallback } from "react";
 
-interface ValidatedTextFieldProps extends Omit<TextFieldProps, "onChange" | "value"> {
+interface ValidatedTextFieldProps
+  extends Omit<TextFieldProps, "onChange" | "value"> {
   value: string | null;
   isValid: (value: string) => boolean;
   onValidatedChange: (value: string | null) => void;
@@ -34,14 +35,17 @@ export default function ValidatedTextField({
         onValidatedChange(trimmedValue);
       }
     },
-    [allowEmpty, isValid, onValidatedChange]
+    [allowEmpty, isValid, onValidatedChange],
   );
 
   useEffect(() => {
     setInputValue(value || "");
   }, [value]);
 
-  const isError = allowEmpty && inputValue === "" || inputValue === "" && noErrorWhenEmpty ? false : !isValid(inputValue);
+  const isError =
+    (allowEmpty && inputValue === "") || (inputValue === "" && noErrorWhenEmpty)
+      ? false
+      : !isValid(inputValue);
 
   return (
     <TextField

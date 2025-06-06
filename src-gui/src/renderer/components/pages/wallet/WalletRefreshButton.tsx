@@ -1,4 +1,4 @@
-import RefreshIcon from "@material-ui/icons/Refresh";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { checkBitcoinBalance } from "renderer/rpc";
 import { isSyncingBitcoin } from "store/hooks";

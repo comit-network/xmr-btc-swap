@@ -1,4 +1,4 @@
-import { Tooltip } from "@material-ui/core";
+import { Tooltip } from "@mui/material";
 import { useAppSelector } from "store/hooks";
 import { getMarkup, piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 
@@ -17,10 +17,15 @@ export function AmountWithUnit({
   exchangeRate?: Amount;
   parenthesisText?: string;
 }) {
-  const fetchFiatPrices = useAppSelector((state) => state.settings.fetchFiatPrices);
+  const fetchFiatPrices = useAppSelector(
+    (state) => state.settings.fetchFiatPrices,
+  );
   const fiatCurrency = useAppSelector((state) => state.settings.fiatCurrency);
   const title =
-    fetchFiatPrices && exchangeRate != null && amount != null && fiatCurrency != null
+    fetchFiatPrices &&
+    exchangeRate != null &&
+    amount != null &&
+    fiatCurrency != null
       ? `≈ ${(exchangeRate * amount).toFixed(2)} ${fiatCurrency}`
       : "";
 
@@ -75,7 +80,10 @@ export function MoneroBitcoinExchangeRate({
   displayMarkup?: boolean;
 }) {
   const marketRate = useAppSelector((state) => state.rates?.xmrBtcRate);
-  const markup = (displayMarkup && marketRate != null) ? `${getMarkup(rate, marketRate).toFixed(2)}% markup` : null;
+  const markup =
+    displayMarkup && marketRate != null
+      ? `${getMarkup(rate, marketRate).toFixed(2)}% markup`
+      : null;
 
   return (
     <AmountWithUnit
@@ -98,10 +106,18 @@ export function MoneroBitcoinExchangeRateFromAmounts({
 }) {
   const rate = satsToBtc(satsAmount) / piconerosToXmr(piconeroAmount);
 
-  return <MoneroBitcoinExchangeRate rate={rate} displayMarkup={displayMarkup} />;
+  return (
+    <MoneroBitcoinExchangeRate rate={rate} displayMarkup={displayMarkup} />
+  );
 }
 
-export function MoneroSatsExchangeRate({ rate, displayMarkup = false }: { rate: Amount, displayMarkup?: boolean }) {
+export function MoneroSatsExchangeRate({
+  rate,
+  displayMarkup = false,
+}: {
+  rate: Amount;
+  displayMarkup?: boolean;
+}) {
   const btc = satsToBtc(rate);
 
   return <MoneroBitcoinExchangeRate rate={btc} displayMarkup={displayMarkup} />;

@@ -4,25 +4,31 @@
   "incremental": true,
   "markdown": {},
   "exec": {
-    "associations": "**/*.{rs}",
-    "rustfmt": "rustfmt --edition 2021",
-    "rustfmt.associations": "**/*.rs"
+    "commands": [
+      {
+        "command": "rustfmt --edition 2021",
+        "exts": ["rs"]
+      }
+    ]
   },
   "includes": [
     "**/*.{md}",
     "**/*.{toml}",
-    "**/*.{rs}"
+    "**/*.{rs}",
+    "**/*.{js,jsx,ts,tsx,json,css,scss,html}"
   ],
   "excludes": [
     "target/",
     "src-tauri/Cargo.toml",
     "monero-sys/monero/",
-    ".git/**"
+    ".git/**",
+    "**/node_modules/**",
+    "**/dist/**"
   ],
   "plugins": [
-    "https://plugins.dprint.dev/markdown-0.13.1.wasm",
-    "https://github.com/thomaseizinger/dprint-plugin-cargo-toml/releases/download/0.1.0/cargo-toml-0.1.0.wasm",
-    "https://plugins.dprint.dev/exec-0.3.5.json@d687dda57be0fe9a0088ccdaefa5147649ff24127d8b3ea227536c68ee7abeab",
-    "https://plugins.dprint.dev/prettier-0.26.6.json@0118376786f37496e41bb19dbcfd1e7214e2dc859a55035c5e54d1107b4c9c57"
+    "https://plugins.dprint.dev/markdown-0.18.0.wasm",
+    "https://plugins.dprint.dev/toml-0.7.0.wasm",
+    "https://plugins.dprint.dev/exec-0.5.1.json@492414e39dea4dccc07b4af796d2f4efdb89e84bae2bd4e1e924c0cc050855bf",
+    "https://plugins.dprint.dev/prettier-0.57.0.json@1bc6b449e982d5b91a25a7c59894102d40c5748651a08a095fb3926e64d55a31"
   ]
 }

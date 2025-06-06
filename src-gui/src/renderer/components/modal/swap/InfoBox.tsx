@@ -1,10 +1,4 @@
-import {
-  Box,
-  LinearProgress,
-  makeStyles,
-  Paper,
-  Typography,
-} from "@material-ui/core";
+import { Box, LinearProgress, Paper, Typography } from "@mui/material";
 import { ReactNode } from "react";
 
 type Props = {
@@ -16,21 +10,6 @@ type Props = {
   icon: ReactNode;
 };
 
-const useStyles = makeStyles((theme) => ({
-  outer: {
-    padding: theme.spacing(1.5),
-    overflow: "hidden",
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.spacing(1),
-  },
-  upperContent: {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  },
-}));
-
 export default function InfoBox({
   id = null,
   title,
@@ -39,12 +18,20 @@ export default function InfoBox({
   icon,
   loading,
 }: Props) {
-  const classes = useStyles();
-
   return (
-    <Paper variant="outlined" className={classes.outer} id={id}>
+    <Paper
+      variant="outlined"
+      id={id}
+      sx={{
+        padding: 1.5,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+      }}
+    >
       <Typography variant="subtitle1">{title}</Typography>
-      <Box className={classes.upperContent}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         {icon}
         {mainContent}
       </Box>

@@ -1,4 +1,4 @@
-import { Box, makeStyles, TextField, Typography } from "@material-ui/core";
+import { Box, TextField, Typography } from "@mui/material";
 import { BidQuote } from "models/tauriModel";
 import { useState } from "react";
 import { useAppSelector } from "store/hooks";
@@ -6,23 +6,6 @@ import { btcToSats, satsToBtc } from "utils/conversionUtils";
 import { MoneroAmount } from "../../../../other/Units";
 
 const MONERO_FEE = 0.000016;
-
-const useStyles = makeStyles((theme) => ({
-  outer: {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  },
-  textField: {
-    "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": {
-      display: "none",
-    },
-    "& input[type=number]": {
-      MozAppearance: "textfield",
-    },
-    maxWidth: theme.spacing(16),
-  },
-}));
 
 function calcBtcAmountWithoutFees(amount: number, fees: number) {
   return amount - fees;
@@ -39,7 +22,6 @@ export default function DepositAmountHelper({
   min_bitcoin_lock_tx_fee: number;
   quote: BidQuote;
 }) {
-  const classes = useStyles();
   const [amount, setAmount] = useState(min_deposit_until_swap_will_start);
   const bitcoinBalance = useAppSelector((s) => s.rpc.state.balance) || 0;
 
@@ -70,7 +52,13 @@ export default function DepositAmountHelper({
   }
 
   return (
-    <Box className={classes.outer}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+      }}
+    >
       <Typography variant="subtitle2">
         Depositing {bitcoinBalance > 0 && <>another</>}
       </Typography>
@@ -80,7 +68,16 @@ export default function DepositAmountHelper({
         onChange={(e) => setAmount(btcToSats(parseFloat(e.target.value)))}
         size="small"
         type="number"
-        className={classes.textField}
+        sx={{
+          "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
+            {
+              display: "none",
+            },
+          "& input[type=number]": {
+            MozAppearance: "textfield",
+          },
+          maxWidth: 16,
+        }}
       />
       <Typography variant="subtitle2">
         BTC will give you approximately{" "}

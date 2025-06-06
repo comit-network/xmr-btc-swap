@@ -1,5 +1,5 @@
-import { Button } from "@material-ui/core";
-import Alert from "@material-ui/lab/Alert";
+import { Button } from "@mui/material";
+import Alert from "@mui/material/Alert";
 import { useNavigate } from "react-router-dom";
 import { useResumeableSwapsCountExcludingPunished } from "store/hooks";
 

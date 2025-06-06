@@ -1,50 +1,41 @@
-import { Box, makeStyles } from "@material-ui/core";
-import FolderOpenIcon from "@material-ui/icons/FolderOpen";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import { Box } from "@mui/material";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { useAppSelector } from "store/hooks";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
 import { getDataDir, initializeContext } from "renderer/rpc";
 import { relaunch } from "@tauri-apps/plugin-process";
-import RotateLeftIcon from "@material-ui/icons/RotateLeft";
+import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { TauriContextStatusEvent } from "models/tauriModel";
 
-const useStyles = makeStyles((theme) => ({
-  actionsOuter: {
-    display: "flex",
-    gap: theme.spacing(1),
-    alignItems: "center",
-  },
-}));
-
 export default function DaemonControlBox() {
-  const classes = useStyles();
   const logs = useAppSelector((s) => s.rpc.logs);
 
   // The daemon can be manually started if it has failed or if it has not been started yet
   const canContextBeManuallyStarted = useAppSelector(
-    (s) => s.rpc.status === TauriContextStatusEvent.Failed || s.rpc.status === null,
+    (s) =>
+      s.rpc.status === TauriContextStatusEvent.Failed || s.rpc.status === null,
   );
   const isContextInitializing = useAppSelector(
     (s) => s.rpc.status === TauriContextStatusEvent.Initializing,
   );
 
-  const stringifiedDaemonStatus = useAppSelector((s) => s.rpc.status ?? "not started");
+  const stringifiedDaemonStatus = useAppSelector(
+    (s) => s.rpc.status ?? "not started",
+  );
 
   return (
     <InfoBox
       id="daemon-control-box"
       title={`Daemon Controller (${stringifiedDaemonStatus})`}
       mainContent={
-        <CliLogsBox
-          label="Logs (current session only)"
-          logs={logs}
-        />
+        <CliLogsBox label="Logs (current session only)" logs={logs} />
       }
       additionalContent={
-        <Box className={classes.actionsOuter}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
           <PromiseInvokeButton
             variant="contained"
             endIcon={<PlayArrowIcon />}

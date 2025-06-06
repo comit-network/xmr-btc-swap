@@ -1,4 +1,8 @@
-import { combineReducers, configureStore, StoreEnhancer } from "@reduxjs/toolkit";
+import {
+  combineReducers,
+  configureStore,
+  StoreEnhancer,
+} from "@reduxjs/toolkit";
 import { persistReducer, persistStore } from "redux-persist";
 import sessionStorage from "redux-persist/lib/storage/session";
 import { reducers } from "store/combinedReducer";
@@ -30,7 +34,10 @@ const createTauriStorage = () => ({
       await tauriStore.set(key, JSON.parse(value));
       await tauriStore.save();
     } catch (err) {
-      console.error(`Error parsing or setting item "${key}" in Tauri store:`, err);
+      console.error(
+        `Error parsing or setting item "${key}" in Tauri store:`,
+        err,
+      );
     }
   },
   removeItem: async (key: string): Promise<void> => {
@@ -77,18 +84,20 @@ const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 let remoteDevToolsEnhancer: StoreEnhancer | undefined;
 
 if (import.meta.env.DEV) {
-  console.log('Development mode detected, attempting to enable Redux DevTools Remote...');
+  console.log(
+    "Development mode detected, attempting to enable Redux DevTools Remote...",
+  );
   try {
-    const { devToolsEnhancer } = await import('@redux-devtools/remote');
+    const { devToolsEnhancer } = await import("@redux-devtools/remote");
     remoteDevToolsEnhancer = devToolsEnhancer({
-      name: 'UnstoppableSwap_RemoteInstance',
+      name: "UnstoppableSwap_RemoteInstance",
       realtime: true,
-      hostname: 'localhost',
+      hostname: "localhost",
       port: 8098,
     });
-    console.log('Redux DevTools Remote enhancer is ready.');
+    console.log("Redux DevTools Remote enhancer is ready.");
   } catch (e) {
-    console.warn('Could not enable Redux DevTools Remote.', e);
+    console.warn("Could not enable Redux DevTools Remote.", e);
     remoteDevToolsEnhancer = undefined;
   }
 }
@@ -99,11 +108,11 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: false,
-  }).prepend(createMainListeners().middleware),
+    }).prepend(createMainListeners().middleware),
   enhancers: (getDefaultEnhancers) => {
     const defaultEnhancers = getDefaultEnhancers();
     return remoteDevToolsEnhancer
-      ? defaultEnhancers.concat(remoteDevToolsEnhancer) 
+      ? defaultEnhancers.concat(remoteDevToolsEnhancer)
       : defaultEnhancers;
   },
 });

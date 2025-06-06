@@ -7,7 +7,6 @@ import {
   Typography,
   IconButton,
   Box,
-  makeStyles,
   Tooltip,
   Select,
   MenuItem,
@@ -20,8 +19,8 @@ import {
   DialogTitle,
   useTheme,
   Switch,
-} from "@material-ui/core";
-import InfoBox from "renderer/components/modal/swap/InfoBox";
+  SelectChangeEvent,
+} from "@mui/material";
 import {
   removeNode,
   resetSettings,
@@ -36,46 +35,48 @@ import {
   Network,
   setTheme,
 } from "store/features/settingsSlice";
-import { useAppDispatch, useAppSelector, useNodes, useSettings } from "store/hooks";
+import {
+  useAppDispatch,
+  useAppSelector,
+  useNodes,
+  useSettings,
+} from "store/hooks";
 import ValidatedTextField from "renderer/components/other/ValidatedTextField";
-import HelpIcon from '@material-ui/icons/HelpOutline';
+import HelpIcon from "@mui/icons-material/HelpOutline";
 import { ReactNode, useState } from "react";
 import { Theme } from "renderer/components/theme";
-import { Add, ArrowUpward, Delete, Edit, HourglassEmpty } from "@material-ui/icons";
+import {
+  Add,
+  ArrowUpward,
+  Delete,
+  Edit,
+  HourglassEmpty,
+} from "@mui/icons-material";
 import { getNetwork } from "store/config";
 import { currencySymbol } from "utils/formatUtils";
 import { setTorEnabled } from "store/features/settingsSlice";
-
+import InfoBox from "renderer/components/modal/swap/InfoBox";
 
 const PLACEHOLDER_ELECTRUM_RPC_URL = "ssl://blockstream.info:700";
 const PLACEHOLDER_MONERO_NODE_URL = "http://xmr-node.cakewallet.com:18081";
-
-const useStyles = makeStyles((theme) => ({
-  title: {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  }
-}));
 
 /**
  * The settings box, containing the settings for the GUI.
  */
 export default function SettingsBox() {
-  const classes = useStyles();
   const theme = useTheme();
 
   return (
     <InfoBox
       title={
-        <Box className={classes.title}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           Settings
         </Box>
       }
       mainContent={
         <Typography variant="subtitle2">
-          Customize the settings of the GUI.
-          Some of these require a restart to take effect.
+          Customize the settings of the GUI. Some of these require a restart to
+          take effect.
         </Typography>
       }
       additionalContent={
@@ -93,7 +94,11 @@ export default function SettingsBox() {
             </Table>
           </TableContainer>
           {/* Reset button with a bit of spacing */}
-          <Box mt={theme.spacing(0.1)} />
+          <Box
+            sx={(theme) => ({
+              mt: theme.spacing(2),
+            })}
+          />
           <ResetButton />
         </>
       }
@@ -104,7 +109,7 @@ export default function SettingsBox() {
 }
 
 /**
- * A button that allows you to reset the settings. 
+ * A button that allows you to reset the settings.
  * Opens a modal that asks for confirmation first.
  */
 function ResetButton() {
@@ -118,17 +123,23 @@ function ResetButton() {
 
   return (
     <>
-      <Button variant="outlined" onClick={() => setModalOpen(true)}>Reset Settings</Button>
+      <Button variant="outlined" onClick={() => setModalOpen(true)}>
+        Reset Settings
+      </Button>
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)}>
         <DialogTitle>Reset Settings</DialogTitle>
-        <DialogContent>Are you sure you want to reset the settings?</DialogContent>
+        <DialogContent>
+          Are you sure you want to reset the settings?
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalOpen(false)}>Cancel</Button>
-          <Button color="primary" onClick={onReset}>Reset</Button>
+          <Button color="primary" onClick={onReset}>
+            Reset
+          </Button>
         </DialogActions>
       </Dialog>
     </>
-  )
+  );
 }
 
 /**
@@ -142,13 +153,18 @@ function FetchFiatPricesSetting() {
     <>
       <TableRow>
         <TableCell>
-          <SettingLabel label="Query fiat prices" tooltip="Whether to fetch fiat prices via the clearnet. This is required for the price display to work. If you require total anonymity and don't use a VPN, you should disable this." />
+          <SettingLabel
+            label="Query fiat prices"
+            tooltip="Whether to fetch fiat prices via the clearnet. This is required for the price display to work. If you require total anonymity and don't use a VPN, you should disable this."
+          />
         </TableCell>
         <TableCell>
           <Switch
             color="primary"
             checked={fetchFiatPrices}
-            onChange={(event) => dispatch(setFetchFiatPrices(event.currentTarget.checked))}
+            onChange={(event) =>
+              dispatch(setFetchFiatPrices(event.currentTarget.checked))
+            }
           />
         </TableCell>
       </TableRow>
@@ -163,13 +179,16 @@ function FetchFiatPricesSetting() {
 function FiatCurrencySetting() {
   const fiatCurrency = useSettings((s) => s.fiatCurrency);
   const dispatch = useAppDispatch();
-  const onChange = (e: React.ChangeEvent<{ value: unknown }>) =>
+  const onChange = (e: SelectChangeEvent<FiatCurrency>) =>
     dispatch(setFiatCurrency(e.target.value as FiatCurrency));
 
   return (
     <TableRow>
       <TableCell>
-        <SettingLabel label="Fiat currency" tooltip="This is the currency that the price display will show prices in." />
+        <SettingLabel
+          label="Fiat currency"
+          tooltip="This is the currency that the price display will show prices in."
+        />
       </TableCell>
       <TableCell>
         <Select
@@ -180,7 +199,13 @@ function FiatCurrencySetting() {
         >
           {Object.values(FiatCurrency).map((currency) => (
             <MenuItem key={currency} value={currency}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  width: "100%",
+                }}
+              >
                 <Box>{currency}</Box>
                 <Box>{currencySymbol(currency)}</Box>
               </Box>
@@ -196,7 +221,9 @@ function FiatCurrencySetting() {
  * URL validation function, forces the URL to be in the format of "protocol://host:port/"
  */
 function isValidUrl(url: string, allowedProtocols: string[]): boolean {
-  const urlPattern = new RegExp(`^(${allowedProtocols.join("|")})://[^\\s]+:\\d+/?$`);
+  const urlPattern = new RegExp(
+    `^(${allowedProtocols.join("|")})://[^\\s]+:\\d+/?$`,
+  );
   return urlPattern.test(url);
 }
 
@@ -212,22 +239,27 @@ function ElectrumRpcUrlSetting() {
   return (
     <TableRow>
       <TableCell>
-        <SettingLabel label="Custom Electrum RPC URL" tooltip="This is the URL of the Electrum server that the GUI will connect to. It is used to sync Bitcoin transactions. If you leave this field empty, the GUI will choose from a list of known servers at random." />
+        <SettingLabel
+          label="Custom Electrum RPC URL"
+          tooltip="This is the URL of the Electrum server that the GUI will connect to. It is used to sync Bitcoin transactions. If you leave this field empty, the GUI will choose from a list of known servers at random."
+        />
       </TableCell>
       <TableCell>
-        <IconButton
-          onClick={() => setTableVisible(true)}
-        >
+        <IconButton onClick={() => setTableVisible(true)} size="large">
           {<Edit />}
         </IconButton>
-        {tableVisible ? <NodeTableModal
-          open={tableVisible}
-          onClose={() => setTableVisible(false)}
-          network={network}
-          blockchain={Blockchain.Bitcoin}
-          isValid={isValid}
-          placeholder={PLACEHOLDER_ELECTRUM_RPC_URL}
-        /> : <></>}
+        {tableVisible ? (
+          <NodeTableModal
+            open={tableVisible}
+            onClose={() => setTableVisible(false)}
+            network={network}
+            blockchain={Blockchain.Bitcoin}
+            isValid={isValid}
+            placeholder={PLACEHOLDER_ELECTRUM_RPC_URL}
+          />
+        ) : (
+          <></>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -236,17 +268,23 @@ function ElectrumRpcUrlSetting() {
 /**
  * A label for a setting, with a tooltip icon.
  */
-function SettingLabel({ label, tooltip }: { label: ReactNode, tooltip: string | null }) {
-  return <Box style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-    <Box>
-      {label}
+function SettingLabel({
+  label,
+  tooltip,
+}: {
+  label: ReactNode;
+  tooltip: string | null;
+}) {
+  return (
+    <Box style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <Box>{label}</Box>
+      <Tooltip title={tooltip}>
+        <IconButton size="small">
+          <HelpIcon />
+        </IconButton>
+      </Tooltip>
     </Box>
-    <Tooltip title={tooltip}>
-      <IconButton size="small">
-        <HelpIcon />
-      </IconButton>
-    </Tooltip>
-  </Box>
+  );
 }
 
 /**
@@ -261,22 +299,27 @@ function MoneroNodeUrlSetting() {
   return (
     <TableRow>
       <TableCell>
-        <SettingLabel label="Custom Monero Node URL" tooltip="This is the URL of the Monero node that the GUI will connect to. Ensure the node is listening for RPC connections over HTTP. If you leave this field empty, the GUI will choose from a list of known nodes at random." />
+        <SettingLabel
+          label="Custom Monero Node URL"
+          tooltip="This is the URL of the Monero node that the GUI will connect to. Ensure the node is listening for RPC connections over HTTP. If you leave this field empty, the GUI will choose from a list of known nodes at random."
+        />
       </TableCell>
       <TableCell>
-        <IconButton
-          onClick={() => setTableVisible(!tableVisible)}
-        >
+        <IconButton onClick={() => setTableVisible(!tableVisible)} size="large">
           <Edit />
         </IconButton>
-        {tableVisible ? <NodeTableModal
-          open={tableVisible}
-          onClose={() => setTableVisible(false)}
-          network={network}
-          blockchain={Blockchain.Monero}
-          isValid={isValid}
-          placeholder={PLACEHOLDER_MONERO_NODE_URL}
-        /> : <></>}
+        {tableVisible ? (
+          <NodeTableModal
+            open={tableVisible}
+            onClose={() => setTableVisible(false)}
+            network={network}
+            blockchain={Blockchain.Monero}
+            isValid={isValid}
+            placeholder={PLACEHOLDER_MONERO_NODE_URL}
+          />
+        ) : (
+          <></>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -323,7 +366,7 @@ function NodeTableModal({
   network,
   isValid,
   placeholder,
-  blockchain
+  blockchain,
 }: {
   network: Network;
   blockchain: Blockchain;
@@ -337,26 +380,40 @@ function NodeTableModal({
       <DialogTitle>Available Nodes</DialogTitle>
       <DialogContent>
         <Typography variant="subtitle2">
-          When the daemon is started, it will attempt to connect to the first available {blockchain} node in this list.
-          If you leave this field empty or all nodes are unavailable, it will choose from a list of known nodes at random.
-          Requires a restart to take effect.
+          When the daemon is started, it will attempt to connect to the first
+          available {blockchain} node in this list. If you leave this field
+          empty or all nodes are unavailable, it will choose from a list of
+          known nodes at random. Requires a restart to take effect.
         </Typography>
-        <NodeTable network={network} blockchain={blockchain} isValid={isValid} placeholder={placeholder} />
+        <NodeTable
+          network={network}
+          blockchain={blockchain}
+          isValid={isValid}
+          placeholder={placeholder}
+        />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} size="large">Close</Button>
+        <Button onClick={onClose} size="large">
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
-  )
+  );
 }
 
 // Create a circle SVG with a given color and radius
-function Circle({ color, radius = 6 }: { color: string, radius?: number }) {
-  return <span>
-    <svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
-      <circle cx={radius} cy={radius} r={radius} fill={color} />
-    </svg>
-  </span>
+function Circle({ color, radius = 6 }: { color: string; radius?: number }) {
+  return (
+    <span>
+      <svg
+        width={radius * 2}
+        height={radius * 2}
+        viewBox={`0 0 ${radius * 2} ${radius * 2}`}
+      >
+        <circle cx={radius} cy={radius} r={radius} fill={color} />
+      </svg>
+    </span>
+  );
 }
 
 /**
@@ -367,17 +424,27 @@ function NodeStatus({ status }: { status: boolean | undefined }) {
 
   switch (status) {
     case true:
-      return <Tooltip title={"This node is available and responding to RPC requests"}>
-        <Circle color={theme.palette.success.dark} />
-      </Tooltip>;
+      return (
+        <Tooltip
+          title={"This node is available and responding to RPC requests"}
+        >
+          <Circle color={theme.palette.success.dark} />
+        </Tooltip>
+      );
     case false:
-      return <Tooltip title={"This node is not available or not responding to RPC requests"}>
-        <Circle color={theme.palette.error.dark} />
-      </Tooltip>;
+      return (
+        <Tooltip
+          title={"This node is not available or not responding to RPC requests"}
+        >
+          <Circle color={theme.palette.error.dark} />
+        </Tooltip>
+      );
     default:
-      return <Tooltip title={"The status of this node is currently unknown"}>
-        <HourglassEmpty />
-      </Tooltip>;
+      return (
+        <Tooltip title={"The status of this node is currently unknown"}>
+          <HourglassEmpty />
+        </Tooltip>
+      );
   }
 }
 
@@ -392,10 +459,10 @@ function NodeTable({
   isValid,
   placeholder,
 }: {
-  network: Network,
-  blockchain: Blockchain,
-  isValid: (url: string) => boolean,
-  placeholder: string,
+  network: Network;
+  blockchain: Blockchain;
+  isValid: (url: string) => boolean;
+  placeholder: string;
 }) {
   const availableNodes = useSettings((s) => s.nodes[network][blockchain]);
   const currentNode = availableNodes[0];
@@ -406,7 +473,7 @@ function NodeTable({
   const onAddNewNode = () => {
     dispatch(addNode({ network, type: blockchain, node: newNode }));
     setNewNode("");
-  }
+  };
 
   const onRemoveNode = (node: string) =>
     dispatch(removeNode({ network, type: blockchain, node }));
@@ -415,20 +482,23 @@ function NodeTable({
     dispatch(moveUpNode({ network, type: blockchain, node }));
 
   const moveUpButton = (node: string) => {
-    if (currentNode === node)
-      return <></>;
+    if (currentNode === node) return <></>;
 
     return (
       <Tooltip title={"Move this node to the top of the list"}>
-        <IconButton onClick={() => onMoveUpNode(node)}>
+        <IconButton onClick={() => onMoveUpNode(node)} size="large">
           <ArrowUpward />
         </IconButton>
       </Tooltip>
-    )
-  }
+    );
+  };
 
   return (
-    <TableContainer component={Paper} style={{ marginTop: '1rem' }} elevation={0}>
+    <TableContainer
+      component={Paper}
+      style={{ marginTop: "1rem" }}
+      elevation={0}
+    >
       <Table size="small">
         {/* Table header row */}
         <TableHead>
@@ -455,10 +525,13 @@ function NodeTable({
                 <Box style={{ display: "flex" }}>
                   <Tooltip
                     title={"Remove this node from your list"}
-                    children={<IconButton
-                      onClick={() => onRemoveNode(node)}
-                      children={<Delete />}
-                    />}
+                    children={
+                      <IconButton
+                        onClick={() => onRemoveNode(node)}
+                        children={<Delete />}
+                        size="large"
+                      />
+                    }
                   />
                   {moveUpButton(node)}
                 </Box>
@@ -482,7 +555,13 @@ function NodeTable({
             <TableCell></TableCell>
             <TableCell>
               <Tooltip title={"Add this node to your list"}>
-                <IconButton onClick={onAddNewNode} disabled={availableNodes.includes(newNode) || newNode.length === 0}>
+                <IconButton
+                  onClick={onAddNewNode}
+                  disabled={
+                    availableNodes.includes(newNode) || newNode.length === 0
+                  }
+                  size="large"
+                >
                   <Add />
                 </IconButton>
               </Tooltip>
@@ -491,24 +570,28 @@ function NodeTable({
         </TableBody>
       </Table>
     </TableContainer>
-  )
+  );
 }
 
 export function TorSettings() {
   const dispatch = useAppDispatch();
-  const torEnabled = useSettings((settings) => settings.enableTor)
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => dispatch(setTorEnabled(event.target.checked));
-  const status = (state: boolean) => state === true ? "enabled" : "disabled";
+  const torEnabled = useSettings((settings) => settings.enableTor);
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) =>
+    dispatch(setTorEnabled(event.target.checked));
+  const status = (state: boolean) => (state === true ? "enabled" : "disabled");
 
   return (
     <TableRow>
       <TableCell>
-        <SettingLabel label="Use Tor" tooltip="Tor (The Onion Router) is a decentralized network allowing for anonymous browsing. If enabled, the app will use its internal Tor client to hide your IP address from the maker. Requires a restart to take effect." />
+        <SettingLabel
+          label="Use Tor"
+          tooltip="Tor (The Onion Router) is a decentralized network allowing for anonymous browsing. If enabled, the app will use its internal Tor client to hide your IP address from the maker. Requires a restart to take effect."
+        />
       </TableCell>
 
       <TableCell>
         <Switch checked={torEnabled} onChange={handleChange} color="primary" />
       </TableCell>
     </TableRow>
-  )
+  );
 }

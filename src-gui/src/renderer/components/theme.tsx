@@ -1,32 +1,67 @@
-import { createTheme } from "@material-ui/core";
-import { indigo } from "@material-ui/core/colors";
+import { createTheme, ThemeOptions } from "@mui/material";
+import { indigo } from "@mui/material/colors";
 
 export enum Theme {
   Light = "light",
   Dark = "dark",
-  Darker = "darker"
 }
 
+const baseTheme: ThemeOptions = {
+  typography: {
+    overline: {
+      textTransform: "none" as const,
+      fontFamily: "monospace",
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        outlined: {
+          color: "inherit",
+          borderColor: "color-mix(in srgb, currentColor 30%, transparent)",
+          "&:hover": {
+            borderColor: "color-mix(in srgb, currentColor 30%, transparent)",
+            backgroundColor: "color-mix(in srgb, #bdbdbd 10%, transparent)",
+          },
+        },
+      },
+    },
+    MuiDialog: {
+      defaultProps: {
+        slotProps: {
+          paper: {
+            variant: "outlined",
+          },
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          "& legend": {
+            transition: "unset",
+          },
+        },
+      },
+    },
+  },
+};
+
 const darkTheme = createTheme({
+  ...baseTheme,
   palette: {
-    type: "dark",
+    mode: "dark",
     primary: {
       main: "#f4511e", // Monero orange
     },
     secondary: indigo,
-  },
-  typography: {
-    overline: {
-      textTransform: "none", // This prevents the text from being all caps
-      fontFamily: "monospace"
-    },
   },
 });
 
 const lightTheme = createTheme({
-  ...darkTheme,
+  ...baseTheme,
   palette: {
-    type: "light",
+    mode: "light",
     primary: {
       main: "#f4511e", // Monero orange
     },
@@ -34,23 +69,12 @@ const lightTheme = createTheme({
   },
 });
 
-const darkerTheme = createTheme({
-  ...darkTheme,
-  palette: {
-    type: 'dark',
-    primary: {
-      main: "#f4511e",
-    },
-    secondary: indigo,
-    background: {
-      default: "#080808",
-      paper: "#181818",
-    },
-  },
+console.log("Creating themes:", {
+  dark: darkTheme,
+  light: lightTheme,
 });
 
 export const themes = {
   [Theme.Dark]: darkTheme,
   [Theme.Light]: lightTheme,
-  [Theme.Darker]: darkerTheme,
 };

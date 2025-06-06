@@ -1,22 +1,18 @@
-import { DialogTitle, makeStyles, Typography } from "@material-ui/core";
+import { DialogTitle, Typography } from "@mui/material";
 import { ReactNode } from "react";
-
-const useStyles = makeStyles({
-  root: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-});
 
 type DialogTitleProps = {
   title: ReactNode;
 };
 
 export default function DialogHeader({ title }: DialogTitleProps) {
-  const classes = useStyles();
-
   return (
-    <DialogTitle disableTypography className={classes.root}>
+    <DialogTitle
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+      }}
+    >
       <Typography variant="h6">{title}</Typography>
     </DialogTitle>
   );

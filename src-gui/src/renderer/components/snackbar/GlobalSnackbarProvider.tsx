@@ -1,5 +1,5 @@
-import { IconButton, styled } from "@material-ui/core";
-import { Close } from "@material-ui/icons";
+import { IconButton, styled } from "@mui/material";
+import { Close } from "@mui/icons-material";
 import {
   MaterialDesignContent,
   SnackbarKey,
@@ -18,7 +18,7 @@ function CloseSnackbarButton({ snackbarId }: { snackbarId: SnackbarKey }) {
   const { closeSnackbar } = useSnackbar();
 
   return (
-    <IconButton onClick={() => closeSnackbar(snackbarId)}>
+    <IconButton onClick={() => closeSnackbar(snackbarId)} size="large">
       <Close />
     </IconButton>
   );

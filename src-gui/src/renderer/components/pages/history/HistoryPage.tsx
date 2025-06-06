@@ -1,4 +1,4 @@
-import { Typography } from "@material-ui/core";
+import { Typography } from "@mui/material";
 import { useAppSelector } from "store/hooks";
 import SwapTxLockAlertsBox from "../../alert/SwapTxLockAlertsBox";
 import SwapDialog from "../../modal/swap/SwapDialog";

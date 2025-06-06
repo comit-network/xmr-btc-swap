@@ -1,5 +1,4 @@
-import { Box, makeStyles } from "@material-ui/core";
-import { Alert, AlertTitle } from "@material-ui/lab/";
+import { Box, Alert, AlertTitle } from "@mui/material";
 import {
   BobStateName,
   GetSwapInfoResponseExt,
@@ -16,41 +15,32 @@ import TruncatedText from "../../other/TruncatedText";
 import { SwapMoneroRecoveryButton } from "../../pages/history/table/SwapMoneroRecoveryButton";
 import { TimelockTimeline } from "./TimelockTimeline";
 
-const useStyles = makeStyles((theme) => ({
-  box: {
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.spacing(1),
-  },
-  list: {
-    padding: "0px",
-    margin: "0px",
-    "& li": {
-      marginBottom: theme.spacing(0.5),
-      "&:last-child": {
-        marginBottom: 0
-      }
-    },
-  },
-  alertMessage: {
-    flexGrow: 1,
-  },
-}));
-
 /**
  * Component for displaying a list of messages.
  * @param messages - Array of messages to display.
  * @returns JSX.Element
  */
-function MessageList({ messages }: { messages: ReactNode[]; }) {
-  const classes = useStyles();
-
+function MessageList({ messages }: { messages: ReactNode[] }) {
   return (
-    <ul className={classes.list}>
-      {messages.filter(msg => msg != null).map((msg, i) => (
-        <li key={i}>{msg}</li>
-      ))}
-    </ul>
+    <Box
+      component="ul"
+      sx={{
+        padding: "0px",
+        margin: "0px",
+        "& li": {
+          marginBottom: 0.5,
+          "&:last-child": {
+            marginBottom: 0,
+          },
+        },
+      }}
+    >
+      {messages
+        .filter((msg) => msg != null)
+        .map((msg, i) => (
+          <li key={i}>{msg}</li>
+        ))}
+    </Box>
   );
 }
 
@@ -59,17 +49,23 @@ function MessageList({ messages }: { messages: ReactNode[]; }) {
  * @param swap - The swap information.
  * @returns JSX.Element
  */
-function BitcoinRedeemedStateAlert({ swap }: { swap: GetSwapInfoResponseExt; }) {
-  const classes = useStyles();
+function BitcoinRedeemedStateAlert({ swap }: { swap: GetSwapInfoResponseExt }) {
   return (
-    <Box className={classes.box}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+      }}
+    >
       <MessageList
         messages={[
           "The Bitcoin has been redeemed by the other party",
           "There is no risk of losing funds. Take as much time as you need",
           "The Monero will automatically be redeemed to your provided address once you resume the swap",
           "If this step fails, you can manually redeem your funds",
-        ]} />
+        ]}
+      />
       <SwapMoneroRecoveryButton swap={swap} size="small" variant="contained" />
     </Box>
   );
@@ -82,7 +78,10 @@ function BitcoinRedeemedStateAlert({ swap }: { swap: GetSwapInfoResponseExt; }) 
  * @returns JSX.Element
  */
 function BitcoinLockedNoTimelockExpiredStateAlert({
-  timelock, cancelTimelockOffset, punishTimelockOffset, isRunning,
+  timelock,
+  cancelTimelockOffset,
+  punishTimelockOffset,
+  isRunning,
 }: {
   timelock: TimelockNone;
   cancelTimelockOffset: number;
@@ -92,20 +91,25 @@ function BitcoinLockedNoTimelockExpiredStateAlert({
   return (
     <MessageList
       messages={[
-        isRunning ? "We are waiting for the other party to lock their Monero" : null,
+        isRunning
+          ? "We are waiting for the other party to lock their Monero"
+          : null,
         <>
-          If the swap isn't completed in {" "}
+          If the swap isn't completed in{" "}
           <HumanizedBitcoinBlockDuration
             blocks={timelock.content.blocks_left}
             displayBlocks={false}
-          />, it needs to be refunded
+          />
+          , it needs to be refunded
         </>,
         "For that, you need to have the app open sometime within the refund period",
         <>
-          After that, cooperation from the other party would be required to recover the funds
+          After that, cooperation from the other party would be required to
+          recover the funds
         </>,
-        isRunning ? null : "Please resume the swap to continue"
-      ]} />
+        isRunning ? null : "Please resume the swap to continue",
+      ]}
+    />
   );
 }
 
@@ -117,7 +121,8 @@ function BitcoinLockedNoTimelockExpiredStateAlert({
  * @returns JSX.Element
  */
 function BitcoinPossiblyCancelledAlert({
-  swap, timelock,
+  swap,
+  timelock,
 }: {
   swap: GetSwapInfoResponseExt;
   timelock: TimelockCancel;
@@ -130,10 +135,13 @@ function BitcoinPossiblyCancelledAlert({
         <>
           If we haven't refunded in{" "}
           <HumanizedBitcoinBlockDuration
-            blocks={timelock.content.blocks_left} />
-          , cooperation from the other party will be required to recover the funds
-        </>
-      ]} />
+            blocks={timelock.content.blocks_left}
+          />
+          , cooperation from the other party will be required to recover the
+          funds
+        </>,
+      ]}
+    />
   );
 }
 
@@ -148,7 +156,8 @@ function PunishTimelockExpiredAlert() {
         "We couldn't refund within the refund period",
         "We might still be able to redeem the Monero. However, this will require cooperation from the other party",
         "Resume the swap as soon as possible",
-      ]} />
+      ]}
+    />
   );
 }
 
@@ -157,8 +166,13 @@ function PunishTimelockExpiredAlert() {
  * @param swap - The swap information.
  * @returns JSX.Element | null
  */
-export function StateAlert({ swap, isRunning }: { swap: GetSwapInfoResponseExtRunningSwap; isRunning: boolean; }) {
-
+export function StateAlert({
+  swap,
+  isRunning,
+}: {
+  swap: GetSwapInfoResponseExtRunningSwap;
+  isRunning: boolean;
+}) {
   switch (swap.state_name) {
     // This is the state where the swap is safe because the other party has redeemed the Bitcoin
     // It cannot be punished anymore
@@ -218,8 +232,6 @@ export default function SwapStatusAlert({
   swap: GetSwapInfoResponseExt;
   isRunning: boolean;
 }): JSX.Element | null {
-  const classes = useStyles();
-
   // If the swap is completed, we do not need to display anything
   if (!isGetSwapInfoResponseRunningSwap(swap)) {
     return null;
@@ -235,12 +247,29 @@ export default function SwapStatusAlert({
       key={swap.swap_id}
       severity="warning"
       variant="filled"
-      classes={{ message: classes.alertMessage }}
+      classes={{ message: "alert-message-flex-grow" }}
+      sx={{
+        "& .alert-message-flex-grow": {
+          flexGrow: 1,
+        },
+      }}
     >
       <AlertTitle>
-        {isRunning ? "Swap has been running for a while" : <>Swap <TruncatedText>{swap.swap_id}</TruncatedText> is not running</>}
+        {isRunning ? (
+          "Swap has been running for a while"
+        ) : (
+          <>
+            Swap <TruncatedText>{swap.swap_id}</TruncatedText> is not running
+          </>
+        )}
       </AlertTitle>
-      <Box className={classes.box}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+        }}
+      >
         <StateAlert swap={swap} isRunning={isRunning} />
         <TimelockTimeline swap={swap} />
       </Box>

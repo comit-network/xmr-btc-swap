@@ -1,4 +1,4 @@
-import { IconButton } from "@material-ui/core";
+import { IconButton } from "@mui/material";
 import { open } from "@tauri-apps/plugin-shell";
 import { ReactNode } from "react";
 
@@ -10,7 +10,7 @@ export default function LinkIconButton({
   children: ReactNode;
 }) {
   return (
-    <IconButton component="span" onClick={() => open(url)}>
+    <IconButton component="span" onClick={() => open(url)} size="large">
       {children}
     </IconButton>
   );

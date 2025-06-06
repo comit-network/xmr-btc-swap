@@ -7,27 +7,20 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  makeStyles,
   TextField,
-  Theme,
-} from "@material-ui/core";
+} from "@mui/material";
 import { ListSellersResponse } from "models/tauriModel";
 import { useSnackbar } from "notistack";
 import { ChangeEvent, useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
-import { listSellersAtRendezvousPoint, PRESET_RENDEZVOUS_POINTS } from "renderer/rpc";
+import {
+  listSellersAtRendezvousPoint,
+  PRESET_RENDEZVOUS_POINTS,
+} from "renderer/rpc";
 import { discoveredMakersByRendezvous } from "store/features/makersSlice";
 import { useAppDispatch } from "store/hooks";
 import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
-
-const useStyles = makeStyles((theme: Theme) => ({
-  chipOuter: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: theme.spacing(1),
-  },
-}));
 
 type ListSellersDialogProps = {
   open: boolean;
@@ -38,7 +31,6 @@ export default function ListSellersDialog({
   open,
   onClose,
 }: ListSellersDialogProps) {
-  const classes = useStyles();
   const [rendezvousAddress, setRendezvousAddress] = useState("");
   const { enqueueSnackbar } = useSnackbar();
   const dispatch = useAppDispatch();
@@ -101,7 +93,7 @@ export default function ListSellersDialog({
           placeholder="/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE"
           error={!!getMultiAddressError()}
         />
-        <Box className={classes.chipOuter}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
           {PRESET_RENDEZVOUS_POINTS.map((rAddress) => (
             <Chip
               key={rAddress}

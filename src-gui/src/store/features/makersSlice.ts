@@ -38,7 +38,9 @@ function selectNewSelectedMaker(
   const selectedPeerId = peerId || slice.selectedMaker?.peerId;
 
   // Check if we still have a record of the currently selected provider
-  const currentMaker = slice.registry.makers?.find((prov) => prov.peerId === selectedPeerId) || slice.rendezvous.makers.find((prov) => prov.peerId === selectedPeerId);
+  const currentMaker =
+    slice.registry.makers?.find((prov) => prov.peerId === selectedPeerId) ||
+    slice.rendezvous.makers.find((prov) => prov.peerId === selectedPeerId);
 
   // If the currently selected provider is not outdated, keep it
   if (currentMaker != null && !isMakerOutdated(currentMaker)) {
@@ -77,8 +79,7 @@ export const makersSlice = createSlice({
 
         // Avoid duplicate entries, replace them instead
         if (indexOfExistingMaker !== -1) {
-          slice.rendezvous.makers[indexOfExistingMaker] =
-            discoveredMakerStatus;
+          slice.rendezvous.makers[indexOfExistingMaker] = discoveredMakerStatus;
         } else {
           slice.rendezvous.makers.push(discoveredMakerStatus);
         }
@@ -88,10 +89,7 @@ export const makersSlice = createSlice({
       slice.rendezvous.makers = sortMakerList(slice.rendezvous.makers);
       slice.selectedMaker = selectNewSelectedMaker(slice);
     },
-    setRegistryMakers(
-      slice,
-      action: PayloadAction<ExtendedMakerStatus[]>,
-    ) {
+    setRegistryMakers(slice, action: PayloadAction<ExtendedMakerStatus[]>) {
       if (stubTestnetMaker) {
         action.payload.push(stubTestnetMaker);
       }

@@ -6,13 +6,11 @@ import {
   DialogContent,
   DialogTitle,
   List,
-  ListItem,
   ListItemAvatar,
   ListItemText,
-  makeStyles,
-} from "@material-ui/core";
-import AddIcon from "@material-ui/icons/Add";
-import SearchIcon from "@material-ui/icons/Search";
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 import { ExtendedMakerStatus } from "models/apiModel";
 import { useState } from "react";
 import { setSelectedMaker } from "store/features/makersSlice";
@@ -21,11 +19,7 @@ import ListSellersDialog from "../listSellers/ListSellersDialog";
 import MakerInfo from "./MakerInfo";
 import MakerSubmitDialog from "./MakerSubmitDialog";
 
-const useStyles = makeStyles({
-  dialogContent: {
-    padding: 0,
-  },
-});
+import ListItemButton from "@mui/material/ListItemButton";
 
 type MakerSelectDialogProps = {
   open: boolean;
@@ -36,9 +30,8 @@ export function MakerSubmitDialogOpenButton() {
   const [open, setOpen] = useState(false);
 
   return (
-    <ListItem
+    <ListItemButton
       autoFocus
-      button
       onClick={() => {
         // Prevents background from being clicked and reopening dialog
         if (!open) {
@@ -53,7 +46,7 @@ export function MakerSubmitDialogOpenButton() {
         </Avatar>
       </ListItemAvatar>
       <ListItemText primary="Add a new maker to public registry" />
-    </ListItem>
+    </ListItemButton>
   );
 }
 
@@ -61,9 +54,8 @@ export function ListSellersDialogOpenButton() {
   const [open, setOpen] = useState(false);
 
   return (
-    <ListItem
+    <ListItemButton
       autoFocus
-      button
       onClick={() => {
         // Prevents background from being clicked and reopening dialog
         if (!open) {
@@ -78,7 +70,7 @@ export function ListSellersDialogOpenButton() {
         </Avatar>
       </ListItemAvatar>
       <ListItemText primary="Discover makers by connecting to a rendezvous point" />
-    </ListItem>
+    </ListItemButton>
   );
 }
 
@@ -86,7 +78,6 @@ export default function MakerListDialog({
   open,
   onClose,
 }: MakerSelectDialogProps) {
-  const classes = useStyles();
   const makers = useAllMakers();
   const dispatch = useAppDispatch();
 
@@ -98,23 +89,20 @@ export default function MakerListDialog({
   return (
     <Dialog onClose={onClose} open={open}>
       <DialogTitle>Select a maker</DialogTitle>
-
-      <DialogContent className={classes.dialogContent} dividers>
+      <DialogContent sx={{ padding: 0 }} dividers>
         <List>
           {makers.map((maker) => (
-            <ListItem
-              button
+            <ListItemButton
               onClick={() => handleMakerChange(maker)}
               key={maker.peerId}
             >
               <MakerInfo maker={maker} key={maker.peerId} />
-            </ListItem>
+            </ListItemButton>
           ))}
           <ListSellersDialogOpenButton />
           <MakerSubmitDialogOpenButton />
         </List>
       </DialogContent>
-
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
       </DialogActions>

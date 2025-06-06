@@ -1,35 +1,33 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/renderer/index.tsx"></script>
+    <style>
+      ::-webkit-scrollbar {
+        display: none;
+      }
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/renderer/index.tsx"></script>
-  <style>
-    ::-webkit-scrollbar {
-      display: none;
-    }
+      *,
+      *::after,
+      *::before {
+        -webkit-user-select: none;
+        -webkit-user-drag: none;
+        -webkit-app-region: no-drag;
+      }
 
-    *,
-    *::after,
-    *::before {
-      -webkit-user-select: none;
-      -webkit-user-drag: none;
-      -webkit-app-region: no-drag;
-    }
-
-    html,
-    body {
-      height: 100%;
-      margin: 0;
-      overflow: auto;
-    }
-  </style>
-</body>
-
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: auto;
+      }
+    </style>
+  </body>
 </html>

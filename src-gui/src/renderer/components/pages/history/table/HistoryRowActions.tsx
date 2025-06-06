@@ -1,9 +1,9 @@
-import { Tooltip } from "@material-ui/core";
-import { ButtonProps } from "@material-ui/core/Button/Button";
-import { green, red } from "@material-ui/core/colors";
-import DoneIcon from "@material-ui/icons/Done";
-import ErrorIcon from "@material-ui/icons/Error";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import { Tooltip } from "@mui/material";
+import { ButtonProps } from "@mui/material/Button";
+import { green, red } from "@mui/material/colors";
+import DoneIcon from "@mui/icons-material/Done";
+import ErrorIcon from "@mui/icons-material/Error";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { GetSwapInfoResponse } from "models/tauriModel";
 import {
   BobStateName,
@@ -28,7 +28,7 @@ export function SwapResumeButton({
       onInvoke={() => resumeSwap(swap.swap_id)}
       {...props}
     >
-      { children }
+      {children}
     </PromiseInvokeButton>
   );
 }
@@ -79,7 +79,9 @@ export default function HistoryRowActions(swap: GetSwapInfoResponse) {
   if (swap.state_name === BobStateName.BtcPunished) {
     return (
       <Tooltip title="You have been punished. You can attempt to recover the Monero with the help of the other party but that is not guaranteed to work">
-        <SwapResumeButton swap={swap} size="small">Attempt recovery</SwapResumeButton>
+        <SwapResumeButton swap={swap} size="small">
+          Attempt recovery
+        </SwapResumeButton>
       </Tooltip>
     );
   }

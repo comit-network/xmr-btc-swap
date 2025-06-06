@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogActions } from "@material-ui/core";
+import { Button, Dialog, DialogActions } from "@mui/material";
 import { useState } from "react";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { withdrawBtc } from "renderer/rpc";

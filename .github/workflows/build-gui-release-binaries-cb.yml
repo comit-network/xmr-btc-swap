@@ -101,7 +101,7 @@ jobs:
       - name: install dprint globally
         uses: taiki-e/cache-cargo-install-action@v2
         with:
-          tool: dprint@0.39.1
+          tool: dprint@0.50.0
 
       - name: Build Tauri App
         env:

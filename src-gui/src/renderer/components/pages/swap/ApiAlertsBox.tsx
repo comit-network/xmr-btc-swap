@@ -1,5 +1,5 @@
-import { Box } from "@material-ui/core";
-import { Alert, AlertTitle } from "@material-ui/lab";
+import { Box } from "@mui/material";
+import { Alert, AlertTitle } from "@mui/material";
 import { removeAlert } from "store/features/alertsSlice";
 import { useAppDispatch, useAppSelector } from "store/hooks";
 

@@ -1,4 +1,4 @@
-import { MenuItem, Select, Box } from "@material-ui/core";
+import { MenuItem, Select, Box } from "@mui/material";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import { PiconeroAmount } from "../../other/Units";
 import { parseDateString } from "utils/parseUtils";
@@ -26,20 +26,20 @@ export default function SwapSelectDropDown({
     <Select
       value={selectedSwap ?? ""}
       variant="outlined"
-      onChange={(e) => setSelectedSwap(e.target.value as string || null)}
+      onChange={(e) => setSelectedSwap((e.target.value as string) || null)}
       style={{ width: "100%" }}
       displayEmpty
     >
       {swaps.map((swap) => (
-          <MenuItem value={swap.swap_id} key={swap.swap_id}>
-            <Box component="span" style={{ whiteSpace: 'pre' }}>
-              Swap <TruncatedText>{swap.swap_id}</TruncatedText> from{' '}
-              {new Date(parseDateString(swap.start_date)).toDateString()} (
-              <PiconeroAmount amount={swap.xmr_amount} />)
-            </Box>
-          </MenuItem>
+        <MenuItem value={swap.swap_id} key={swap.swap_id}>
+          <Box component="span" style={{ whiteSpace: "pre" }}>
+            Swap <TruncatedText>{swap.swap_id}</TruncatedText> from{" "}
+            {new Date(parseDateString(swap.start_date)).toDateString()} (
+            <PiconeroAmount amount={swap.xmr_amount} />)
+          </Box>
+        </MenuItem>
       ))}
       <MenuItem value="">Do not attach a swap</MenuItem>
     </Select>
   );
-} 
+}

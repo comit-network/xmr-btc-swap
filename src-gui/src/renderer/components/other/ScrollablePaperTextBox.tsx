@@ -1,7 +1,7 @@
-import { Box, Divider, IconButton, Paper, Typography } from "@material-ui/core";
-import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
-import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
+import { Box, Divider, IconButton, Paper, Typography } from "@mui/material";
+import FileCopyOutlinedIcon from "@mui/icons-material/FileCopyOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { ReactNode, useEffect, useRef } from "react";
 import { VList, VListHandle } from "virtua";
 import { ExpandableSearchBox } from "./ExpandableSearchBox";
@@ -20,10 +20,10 @@ export default function ScrollablePaperTextBox({
   rows: ReactNode[];
   title: string;
   copyValue: string;
-  searchQuery: string | null;
+  searchQuery?: string | null;
   setSearchQuery?: ((query: string) => void) | null;
   minHeight?: string;
-  topRightButton?: ReactNode | null
+  topRightButton?: ReactNode | null;
 }) {
   const virtuaEl = useRef<VListHandle | null>(null);
 
@@ -50,7 +50,14 @@ export default function ScrollablePaperTextBox({
         width: "100%",
       }}
     >
-      <Box style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+      <Box
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Typography>{title}</Typography>
         {topRightButton}
       </Box>

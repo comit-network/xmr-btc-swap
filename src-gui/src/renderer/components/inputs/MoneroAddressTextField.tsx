@@ -1,18 +1,30 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, IconButton, List, ListItem, ListItemText, TextField } from "@material-ui/core";
-import { TextFieldProps } from "@material-ui/core/TextField/TextField";
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  IconButton,
+  List,
+  ListItemText,
+  TextField,
+} from "@mui/material";
+import { TextFieldProps } from "@mui/material";
 import { useEffect, useState } from "react";
 import { getMoneroAddresses } from "renderer/rpc";
 import { isTestnet } from "store/config";
 import { isXmrAddressValid } from "utils/conversionUtils";
-import ImportContactsIcon from '@material-ui/icons/ImportContacts';
+import ImportContactsIcon from "@mui/icons-material/ImportContacts";
 import TruncatedText from "../other/TruncatedText";
+
+import ListItemButton from "@mui/material/ListItemButton";
 
 type MoneroAddressTextFieldProps = TextFieldProps & {
   address: string;
   onAddressChange: (address: string) => void;
   onAddressValidityChange: (valid: boolean) => void;
   helperText: string;
-}
+};
 
 export default function MoneroAddressTextField({
   address,
@@ -59,12 +71,14 @@ export default function MoneroAddressTextField({
         helperText={address.length > 0 ? errorText || helperText : helperText}
         placeholder={placeholder}
         variant="outlined"
-        InputProps={{
-          endAdornment: addresses?.length > 0 && (
-            <IconButton onClick={() => setShowDialog(true)} size="small">
-              <ImportContactsIcon />
-            </IconButton>
-          )
+        slotProps={{
+          input: {
+            endAdornment: addresses?.length > 0 && (
+              <IconButton onClick={() => setShowDialog(true)} size="small">
+                <ImportContactsIcon />
+              </IconButton>
+            ),
+          },
         }}
         {...props}
       />
@@ -90,26 +104,21 @@ function RecentlyUsedAddressesDialog({
   open,
   onClose,
   addresses,
-  onAddressSelect
+  onAddressSelect,
 }: RecentlyUsedAddressesDialogProps) {
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogContent>
         <List>
           {addresses.map((addr) => (
-            <ListItem 
-              button 
-              key={addr}
-              onClick={() => onAddressSelect(addr)}
-            >
-              <ListItemText 
+            <ListItemButton key={addr} onClick={() => onAddressSelect(addr)}>
+              <ListItemText
                 primary={
-                  <Box fontFamily="monospace">
+                  <Box
+                    sx={{
+                      fontFamily: "monospace",
+                    }}
+                  >
                     <TruncatedText limit={40} truncateMiddle>
                       {addr}
                     </TruncatedText>
@@ -117,16 +126,12 @@ function RecentlyUsedAddressesDialog({
                 }
                 secondary="Recently used as a redeem address"
               />
-            </ListItem>
+            </ListItemButton>
           ))}
         </List>
       </DialogContent>
       <DialogActions>
-        <Button 
-          onClick={onClose}
-          variant="contained"
-          color="primary"
-        >
+        <Button onClick={onClose} variant="contained" color="primary">
           Close
         </Button>
       </DialogActions>

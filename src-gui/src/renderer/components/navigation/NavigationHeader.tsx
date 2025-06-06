@@ -1,12 +1,12 @@
-import { Box, List, Badge } from "@material-ui/core";
-import AccountBalanceWalletIcon from "@material-ui/icons/AccountBalanceWallet";
-import HistoryOutlinedIcon from "@material-ui/icons/HistoryOutlined";
-import SwapHorizOutlinedIcon from "@material-ui/icons/SwapHorizOutlined";
-import FeedbackOutlinedIcon from '@material-ui/icons/FeedbackOutlined';
+import { Box, List, Badge } from "@mui/material";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 import RouteListItemIconButton from "./RouteListItemIconButton";
 import UnfinishedSwapsBadge from "./UnfinishedSwapsCountBadge";
 import { useTotalUnreadMessagesCount } from "store/hooks";
-import SettingsIcon from '@material-ui/icons/Settings';
+import SettingsIcon from "@mui/icons-material/Settings";
 
 export default function NavigationHeader() {
   const totalUnreadCount = useTotalUnreadMessagesCount();

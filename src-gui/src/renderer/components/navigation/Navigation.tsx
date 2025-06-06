@@ -1,38 +1,30 @@
-import { Box, Drawer, makeStyles } from "@material-ui/core";
+import { Box, Drawer } from "@mui/material";
 import NavigationFooter from "./NavigationFooter";
 import NavigationHeader from "./NavigationHeader";
 
-export const drawerWidth = 240;
-
-const useStyles = makeStyles({
-  drawer: {
-    width: drawerWidth,
-    flexShrink: 0,
-  },
-  drawerPaper: {
-    width: drawerWidth,
-  },
-  drawerContainer: {
-    overflow: "auto",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    height: "100%",
-  },
-});
+export const drawerWidth = "240px";
 
 export default function Navigation() {
-  const classes = useStyles();
-
   return (
     <Drawer
-      className={classes.drawer}
       variant="permanent"
-      classes={{
-        paper: classes.drawerPaper,
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        "& .MuiDrawer-paper": {
+          width: drawerWidth,
+        },
       }}
     >
-      <Box className={classes.drawerContainer}>
+      <Box
+        sx={{
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          height: "100%",
+        }}
+      >
         <NavigationHeader />
         <NavigationFooter />
       </Box>

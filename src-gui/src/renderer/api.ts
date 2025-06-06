@@ -5,20 +5,34 @@
 // - and to submit feedback
 // - fetch currency rates from CoinGecko
 
-import { Alert, Attachment, AttachmentInput, ExtendedMakerStatus, Feedback, Message, MessageWithAttachments, PrimitiveDateTimeString } from "models/apiModel";
+import {
+  Alert,
+  Attachment,
+  AttachmentInput,
+  ExtendedMakerStatus,
+  Feedback,
+  Message,
+  MessageWithAttachments,
+  PrimitiveDateTimeString,
+} from "models/apiModel";
 import { store } from "./store/storeRenderer";
-import { setBtcPrice, setXmrBtcRate, setXmrPrice } from "store/features/ratesSlice";
+import {
+  setBtcPrice,
+  setXmrBtcRate,
+  setXmrPrice,
+} from "store/features/ratesSlice";
 import { FiatCurrency } from "store/features/settingsSlice";
 import { setAlerts } from "store/features/alertsSlice";
-import { registryConnectionFailed, setRegistryMakers } from "store/features/makersSlice";
+import {
+  registryConnectionFailed,
+  setRegistryMakers,
+} from "store/features/makersSlice";
 import logger from "utils/logger";
 import { setConversation } from "store/features/conversationsSlice";
 
 const PUBLIC_REGISTRY_API_BASE_URL = "https://api.unstoppableswap.net";
 
-async function fetchMakersViaHttp(): Promise<
-  ExtendedMakerStatus[]
-> {
+async function fetchMakersViaHttp(): Promise<ExtendedMakerStatus[]> {
   const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/list`);
   return (await response.json()) as ExtendedMakerStatus[];
 }
@@ -30,7 +44,7 @@ async function fetchAlertsViaHttp(): Promise<Alert[]> {
 
 export async function submitFeedbackViaHttp(
   content: string,
-  attachments?: AttachmentInput[]
+  attachments?: AttachmentInput[],
 ): Promise<string> {
   type Response = string;
 
@@ -39,64 +53,83 @@ export async function submitFeedbackViaHttp(
     attachments: attachments || [], // Ensure attachments is always an array
   };
 
-  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/submit-feedback`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${PUBLIC_REGISTRY_API_BASE_URL}/api/submit-feedback`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestPayload), // Send the corrected structure
     },
-    body: JSON.stringify(requestPayload), // Send the corrected structure
-  });
+  );
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to submit feedback. Status: ${response.status}. Body: ${errorBody}`);
+    throw new Error(
+      `Failed to submit feedback. Status: ${response.status}. Body: ${errorBody}`,
+    );
   }
 
   const responseBody = (await response.json()) as Response;
   return responseBody;
 }
 
-export async function fetchFeedbackMessagesViaHttp(feedbackId: string): Promise<Message[]> {
-  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/feedback/${feedbackId}/messages`);
+export async function fetchFeedbackMessagesViaHttp(
+  feedbackId: string,
+): Promise<Message[]> {
+  const response = await fetch(
+    `${PUBLIC_REGISTRY_API_BASE_URL}/api/feedback/${feedbackId}/messages`,
+  );
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to fetch messages for feedback ${feedbackId}. Status: ${response.status}. Body: ${errorBody}`);
+    throw new Error(
+      `Failed to fetch messages for feedback ${feedbackId}. Status: ${response.status}. Body: ${errorBody}`,
+    );
   }
   // Assuming the response is directly the Message[] array including attachments
-  return (await response.json()) as Message[]; 
+  return (await response.json()) as Message[];
 }
 
 export async function appendFeedbackMessageViaHttp(
-  feedbackId: string, 
+  feedbackId: string,
   content: string,
-  attachments?: AttachmentInput[]
+  attachments?: AttachmentInput[],
 ): Promise<number> {
-  type Response = number; 
+  type Response = number;
 
   const body = {
-    feedback_id: feedbackId, 
+    feedback_id: feedbackId,
     content,
     attachments: attachments || [], // Ensure attachments is always an array
   };
 
-  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/append-feedback-message`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${PUBLIC_REGISTRY_API_BASE_URL}/api/append-feedback-message`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body), // Send new structure
     },
-    body: JSON.stringify(body), // Send new structure
-  });
+  );
 
   if (!response.ok) {
-    const errorBody = await response.text(); 
-    throw new Error(`Failed to append message for feedback ${feedbackId}. Status: ${response.status}. Body: ${errorBody}`);
+    const errorBody = await response.text();
+    throw new Error(
+      `Failed to append message for feedback ${feedbackId}. Status: ${response.status}. Body: ${errorBody}`,
+    );
   }
 
   const responseBody = (await response.json()) as Response;
   return responseBody;
 }
 
-async function fetchCurrencyPrice(currency: string, fiatCurrency: FiatCurrency): Promise<number> {
+async function fetchCurrencyPrice(
+  currency: string,
+  fiatCurrency: FiatCurrency,
+): Promise<number> {
   const response = await fetch(
     `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=${fiatCurrency.toLowerCase()}`,
   );
@@ -105,7 +138,9 @@ async function fetchCurrencyPrice(currency: string, fiatCurrency: FiatCurrency):
 }
 
 async function fetchXmrBtcRate(): Promise<number> {
-  const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=XMRXBT');
+  const response = await fetch(
+    "https://api.kraken.com/0/public/Ticker?pair=XMRXBT",
+  );
   const data = await response.json();
 
   if (data.error && data.error.length > 0) {
@@ -127,13 +162,12 @@ async function fetchXmrPrice(fiatCurrency: FiatCurrency): Promise<number> {
 }
 
 /**
- * If enabled by the user, fetch the XMR, BTC and XMR/BTC rates 
+ * If enabled by the user, fetch the XMR, BTC and XMR/BTC rates
  * and store them in the Redux store.
  */
 export async function updateRates(): Promise<void> {
   const settings = store.getState().settings;
-  if (!settings.fetchFiatPrices)
-    return;
+  if (!settings.fetchFiatPrices) return;
 
   try {
     const xmrBtcRate = await fetchXmrBtcRate();
@@ -191,8 +225,12 @@ export async function fetchAllConversations(): Promise<void> {
       const messages = await fetchFeedbackMessagesViaHttp(feedbackId);
       console.log("Fetched messages for feedback id", feedbackId, messages);
       store.dispatch(setConversation({ feedbackId, messages }));
-    } catch (error) { 
-      logger.error(error, "Error fetching messages for feedback id", feedbackId);
+    } catch (error) {
+      logger.error(
+        error,
+        "Error fetching messages for feedback id",
+        feedbackId,
+      );
     }
   }
 }

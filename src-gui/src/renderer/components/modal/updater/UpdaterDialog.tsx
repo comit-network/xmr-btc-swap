@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -8,44 +8,46 @@ import {
   Button,
   LinearProgress,
   Typography,
-  makeStyles,
   LinearProgressProps,
   Box,
   Link,
-} from '@material-ui/core';
-import SystemUpdateIcon from '@material-ui/icons/SystemUpdate';
-import { check, Update, DownloadEvent } from '@tauri-apps/plugin-updater';
-import { useSnackbar } from 'notistack';
-import { relaunch } from '@tauri-apps/plugin-process';
+} from "@mui/material";
+import SystemUpdateIcon from "@mui/icons-material/SystemUpdate";
+import { check, Update, DownloadEvent } from "@tauri-apps/plugin-updater";
+import { useSnackbar } from "notistack";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 const GITHUB_RELEASES_URL = "https://github.com/UnstoppableSwap/core/releases";
 const HOMEPAGE_URL = "https://unstoppableswap.net/";
-
-const useStyles = makeStyles((theme) => ({
-  progress: {
-    marginTop: theme.spacing(2)
-  },
-  releaseNotes: {
-    marginTop: theme.spacing(2),
-    marginBottom: theme.spacing(1)
-  },
-  noteContent: {
-    whiteSpace: 'pre-line'
-  }
-}));
 
 interface DownloadProgress {
   contentLength: number | null;
   downloadedBytes: number;
 }
 
-function LinearProgressWithLabel(props: LinearProgressProps & { label?: string }) {
+function LinearProgressWithLabel(
+  props: LinearProgressProps & { label?: string },
+) {
   return (
-    <Box display="flex" alignItems="center">
-      <Box width="100%" mr={1}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+      }}
+    >
+      <Box
+        sx={{
+          width: "100%",
+          mr: 1,
+        }}
+      >
         <LinearProgress variant="determinate" {...props} />
       </Box>
-      <Box minWidth={85}>
+      <Box
+        sx={{
+          minWidth: 85,
+        }}
+      >
         <Typography variant="body2" color="textSecondary">
           {props.label || `${Math.round(props.value)}%`}
         </Typography>
@@ -55,20 +57,22 @@ function LinearProgressWithLabel(props: LinearProgressProps & { label?: string }
 }
 
 export default function UpdaterDialog() {
-  const classes = useStyles();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [downloadProgress, setDownloadProgress] =
+    useState<DownloadProgress | null>(null);
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     // Check for updates when component mounts
-    check().then((updateResponse) => {
-      setAvailableUpdate(updateResponse);
-    }).catch((err) => {
-      enqueueSnackbar(`Failed to check for updates: ${err}`, {
-        variant: 'error',
+    check()
+      .then((updateResponse) => {
+        setAvailableUpdate(updateResponse);
+      })
+      .catch((err) => {
+        enqueueSnackbar(`Failed to check for updates: ${err}`, {
+          variant: "error",
+        });
       });
-    });
   }, []);
 
   // If no update is available, don't render the dialog
@@ -76,18 +80,18 @@ export default function UpdaterDialog() {
 
   function hideNotification() {
     setAvailableUpdate(null);
-  };
+  }
 
   async function handleInstall() {
     try {
       await availableUpdate.downloadAndInstall((event: DownloadEvent) => {
-        if (event.event === 'Started') {
+        if (event.event === "Started") {
           setDownloadProgress({
             contentLength: event.data.contentLength || null,
             downloadedBytes: 0,
           });
-        } else if (event.event === 'Progress') {
-          setDownloadProgress(prev => ({
+        } else if (event.event === "Progress") {
+          setDownloadProgress((prev) => ({
             ...prev,
             downloadedBytes: prev.downloadedBytes + event.data.chunkLength,
           }));
@@ -98,15 +102,18 @@ export default function UpdaterDialog() {
       relaunch();
     } catch (err) {
       enqueueSnackbar(`Failed to install update: ${err}`, {
-        variant: "error"
+        variant: "error",
       });
     }
-  };
+  }
 
   const isDownloading = downloadProgress !== null;
 
   const progress = isDownloading
-    ? Math.round((downloadProgress.downloadedBytes / downloadProgress.contentLength) * 100)
+    ? Math.round(
+        (downloadProgress.downloadedBytes / downloadProgress.contentLength) *
+          100,
+      )
     : 0;
 
   return (
@@ -119,15 +126,28 @@ export default function UpdaterDialog() {
       <DialogTitle>Update Available</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          A new version (v{availableUpdate.version}) is available. Your current version is {availableUpdate.currentVersion}.
-          The update will be verified using PGP signature verification to ensure authenticity. Alternatively, you can download the
-          update from <Link href={GITHUB_RELEASES_URL} target="_blank">GitHub</Link> or visit the <Link href={HOMEPAGE_URL} target="_blank">download page</Link>.
+          A new version (v{availableUpdate.version}) is available. Your current
+          version is {availableUpdate.currentVersion}. The update will be
+          verified using PGP signature verification to ensure authenticity.
+          Alternatively, you can download the update from{" "}
+          <Link href={GITHUB_RELEASES_URL} target="_blank">
+            GitHub
+          </Link>{" "}
+          or visit the{" "}
+          <Link href={HOMEPAGE_URL} target="_blank">
+            download page
+          </Link>
+          .
           {availableUpdate.body && (
             <>
-              <Typography variant="h6" className={classes.releaseNotes}>
+              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
                 Release Notes:
               </Typography>
-              <Typography variant="body2" component="div" className={classes.noteContent}>
+              <Typography
+                variant="body2"
+                component="div"
+                sx={{ whiteSpace: "pre-line" }}
+              >
                 {availableUpdate.body}
               </Typography>
             </>
@@ -135,13 +155,14 @@ export default function UpdaterDialog() {
         </DialogContentText>
 
         {isDownloading && (
-          <Box className={classes.progress}>
+          <Box sx={{ mt: 2 }}>
             <LinearProgressWithLabel
               value={progress}
-              label={`${(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB${downloadProgress.contentLength
-                ? ` / ${(downloadProgress.contentLength / 1024 / 1024).toFixed(1)} MB`
-                : ''
-                }`}
+              label={`${(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB${
+                downloadProgress.contentLength
+                  ? ` / ${(downloadProgress.contentLength / 1024 / 1024).toFixed(1)} MB`
+                  : ""
+              }`}
             />
           </Box>
         )}
@@ -149,7 +170,6 @@ export default function UpdaterDialog() {
       <DialogActions>
         <Button
           variant="text"
-          color="default"
           onClick={hideNotification}
           disabled={isDownloading}
         >
@@ -162,7 +182,7 @@ export default function UpdaterDialog() {
           onClick={handleInstall}
           disabled={isDownloading}
         >
-          {isDownloading ? 'DOWNLOADING...' : 'INSTALL UPDATE'}
+          {isDownloading ? "DOWNLOADING..." : "INSTALL UPDATE"}
         </Button>
       </DialogActions>
     </Dialog>

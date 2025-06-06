@@ -1,23 +1,23 @@
 [package]
 name = "monero-rpc"
 version = "0.1.0"
-authors = [ "CoBloX Team <team@coblox.tech>" ]
+authors = ["CoBloX Team <team@coblox.tech>"]
 edition = "2021"
 
 [dependencies]
 anyhow = "1"
 curve25519-dalek = "3.1"
 hex = "0.4"
-jsonrpc_client = { version = "0.7", features = [ "reqwest" ] }
+jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero = "0.12"
 monero-epee-bin-serde = "1"
 rand = "0.7"
-reqwest = { version = "0.12", default-features = false, features = [ "json" ] }
-rust_decimal = { version = "1", features = [ "serde-float" ] }
-serde = { version = "1.0", features = [ "derive" ] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+rust_decimal = { version = "1", features = ["serde-float"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
 
 [dev-dependencies]
 hex-literal = "0.4"
-tokio = { version = "1", features = [ "full" ] }
+tokio = { version = "1", features = ["full"] }

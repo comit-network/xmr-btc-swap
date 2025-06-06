@@ -1,4 +1,4 @@
-import { Button, Typography } from "@material-ui/core";
+import { Button, Typography } from "@mui/material";
 import { useState } from "react";
 import FeedbackDialog from "../../modal/feedback/FeedbackDialog";
 import InfoBox from "../../modal/swap/InfoBox";
@@ -11,9 +11,9 @@ export default function FeedbackInfoBox() {
       title="Feedback"
       mainContent={
         <Typography variant="subtitle2">
-          Your input is crucial to us! We'd love to hear your thoughts on
-          Atomic Swaps. We personally read every response to improve the
-          project. Got two minutes to share?
+          Your input is crucial to us! We'd love to hear your thoughts on Atomic
+          Swaps. We personally read every response to improve the project. Got
+          two minutes to share?
         </Typography>
       }
       additionalContent={

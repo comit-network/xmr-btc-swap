@@ -11,25 +11,29 @@ function initialState(): NodesSlice {
       [Blockchain.Bitcoin]: {},
       [Blockchain.Monero]: {},
     },
-  }
+  };
 }
 
 const nodesSlice = createSlice({
   name: "nodes",
   initialState: initialState(),
   reducers: {
-    setStatus(slice, action: PayloadAction<{
-      node: string,
-      status: boolean,
-      blockchain: Blockchain,
-    }>) {
-      slice.nodes[action.payload.blockchain][action.payload.node] = action.payload.status;
+    setStatus(
+      slice,
+      action: PayloadAction<{
+        node: string;
+        status: boolean;
+        blockchain: Blockchain;
+      }>,
+    ) {
+      slice.nodes[action.payload.blockchain][action.payload.node] =
+        action.payload.status;
     },
     resetStatuses(slice) {
       slice.nodes = {
         [Blockchain.Bitcoin]: {},
         [Blockchain.Monero]: {},
-      }
+      };
     },
   },
 });

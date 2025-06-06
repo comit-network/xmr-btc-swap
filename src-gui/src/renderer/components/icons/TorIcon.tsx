@@ -1,5 +1,4 @@
-import { SvgIcon } from "@material-ui/core";
-import { SvgIconProps } from "@material-ui/core/SvgIcon/SvgIcon";
+import SvgIcon, { SvgIconProps } from "@mui/material/SvgIcon";
 
 export default function TorIcon(props: SvgIconProps) {
   return (

@@ -30,8 +30,7 @@ export function isBtcAddressValid(address: string, testnet: boolean) {
 }
 
 export function getBitcoinTxExplorerUrl(txid: string, testnet: boolean) {
-  return `https://mempool.space/${testnet ? "/testnet" : ""
-    }/tx/${txid}`;
+  return `https://mempool.space/${testnet ? "/testnet" : ""}/tx/${txid}`;
 }
 
 export function getMoneroTxExplorerUrl(txid: string, stagenet: boolean) {
@@ -73,33 +72,60 @@ export function bytesToMb(bytes: number): number {
 
 /// Get the markup of a maker's exchange rate compared to the market rate in percent
 export function getMarkup(makerPrice: number, marketPrice: number): number {
-  return (makerPrice - marketPrice) / marketPrice * 100;
+  return ((makerPrice - marketPrice) / marketPrice) * 100;
 }
 
 // Updated function to parse 9-element tuple and format it
-export function formatDateTime(dateTime: [number, number, number, number, number, number, number, number, number] | null | undefined): string {
+export function formatDateTime(
+  dateTime:
+    | [number, number, number, number, number, number, number, number, number]
+    | null
+    | undefined,
+): string {
   if (!dateTime || !Array.isArray(dateTime) || dateTime.length !== 9) {
     // Basic validation for null, undefined, or incorrect structure
     return "Invalid Date Input";
   }
-  
+
   try {
-    const [year, dayOfYear, hour, minute, second, nanoseconds, offsetH, offsetM, offsetS] = dateTime;
+    const [
+      year,
+      dayOfYear,
+      hour,
+      minute,
+      second,
+      nanoseconds,
+      offsetH,
+      offsetM,
+      offsetS,
+    ] = dateTime;
 
     // More robust validation (example)
-    if (year < 1970 || dayOfYear < 1 || dayOfYear > 366 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59 || nanoseconds < 0 || nanoseconds > 999999999) {
-        return "Invalid Date Components";
+    if (
+      year < 1970 ||
+      dayOfYear < 1 ||
+      dayOfYear > 366 ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59 ||
+      second < 0 ||
+      second > 59 ||
+      nanoseconds < 0 ||
+      nanoseconds > 999999999
+    ) {
+      return "Invalid Date Components";
     }
-    
+
     // Calculate total offset in seconds (handle potential non-zero offsets)
-    const totalOffsetSeconds = (offsetH * 3600) + (offsetM * 60) + offsetS;
+    const totalOffsetSeconds = offsetH * 3600 + offsetM * 60 + offsetS;
 
     // Calculate milliseconds from nanoseconds
     const milliseconds = Math.floor(nanoseconds / 1_000_000);
 
     // Create Date object for the start of the year *in UTC*
     const date = new Date(Date.UTC(year, 0, 1)); // Month is 0-indexed (January)
-    
+
     // Add (dayOfYear - 1) days to get the correct date *in UTC*
     date.setUTCDate(date.getUTCDate() + dayOfYear - 1);
 
@@ -115,19 +141,18 @@ export function formatDateTime(dateTime: [number, number, number, number, number
 
     // Final validation
     if (isNaN(date.getTime())) {
-        return "Invalid Calculated Date";
+      return "Invalid Calculated Date";
     }
 
     // Format to a readable string (e.g., "YYYY-MM-DD HH:MM:SS UTC")
     const yyyy = date.getUTCFullYear();
-    const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(date.getUTCDate()).padStart(2, '0');
-    const HH = String(date.getUTCHours()).padStart(2, '0');
-    const MM = String(date.getUTCMinutes()).padStart(2, '0');
-    const SS = String(date.getUTCSeconds()).padStart(2, '0');
+    const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(date.getUTCDate()).padStart(2, "0");
+    const HH = String(date.getUTCHours()).padStart(2, "0");
+    const MM = String(date.getUTCMinutes()).padStart(2, "0");
+    const SS = String(date.getUTCSeconds()).padStart(2, "0");
 
     return `${yyyy}-${mm}-${dd} ${HH}:${MM}:${SS} UTC`;
-
   } catch (e) {
     return "Invalid Date Format";
   }

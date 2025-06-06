@@ -61,4 +61,3 @@ export function parseCliLogString(log: string): CliLog | string {
     return log;
   }
 }
-

@@ -1,6 +1,5 @@
 import {
   Box,
-  makeStyles,
   Paper,
   Table,
   TableBody,
@@ -8,23 +7,20 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-} from "@material-ui/core";
+} from "@mui/material";
 import { useSwapInfosSortedByDate } from "../../../../../store/hooks";
 import HistoryRow from "./HistoryRow";
 
-const useStyles = makeStyles((theme) => ({
-  outer: {
-    paddingTop: theme.spacing(1),
-    paddingBottom: theme.spacing(1),
-  },
-}));
-
 export default function HistoryTable() {
-  const classes = useStyles();
   const swapSortedByDate = useSwapInfosSortedByDate();
 
   return (
-    <Box className={classes.outer}>
+    <Box
+      sx={{
+        paddingTop: 1,
+        paddingBottom: 1,
+      }}
+    >
       <TableContainer component={Paper}>
         <Table>
           <TableHead>

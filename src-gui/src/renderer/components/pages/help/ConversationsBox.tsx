@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
-  makeStyles,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -25,45 +24,28 @@ import {
   ListItem,
   ListItemIcon,
   Link,
-} from "@material-ui/core";
-import ChatIcon from '@material-ui/icons/Chat';
-import SendIcon from '@material-ui/icons/Send';
+} from "@mui/material";
+import ChatIcon from "@mui/icons-material/Chat";
+import SendIcon from "@mui/icons-material/Send";
 import InfoBox from "renderer/components/modal/swap/InfoBox";
 import TruncatedText from "renderer/components/other/TruncatedText";
-import clsx from 'clsx';
-import { useAppSelector, useAppDispatch, useUnreadMessagesCount } from "store/hooks";
+import clsx from "clsx";
+import {
+  useAppSelector,
+  useAppDispatch,
+  useUnreadMessagesCount,
+} from "store/hooks";
 import { markMessagesAsSeen } from "store/features/conversationsSlice";
-import { appendFeedbackMessageViaHttp, fetchAllConversations } from "renderer/api";
+import {
+  appendFeedbackMessageViaHttp,
+  fetchAllConversations,
+} from "renderer/api";
 import { useSnackbar } from "notistack";
 import logger from "utils/logger";
-import AttachmentIcon from '@material-ui/icons/Attachment';
+import AttachmentIcon from "@mui/icons-material/Attachment";
 import { Message, PrimitiveDateTimeString } from "models/apiModel";
 import { formatDateTime } from "utils/conversionUtils";
-
-// Styles
-const useStyles = makeStyles((theme) => ({
-  content: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: theme.spacing(2) },
-  tableContainer: { maxHeight: 300 },
-  dialogContent: { display: 'flex', flexDirection: 'column' },
-  messagesContainer: { flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: theme.spacing(1), maxHeight: 400, padding: theme.spacing(1) },
-  messageRow: { display: 'flex', marginTop: theme.spacing(1) },
-  staffRow: { justifyContent: 'flex-start' },
-  userRow: { justifyContent: 'flex-end' },
-  messageBubble: { padding: theme.spacing(1.5), borderRadius: theme.shape.borderRadius * 2, maxWidth: '75%', wordBreak: 'break-word', boxShadow: theme.shadows[1] },
-  staffBubble: { border: `1px solid ${theme.palette.divider}`, color: theme.palette.text.primary, borderRadius: theme.spacing(2) },
-  userBubble: { backgroundColor: theme.palette.primary.main, color: theme.palette.primary.contrastText, borderRadius: theme.spacing(2) },
-  timestamp: { marginTop: theme.spacing(0.5), fontSize: '0.75rem', opacity: 0.7, textAlign: 'right' },
-  inputArea: { flexShrink: 0, marginTop: theme.spacing(2) },
-  attachmentList: {
-    marginTop: theme.spacing(1),
-    marginBottom: theme.spacing(1),
-    paddingLeft: theme.spacing(2),
-  },
-  attachmentItem: {
-    paddingTop: theme.spacing(0.5),
-    paddingBottom: theme.spacing(0.5),
-  }
-}));
+import { Theme } from "renderer/components/theme";
 
 // Hook: sorted feedback IDs by latest activity, then unread
 function useSortedFeedbackIds() {
@@ -73,25 +55,31 @@ function useSortedFeedbackIds() {
   return useMemo(() => {
     const arr = ids.map((id) => {
       const msgs = conv[id] || [];
-      const unread = msgs.filter((m) => m.is_from_staff && !seen.has(m.id.toString())).length;
+      const unread = msgs.filter(
+        (m) => m.is_from_staff && !seen.has(m.id.toString()),
+      ).length;
       const latest = msgs.reduce((d, m) => {
         try {
           const formattedDate = formatDateTime(m.created_at);
           if (formattedDate.startsWith("Invalid")) return d;
           const t = new Date(formattedDate).getTime();
           return isNaN(t) ? d : Math.max(d, t);
-        } catch(e) { return d; }
+        } catch (e) {
+          return d;
+        }
       }, 0);
       return { id, unread, latest };
     });
-    arr.sort((a, b) => b.latest - a.latest || (b.unread > 0 ? 1 : 0) - (a.unread > 0 ? 1 : 0));
+    arr.sort(
+      (a, b) =>
+        b.latest - a.latest || (b.unread > 0 ? 1 : 0) - (a.unread > 0 ? 1 : 0),
+    );
     return arr.map((x) => x.id);
   }, [ids, conv, seen]);
 }
 
 // Main component
 export default function ConversationsBox() {
-  const classes = useStyles();
   const sortedIds = useSortedFeedbackIds();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -106,25 +94,57 @@ export default function ConversationsBox() {
       icon={null}
       loading={false}
       mainContent={
-        <Box className={classes.content}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 2,
+          }}
+        >
           <Typography variant="subtitle2">
-            View your past feedback submissions and any replies from the development team.
+            View your past feedback submissions and any replies from the
+            development team.
           </Typography>
           {sortedIds.length === 0 ? (
             <Typography variant="body2">No feedback submitted yet.</Typography>
           ) : (
-            <TableContainer component={Paper} className={classes.tableContainer}>
+            <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell style={{ width: '25%' }}>Last Message</TableCell>
-                    <TableCell style={{ width: '60%' }}>Preview</TableCell>
-                    <TableCell align="right" style={{ width: '15%' }} />
+                    <TableCell
+                      sx={(theme) => ({
+                        width: "25%",
+                        backgroundColor: theme.palette.grey[900],
+                      })}
+                    >
+                      Last Message
+                    </TableCell>
+                    <TableCell
+                      sx={(theme) => ({
+                        width: "60%",
+                        backgroundColor: theme.palette.grey[900],
+                      })}
+                    >
+                      Preview
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={(theme) => ({
+                        width: "15%",
+                        backgroundColor: theme.palette.grey[900],
+                      })}
+                    />
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {sortedIds.map((id) => (
-                    <ConversationRow key={id} feedbackId={id} onOpen={setOpenId} />
+                    <ConversationRow
+                      key={id}
+                      feedbackId={id}
+                      onOpen={setOpenId}
+                    />
                   ))}
                 </TableBody>
               </Table>
@@ -146,8 +166,16 @@ export default function ConversationsBox() {
 }
 
 // Single row
-function ConversationRow({ feedbackId, onOpen }: { feedbackId: string, onOpen: (id: string) => void }) {
-  const msgs = useAppSelector((s) => s.conversations.conversations[feedbackId] || []);
+function ConversationRow({
+  feedbackId,
+  onOpen,
+}: {
+  feedbackId: string;
+  onOpen: (id: string) => void;
+}) {
+  const msgs = useAppSelector(
+    (s) => s.conversations.conversations[feedbackId] || [],
+  );
   const unread = useUnreadMessagesCount(feedbackId);
   const sorted = useMemo(
     () =>
@@ -162,13 +190,15 @@ function ConversationRow({ feedbackId, onOpen }: { feedbackId: string, onOpen: (
           if (isNaN(dateA)) return 1;
           if (isNaN(dateB)) return -1;
           return dateB - dateA;
-        } catch (e) { return 0; }
+        } catch (e) {
+          return 0;
+        }
       }),
-    [msgs]
+    [msgs],
   );
   const lastMsg = sorted[0];
-  const time = lastMsg ? formatDateTime(lastMsg.created_at) : '-';
-  const content = lastMsg ? lastMsg.content : 'No messages yet';
+  const time = lastMsg ? formatDateTime(lastMsg.created_at) : "-";
+  const content = lastMsg ? lastMsg.content : "No messages yet";
   const preview = (() => {
     return content;
   })();
@@ -176,15 +206,24 @@ function ConversationRow({ feedbackId, onOpen }: { feedbackId: string, onOpen: (
 
   return (
     <TableRow>
-      <TableCell style={{ width: '25%' }}>{time}</TableCell>
-      <TableCell style={{ width: '60%' }}>
+      <TableCell style={{ width: "25%" }}>{time}</TableCell>
+      <TableCell style={{ width: "60%" }}>
         "<TruncatedText limit={30}>{preview}</TruncatedText>"
       </TableCell>
-      <TableCell align="right" style={{ width: '15%' }}>
+      <TableCell align="right" style={{ width: "15%" }}>
         <Badge badgeContent={unread} color="primary" overlap="rectangular">
-          <Tooltip title={hasStaff ? 'Open Conversation' : 'No developer has responded'} arrow>
+          <Tooltip
+            title={
+              hasStaff ? "Open Conversation" : "No developer has responded"
+            }
+            arrow
+          >
             <span>
-              <IconButton size="small" onClick={() => onOpen(feedbackId)} disabled={!hasStaff}>
+              <IconButton
+                size="small"
+                onClick={() => onOpen(feedbackId)}
+                disabled={!hasStaff}
+              >
                 <ChatIcon />
               </IconButton>
             </span>
@@ -196,138 +235,117 @@ function ConversationRow({ feedbackId, onOpen }: { feedbackId: string, onOpen: (
 }
 
 // Modal
-function ConversationModal({ open, onClose, feedbackId }: { open: boolean, onClose: () => void, feedbackId: string }) {
-  const classes = useStyles();
+function ConversationModal({
+  open,
+  onClose,
+  feedbackId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  feedbackId: string;
+}) {
   const dispatch = useAppDispatch();
+  const msgs = useAppSelector(
+    (s) => s.conversations.conversations[feedbackId] || [],
+  );
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
-  const msgs = useAppSelector((s): Message[] => s.conversations.conversations[feedbackId] || []);
-  const seen = useAppSelector((s) => new Set(s.conversations.seenMessages));
-  const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
 
+  // Mark messages as seen when modal opens
   useEffect(() => {
-    if (open) {
-      const unseen = msgs.filter((m) => !seen.has(m.id.toString()));
-      if (unseen.length) dispatch(markMessagesAsSeen(unseen));
+    if (open && msgs.length > 0) {
+      const unreadMessages = msgs.filter((m) => m.is_from_staff);
+      if (unreadMessages.length > 0) {
+        dispatch(markMessagesAsSeen(unreadMessages));
+      }
     }
-  }, [open, msgs, seen, dispatch]);
+  }, [open, msgs, dispatch]);
 
-  const sorted = useMemo(
+  // Sort messages chronologically
+  const sortedMsgs = useMemo(
     () =>
       [...msgs].sort((a, b) => {
         try {
           const formattedDateA = formatDateTime(a.created_at);
           const formattedDateB = formatDateTime(b.created_at);
-          if (formattedDateA.startsWith("Invalid")) return 1;
-          if (formattedDateB.startsWith("Invalid")) return -1;
+          if (formattedDateA.startsWith("Invalid")) return -1;
+          if (formattedDateB.startsWith("Invalid")) return 1;
           const dateA = new Date(formattedDateA).getTime();
           const dateB = new Date(formattedDateB).getTime();
-          if (isNaN(dateA)) return 1;
-          if (isNaN(dateB)) return -1;
-          return dateB - dateA;
-        } catch(e) { return 0; }
+          if (isNaN(dateA)) return -1;
+          if (isNaN(dateB)) return 1;
+          return dateA - dateB;
+        } catch (e) {
+          return 0;
+        }
       }),
-    [msgs]
+    [msgs],
   );
 
   const sendMessage = async () => {
-    if (!text.trim()) return;
-    setLoading(true);
+    if (!newMessage.trim() || sending) return;
+    setSending(true);
     try {
-      await appendFeedbackMessageViaHttp(feedbackId, text);
-      setText('');
-      enqueueSnackbar('Message sent successfully!', { variant: 'success' });
+      await appendFeedbackMessageViaHttp(feedbackId, newMessage.trim());
+      setNewMessage("");
+      enqueueSnackbar("Message sent successfully!", { variant: "success" });
+      // Fetch updated conversations
       fetchAllConversations();
-    } catch (e) {
-      enqueueSnackbar('Failed to send message. Please try again.', { variant: 'error' });
+    } catch (error) {
+      logger.error("Error sending message:", error);
+      enqueueSnackbar("Failed to send message. Please try again.", {
+        variant: "error",
+      });
     } finally {
-      setLoading(false);
+      setSending(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth scroll="paper">
-      <DialogTitle>Conversation <TruncatedText limit={8} truncateMiddle>{feedbackId}</TruncatedText></DialogTitle>
-      <DialogContent dividers className={classes.dialogContent}>
-        {sorted.length === 0 ? (
-          <Typography variant="body2">No messages in this conversation.</Typography>
-        ) : (
-          <Box className={classes.messagesContainer}>
-            {sorted.map((m: Message) => {
-              const raw = m.content;
-              return (
-                <Box
-                  key={m.id}
-                  className={clsx(
-                    classes.messageRow,
-                    m.is_from_staff ? classes.staffRow : classes.userRow
-                  )}
-                >
-                  <Box className={clsx(
-                    classes.messageBubble,
-                    m.is_from_staff ? classes.staffBubble : classes.userBubble
-                  )}
-                  >
-                    <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
-                      {raw}
-                    </Typography>
-                    {m.attachments && m.attachments.length > 0 && (
-                      <List dense disablePadding className={classes.attachmentList}>
-                        {m.attachments.map((att) => (
-                          <ListItem key={att.id} className={classes.attachmentItem}>
-                            <ListItemIcon style={{ minWidth: 'auto', marginRight: '8px' }}>
-                              <AttachmentIcon fontSize="small" />
-                            </ListItemIcon>
-                            <Link 
-                              href="#" 
-                              onClick={(e) => {
-                                e.preventDefault(); 
-                                alert(`Attachment Key: ${att.key}\n\nContent:\n${att.content}`);
-                              }}
-                              variant="body2"
-                              color="inherit"
-                              underline="none"
-                            >
-                              {att.key}
-                            </Link>
-                          </ListItem>
-                        ))}
-                      </List>
-                    )}
-                    <Typography variant="caption" className={classes.timestamp}>
-                      {m.is_from_staff ? 'Developer' : 'You'} · {formatDateTime(m.created_at)}
-                    </Typography>
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-        <Box className={classes.inputArea}>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Conversation</DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column" }}>
+        <Box
+          sx={{
+            flexGrow: 1,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+            maxHeight: 400,
+            padding: 1,
+          }}
+        >
+          {sortedMsgs.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+        </Box>
+        <Box sx={{ flexShrink: 0, marginTop: 2 }}>
           <TextField
-            variant="outlined"
             fullWidth
-            placeholder="Type your message..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={loading}
             multiline
-            rowsMax={4}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
+            rows={3}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type your message here..."
+            disabled={sending}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
                   <IconButton
-                    color="primary"
                     onClick={sendMessage}
-                    disabled={!text.trim() || loading}
+                    disabled={!newMessage.trim() || sending}
                   >
-                    {loading ? <CircularProgress size={24} /> : <SendIcon />}
+                    {sending ? <CircularProgress size={20} /> : <SendIcon />}
                   </IconButton>
                 </InputAdornment>
               ),
@@ -336,10 +354,86 @@ function ConversationModal({ open, onClose, feedbackId }: { open: boolean, onClo
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} variant="outlined">
-          Close
-        </Button>
+        <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+// Message bubble component
+function MessageBubble({ message }: { message: Message }) {
+  const isStaff = message.is_from_staff;
+  const time = formatDateTime(message.created_at);
+
+  const attachments = message.attachments || [];
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        marginTop: 1,
+        justifyContent: isStaff ? "flex-start" : "flex-end",
+      }}
+    >
+      <Box
+        sx={(theme) => ({
+          padding: 1.5,
+          borderRadius:
+            typeof theme.shape.borderRadius === "number"
+              ? theme.shape.borderRadius * 2
+              : 8,
+          maxWidth: "75%",
+          wordBreak: "break-word",
+          boxShadow: theme.shadows[1],
+          ...(isStaff
+            ? {
+                border: `1px solid ${theme.palette.divider}`,
+                color: theme.palette.text.primary,
+                borderRadius: 2,
+              }
+            : {
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.primary.contrastText,
+                borderRadius: 2,
+              }),
+        })}
+      >
+        <Typography variant="body2">{message.content}</Typography>
+        {attachments.length > 0 && (
+          <List sx={{ marginTop: 1, marginBottom: 1, paddingLeft: 2 }}>
+            {attachments.map((att, idx) => (
+              <ListItem key={idx} sx={{ paddingTop: 0.5, paddingBottom: 0.5 }}>
+                <ListItemIcon>
+                  <AttachmentIcon />
+                </ListItemIcon>
+                <Link
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    alert(
+                      `Attachment Key: ${att.key}\n\nContent:\n${att.content}`,
+                    );
+                  }}
+                >
+                  {att.key}
+                </Link>
+              </ListItem>
+            ))}
+          </List>
+        )}
+        <Typography
+          variant="caption"
+          sx={{
+            marginTop: 0.5,
+            fontSize: "0.75rem",
+            opacity: 0.7,
+            textAlign: "right",
+            display: "block",
+          }}
+        >
+          {time}
+        </Typography>
+      </Box>
+    </Box>
   );
 }

@@ -52,7 +52,7 @@ jobs:
       - name: Commit changelog and manifest files
         id: make-commit
         env:
-          DPRINT_VERSION: "0.39.1"
+          DPRINT_VERSION: "0.50.0"
           RUST_TOOLCHAIN: "1.82"
         run: |
           rustup component add rustfmt --toolchain "$RUST_TOOLCHAIN-x86_64-unknown-linux-gnu"

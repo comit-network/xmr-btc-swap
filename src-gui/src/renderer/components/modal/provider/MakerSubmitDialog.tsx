@@ -6,7 +6,7 @@ import {
   DialogContentText,
   DialogTitle,
   TextField,
-} from "@material-ui/core";
+} from "@mui/material";
 import { Multiaddr } from "multiaddr";
 import { ChangeEvent, useState } from "react";
 
@@ -68,8 +68,8 @@ export default function MakerSubmitDialog({
       <DialogTitle>Submit a maker to the public registry</DialogTitle>
       <DialogContent dividers>
         <DialogContentText>
-          If the maker is valid and reachable, it will be displayed to all
-          other users to trade with.
+          If the maker is valid and reachable, it will be displayed to all other
+          users to trade with.
         </DialogContentText>
         <TextField
           autoFocus

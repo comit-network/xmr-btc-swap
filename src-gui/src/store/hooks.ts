@@ -1,5 +1,13 @@
 import { sortBy, sum } from "lodash";
-import { BobStateName, GetSwapInfoResponseExt, isBitcoinSyncProgress, isPendingBackgroundProcess, isPendingLockBitcoinApprovalEvent, PendingApprovalRequest, PendingLockBitcoinApprovalRequest } from "models/tauriModelExt";
+import {
+  BobStateName,
+  GetSwapInfoResponseExt,
+  isBitcoinSyncProgress,
+  isPendingBackgroundProcess,
+  isPendingLockBitcoinApprovalEvent,
+  PendingApprovalRequest,
+  PendingLockBitcoinApprovalRequest,
+} from "models/tauriModelExt";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
@@ -9,7 +17,11 @@ import { SettingsState } from "./features/settingsSlice";
 import { NodesSlice } from "./features/nodesSlice";
 import { RatesState } from "./features/ratesSlice";
 import { sortMakerList } from "utils/sortUtils";
-import { TauriBackgroundProgress, TauriBitcoinSyncProgress, TauriContextStatusEvent } from "models/tauriModel";
+import {
+  TauriBackgroundProgress,
+  TauriBitcoinSyncProgress,
+  TauriContextStatusEvent,
+} from "models/tauriModel";
 
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -23,7 +35,8 @@ export function useResumeableSwapsCount(
     (state) =>
       saneSwapInfos.filter(
         (swapInfo: GetSwapInfoResponseExt) =>
-          !swapInfo.completed && (additionalFilter == null || additionalFilter(swapInfo))
+          !swapInfo.completed &&
+          (additionalFilter == null || additionalFilter(swapInfo)),
       ).length,
   );
 }
@@ -35,7 +48,9 @@ export function useResumeableSwapsCount(
  */
 export function useResumeableSwapsCountExcludingPunished() {
   return useResumeableSwapsCount(
-    (s) => s.state_name !== BobStateName.BtcPunished && s.state_name !== BobStateName.SwapSetupCompleted,
+    (s) =>
+      s.state_name !== BobStateName.BtcPunished &&
+      s.state_name !== BobStateName.SwapSetupCompleted,
   );
 }
 
@@ -48,7 +63,9 @@ export function useIsSwapRunning() {
 }
 
 export function useIsContextAvailable() {
-  return useAppSelector((state) => state.rpc.status === TauriContextStatusEvent.Available);
+  return useAppSelector(
+    (state) => state.rpc.status === TauriContextStatusEvent.Available,
+  );
 }
 
 /// We do not use a sanity check here, as opposed to the other useSwapInfo hooks,
@@ -57,7 +74,7 @@ export function useSwapInfo(
   swapId: string | null,
 ): GetSwapInfoResponseExt | null {
   return useAppSelector((state) =>
-    swapId ? state.rpc.state.swapInfos[swapId] ?? null : null,
+    swapId ? (state.rpc.state.swapInfos[swapId] ?? null) : null,
   );
 }
 
@@ -118,10 +135,7 @@ export function useSaneSwapInfos() {
 export function useSwapInfosSortedByDate() {
   const swapInfos = useSaneSwapInfos();
 
-  return sortBy(
-    swapInfos,
-    (swap) => -parseDateString(swap.start_date),
-  );
+  return sortBy(swapInfos, (swap) => -parseDateString(swap.start_date));
 }
 
 export function useRates<T>(selector: (rates: RatesState) => T): T {
@@ -151,14 +165,21 @@ export function usePendingLockBitcoinApproval(): PendingLockBitcoinApprovalReque
 
 /// Returns all the pending background processes
 /// In the format [id, {componentName, {type: "Pending", content: {consumed, total}}}]
-export function usePendingBackgroundProcesses(): [string, TauriBackgroundProgress][] {
+export function usePendingBackgroundProcesses(): [
+  string,
+  TauriBackgroundProgress,
+][] {
   const background = useAppSelector((state) => state.rpc.state.background);
-  return Object.entries(background).filter(([_, c]) => isPendingBackgroundProcess(c));
+  return Object.entries(background).filter(([_, c]) =>
+    isPendingBackgroundProcess(c),
+  );
 }
 
 export function useBitcoinSyncProgress(): TauriBitcoinSyncProgress[] {
   const pendingProcesses = usePendingBackgroundProcesses();
-  const syncingProcesses = pendingProcesses.map(([_, c]) => c).filter(isBitcoinSyncProgress);
+  const syncingProcesses = pendingProcesses
+    .map(([_, c]) => c)
+    .filter(isBitcoinSyncProgress);
   return syncingProcesses.map((c) => c.progress.content);
 }
 

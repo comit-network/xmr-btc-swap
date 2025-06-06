@@ -36,6 +36,7 @@ const ratesSlice = createSlice({
   },
 });
 
-export const { setBtcPrice, setXmrPrice, setXmrBtcRate, resetRates } = ratesSlice.actions;
+export const { setBtcPrice, setXmrPrice, setXmrBtcRate, resetRates } =
+  ratesSlice.actions;
 
 export default ratesSlice.reducer;

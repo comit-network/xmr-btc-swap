@@ -6,7 +6,7 @@ export interface ExtendedMakerStatus extends MakerStatus {
   recommended?: boolean;
 }
 
-export interface MakerStatus extends MakerQuote, Maker { }
+export interface MakerStatus extends MakerQuote, Maker {}
 
 export interface MakerQuote {
   price: number;
@@ -29,16 +29,16 @@ export interface Alert {
 
 // Define the correct 9-element tuple type for PrimitiveDateTime
 export type PrimitiveDateTimeString = [
-    number, // Year
-    number, // Day of Year
-    number, // Hour
-    number, // Minute
-    number, // Second
-    number, // Nanosecond
-    number, // Offset Hour
-    number, // Offset Minute
-    number  // Offset Second
-]; 
+  number, // Year
+  number, // Day of Year
+  number, // Hour
+  number, // Minute
+  number, // Second
+  number, // Nanosecond
+  number, // Offset Hour
+  number, // Offset Minute
+  number, // Offset Second
+];
 
 export interface Feedback {
   id: string;
@@ -46,7 +46,7 @@ export interface Feedback {
 }
 
 export interface Attachment {
-  id: number; 
+  id: number;
   message_id: number;
   key: string;
   content: string;

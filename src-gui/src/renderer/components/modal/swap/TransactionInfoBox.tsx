@@ -1,4 +1,4 @@
-import { Link, Typography } from "@material-ui/core";
+import { Link, Typography } from "@mui/material";
 import { ReactNode } from "react";
 import InfoBox from "./InfoBox";
 

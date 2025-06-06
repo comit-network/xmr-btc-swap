@@ -1,21 +1,23 @@
 import globals from "globals";
-import pluginJs from "@eslint/js";
+import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import pluginReact from "eslint-plugin-react";
 
 export default [
-  {
-    ignores: ["node_modules", "dist"],
-  },
-  pluginJs.configs.recommended,
+  { ignores: ["node_modules", "dist"] },
+  js.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
   {
-    files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"],
-    languageOptions: { globals: globals.browser },
+    languageOptions: {
+      globals: globals.browser,
+    },
     rules: {
       "react/react-in-jsx-scope": "off",
-      // Disallow the use of the `open` on the gloal object
+      "react/no-unescaped-entities": "off",
+      "react/no-children-prop": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
       "no-restricted-globals": [
         "warn",
         {
@@ -24,7 +26,6 @@ export default [
             "Use the open(...) function from @tauri-apps/plugin-shell instead",
         },
       ],
-      // Disallow the use of the `open` on the `window` object
       "no-restricted-properties": [
         "warn",
         {

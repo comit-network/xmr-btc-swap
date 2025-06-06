@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Td, Th, Tr } from 'nextra/components'
+import { Table, Td, Th, Tr } from "nextra/components";
 
 export default function SwapMakerTable() {
   function satsToBtc(sats) {
@@ -40,9 +40,7 @@ export default function SwapMakerTable() {
         <tbody>
           {makers.map((maker) => (
             <Tr key={maker.peerId}>
-              <Td>
-                {maker.testnet ? "Testnet" : "Mainnet"}
-              </Td>
+              <Td>{maker.testnet ? "Testnet" : "Mainnet"}</Td>
               <Td>{maker.multiAddr}</Td>
               <Td>{maker.peerId}</Td>
               <Td>{satsToBtc(maker.minSwapAmount)} BTC</Td>

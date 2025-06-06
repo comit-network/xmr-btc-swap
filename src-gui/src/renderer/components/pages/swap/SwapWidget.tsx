@@ -2,15 +2,14 @@ import {
   Box,
   Fab,
   LinearProgress,
-  makeStyles,
   Paper,
   TextField,
   Typography,
-} from "@material-ui/core";
-import InputAdornment from "@material-ui/core/InputAdornment";
-import ArrowDownwardIcon from "@material-ui/icons/ArrowDownward";
-import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
-import { Alert } from "@material-ui/lab";
+} from "@mui/material";
+import InputAdornment from "@mui/material/InputAdornment";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { Alert } from "@mui/material";
 import { ExtendedMakerStatus } from "models/apiModel";
 import { ChangeEvent, useEffect, useState } from "react";
 import { useAppSelector } from "store/hooks";
@@ -29,47 +28,10 @@ function isRegistryDown(reconnectionAttempts: number): boolean {
   return reconnectionAttempts > RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN;
 }
 
-const useStyles = makeStyles((theme) => ({
-  inner: {
-    width: "min(480px, 100%)",
-    minHeight: "150px",
-    display: "grid",
-    padding: theme.spacing(1),
-    gridGap: theme.spacing(1),
-  },
-  header: {
-    padding: 0,
-  },
-  headerText: {
-    padding: theme.spacing(1),
-  },
-  makerInfo: {
-    padding: theme.spacing(1),
-  },
-  swapIconOuter: {
-    display: "flex",
-    justifyContent: "center",
-  },
-  swapIcon: {
-    marginRight: theme.spacing(1),
-  },
-  noMakersAlertOuter: {
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.spacing(1),
-  },
-  noMakersAlertButtonsOuter: {
-    display: "flex",
-    gap: theme.spacing(1),
-  },
-}));
-
 function Title() {
-  const classes = useStyles();
-
   return (
-    <Box className={classes.header}>
-      <Typography variant="h5" className={classes.headerText}>
+    <Box sx={{ padding: 0 }}>
+      <Typography variant="h5" sx={{ padding: 1 }}>
         Swap
       </Typography>
     </Box>
@@ -81,8 +43,6 @@ function HasMakerSwapWidget({
 }: {
   selectedMaker: ExtendedMakerStatus;
 }) {
-  const classes = useStyles();
-
   const forceShowDialog = useAppSelector((state) => state.swap.state !== null);
   const [showDialog, setShowDialog] = useState(false);
   const [btcFieldValue, setBtcFieldValue] = useState<number | string>(
@@ -133,7 +93,16 @@ function HasMakerSwapWidget({
     // 'elevation' prop can't be passed down (type def issue)
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    <Box className={classes.inner} component={Paper} elevation={5}>
+    <Paper
+      variant="outlined"
+      sx={(theme) => ({
+        width: "min(480px, 100%)",
+        minHeight: "150px",
+        display: "grid",
+        padding: theme.spacing(2),
+        gridGap: theme.spacing(1),
+      })}
+    >
       <Title />
       <TextField
         label="For this many BTC"
@@ -148,7 +117,7 @@ function HasMakerSwapWidget({
           endAdornment: <InputAdornment position="end">BTC</InputAdornment>,
         }}
       />
-      <Box className={classes.swapIconOuter}>
+      <Box sx={{ display: "flex", justifyContent: "center" }}>
         <ArrowDownwardIcon fontSize="small" />
       </Box>
       <TextField
@@ -162,14 +131,14 @@ function HasMakerSwapWidget({
       />
       <MakerSelect />
       <Fab variant="extended" color="primary" onClick={handleGuideDialogOpen}>
-        <SwapHorizIcon className={classes.swapIcon} />
+        <SwapHorizIcon sx={{ marginRight: 1 }} />
         Swap
       </Fab>
       <SwapDialog
         open={showDialog || forceShowDialog}
         onClose={() => setShowDialog(false)}
       />
-    </Box>
+    </Paper>
   );
 }
 
@@ -178,18 +147,15 @@ function HasNoMakersSwapWidget() {
   const isPublicRegistryDown = useAppSelector((state) =>
     isRegistryDown(state.makers.registry.connectionFailsCount),
   );
-  const classes = useStyles();
 
   const alertBox = isPublicRegistryDown ? (
     <Alert severity="info">
-      <Box className={classes.noMakersAlertOuter}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Typography>
           Currently, the public registry of makers seems to be unreachable.
           Here&apos;s what you can do:
           <ul>
-            <li>
-              Try discovering a maker by connecting to a rendezvous point
-            </li>
+            <li>Try discovering a maker by connecting to a rendezvous point</li>
             <li>
               Try again later when the public registry may be reachable again
             </li>
@@ -202,19 +168,17 @@ function HasNoMakersSwapWidget() {
     </Alert>
   ) : (
     <Alert severity="info">
-      <Box className={classes.noMakersAlertOuter}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Typography>
           Currently, there are no makers (trading partners) available in the
           official registry. Here&apos;s what you can do:
           <ul>
-            <li>
-              Try discovering a maker by connecting to a rendezvous point
-            </li>
+            <li>Try discovering a maker by connecting to a rendezvous point</li>
             <li>Add a new maker to the public registry</li>
             <li>Try again later when more makers may be available</li>
           </ul>
         </Typography>
-        <Box>
+        <Box sx={{ display: "flex", gap: 1 }}>
           <MakerSubmitDialogOpenButton />
           <ListSellersDialogOpenButton />
         </Box>
@@ -225,19 +189,27 @@ function HasNoMakersSwapWidget() {
   return (
     <Box>
       {alertBox}
-      <SwapDialog open={forceShowDialog} onClose={() => { }} />
+      <SwapDialog open={forceShowDialog} onClose={() => {}} />
     </Box>
   );
 }
 
 function MakerLoadingSwapWidget() {
-  const classes = useStyles();
-
   return (
     // 'elevation' prop can't be passed down (type def issue)
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    <Box className={classes.inner} component={Paper} elevation={15}>
+    <Box
+      component={Paper}
+      elevation={15}
+      sx={{
+        width: "min(480px, 100%)",
+        minHeight: "150px",
+        display: "grid",
+        padding: 1,
+        gridGap: 1,
+      }}
+    >
       <Title />
       <LinearProgress />
     </Box>
@@ -245,9 +217,7 @@ function MakerLoadingSwapWidget() {
 }
 
 export default function SwapWidget() {
-  const selectedMaker = useAppSelector(
-    (state) => state.makers.selectedMaker,
-  );
+  const selectedMaker = useAppSelector((state) => state.makers.selectedMaker);
   // If we fail more than RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN reconnect attempts, we'll show the "no makers" widget. We can assume the public registry is down.
   const makerLoading = useAppSelector(
     (state) =>
@@ -258,8 +228,10 @@ export default function SwapWidget() {
   if (makerLoading) {
     return <MakerLoadingSwapWidget />;
   }
-  if (selectedMaker) {
-    return <HasMakerSwapWidget selectedMaker={selectedMaker} />;
+
+  if (selectedMaker === null) {
+    return <HasNoMakersSwapWidget />;
   }
-  return <HasNoMakersSwapWidget />;
+
+  return <HasMakerSwapWidget selectedMaker={selectedMaker} />;
 }

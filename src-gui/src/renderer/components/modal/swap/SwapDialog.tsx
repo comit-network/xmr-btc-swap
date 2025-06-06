@@ -1,10 +1,4 @@
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  makeStyles,
-} from "@material-ui/core";
+import { Button, Dialog, DialogActions, DialogContent } from "@mui/material";
 import { useState } from "react";
 import { swapReset } from "store/features/swapSlice";
 import { useAppDispatch, useAppSelector, useIsSwapRunning } from "store/hooks";
@@ -14,15 +8,6 @@ import SwapStatePage from "./pages/SwapStatePage";
 import SwapDialogTitle from "./SwapDialogTitle";
 import SwapStateStepper from "./SwapStateStepper";
 
-const useStyles = makeStyles({
-  content: {
-    minHeight: "25rem",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-});
-
 export default function SwapDialog({
   open,
   onClose,
@@ -30,8 +15,6 @@ export default function SwapDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const classes = useStyles();
-
   const swap = useAppSelector((state) => state.swap);
   const isSwapRunning = useIsSwapRunning();
   const [debug, setDebug] = useState(false);
@@ -59,7 +42,15 @@ export default function SwapDialog({
         title="Swap Bitcoin for Monero"
       />
 
-      <DialogContent dividers className={classes.content}>
+      <DialogContent
+        dividers
+        sx={{
+          minHeight: "25rem",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         {debug ? (
           <DebugPage />
         ) : (

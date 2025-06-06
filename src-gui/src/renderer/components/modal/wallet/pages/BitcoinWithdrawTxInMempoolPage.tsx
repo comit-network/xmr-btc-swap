@@ -1,4 +1,4 @@
-import { DialogContentText } from "@material-ui/core";
+import { DialogContentText } from "@mui/material";
 import BitcoinTransactionInfoBox from "../../swap/BitcoinTransactionInfoBox";
 
 export default function BtcTxInMempoolPageContent({

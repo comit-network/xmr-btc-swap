@@ -1,8 +1,8 @@
-import { Box } from "@material-ui/core";
+import { Box } from "@mui/material";
 import { ReactNode } from "react";
 import ActionableMonospaceTextBox from "renderer/components/other/ActionableMonospaceTextBox";
 import InfoBox from "./InfoBox";
-import { Alert } from "@material-ui/lab";
+import { Alert } from "@mui/material";
 
 type Props = {
   title: string;
@@ -20,7 +20,13 @@ export default function DepositAddressInfoBox({
   return (
     <InfoBox
       title={title}
-      mainContent={<ActionableMonospaceTextBox content={address} displayCopyIcon={true} enableQrCode={true} />}
+      mainContent={
+        <ActionableMonospaceTextBox
+          content={address}
+          displayCopyIcon={true}
+          enableQrCode={true}
+        />
+      }
       additionalContent={
         <Box
           style={{

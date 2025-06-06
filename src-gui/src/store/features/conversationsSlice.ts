@@ -25,7 +25,7 @@ const conversationsSlice = createSlice({
     addFeedbackId(slice, action: PayloadAction<string>) {
       // Only add if not already present
       if (!slice.knownFeedbackIds.includes(action.payload)) {
-          slice.knownFeedbackIds.push(action.payload);
+        slice.knownFeedbackIds.push(action.payload);
       }
     },
     // Removes a feedback id from the list of known ones
@@ -37,18 +37,26 @@ const conversationsSlice = createSlice({
       delete slice.conversations[action.payload];
     },
     // Sets the conversations for a given feedback id (Payload uses the correct Message type)
-    setConversation(slice, action: PayloadAction<{feedbackId: string, messages: Message[]}>) {
+    setConversation(
+      slice,
+      action: PayloadAction<{ feedbackId: string; messages: Message[] }>,
+    ) {
       slice.conversations[action.payload.feedbackId] = action.payload.messages;
     },
     // Sets the seen messages for a given feedback id (Payload uses the correct Message type)
     markMessagesAsSeen(slice, action: PayloadAction<Message[]>) {
       const newSeenIds = action.payload
         .map((msg) => msg.id.toString())
-        .filter(id => !slice.seenMessages.includes(id)); // Avoid duplicates
+        .filter((id) => !slice.seenMessages.includes(id)); // Avoid duplicates
       slice.seenMessages.push(...newSeenIds);
     },
   },
 });
 
-export const { addFeedbackId, removeFeedback, setConversation, markMessagesAsSeen } = conversationsSlice.actions;
+export const {
+  addFeedbackId,
+  removeFeedback,
+  setConversation,
+  markMessagesAsSeen,
+} = conversationsSlice.actions;
 export default conversationsSlice.reducer;

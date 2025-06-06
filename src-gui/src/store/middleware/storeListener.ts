@@ -1,12 +1,25 @@
 import { createListenerMiddleware } from "@reduxjs/toolkit";
-import { getAllSwapInfos, checkBitcoinBalance, updateAllNodeStatuses, fetchSellersAtPresetRendezvousPoints, getSwapInfo } from "renderer/rpc";
+import {
+  getAllSwapInfos,
+  checkBitcoinBalance,
+  updateAllNodeStatuses,
+  fetchSellersAtPresetRendezvousPoints,
+  getSwapInfo,
+} from "renderer/rpc";
 import logger from "utils/logger";
 import { contextStatusEventReceived } from "store/features/rpcSlice";
-import { addNode, setFetchFiatPrices, setFiatCurrency } from "store/features/settingsSlice";
+import {
+  addNode,
+  setFetchFiatPrices,
+  setFiatCurrency,
+} from "store/features/settingsSlice";
 import { fetchFeedbackMessagesViaHttp, updateRates } from "renderer/api";
 import { store } from "renderer/store/storeRenderer";
 import { swapProgressEventReceived } from "store/features/swapSlice";
-import { addFeedbackId, setConversation } from "store/features/conversationsSlice";
+import {
+  addFeedbackId,
+  setConversation,
+} from "store/features/conversationsSlice";
 import { TauriContextStatusEvent } from "models/tauriModel";
 
 export function createMainListeners() {
@@ -45,7 +58,9 @@ export function createMainListeners() {
       }
 
       // Update the swap info
-      logger.info("Swap progress event received, updating swap info from database...");
+      logger.info(
+        "Swap progress event received, updating swap info from database...",
+      );
       await getSwapInfo(action.payload.swap_id);
     },
   });

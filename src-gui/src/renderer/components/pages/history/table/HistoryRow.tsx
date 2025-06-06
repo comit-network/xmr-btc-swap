@@ -1,29 +1,17 @@
-import {
-  Box,
-  Collapse,
-  IconButton,
-  makeStyles,
-  TableCell,
-  TableRow,
-} from "@material-ui/core";
-import ArrowForwardIcon from "@material-ui/icons/ArrowForward";
-import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
+import { Box, Collapse, IconButton, TableCell, TableRow } from "@mui/material";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { GetSwapInfoResponse } from "models/tauriModel";
 import { useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import { PiconeroAmount, SatsAmount } from "../../../other/Units";
 import HistoryRowActions from "./HistoryRowActions";
 import HistoryRowExpanded from "./HistoryRowExpanded";
-import { bobStateNameToHumanReadable, GetSwapInfoResponseExt } from "models/tauriModelExt";
-
-const useStyles = makeStyles((theme) => ({
-  amountTransferContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  },
-}));
+import {
+  bobStateNameToHumanReadable,
+  GetSwapInfoResponseExt,
+} from "models/tauriModelExt";
 
 function AmountTransfer({
   btcAmount,
@@ -32,10 +20,14 @@ function AmountTransfer({
   xmrAmount: number;
   btcAmount: number;
 }) {
-  const classes = useStyles();
-
   return (
-    <Box className={classes.amountTransferContainer}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+      }}
+    >
       <SatsAmount amount={btcAmount} />
       <ArrowForwardIcon />
       <PiconeroAmount amount={xmrAmount} />

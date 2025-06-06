@@ -1,6 +1,8 @@
-import { ListItem, ListItemIcon, ListItemText } from "@material-ui/core";
+import { ListItemIcon, ListItemText } from "@mui/material";
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+
+import ListItemButton from "@mui/material/ListItemButton";
 
 export default function RouteListItemIconButton({
   name,
@@ -14,9 +16,9 @@ export default function RouteListItemIconButton({
   const navigate = useNavigate();
 
   return (
-    <ListItem button onClick={() => navigate(route)} key={name}>
+    <ListItemButton onClick={() => navigate(route)} key={name}>
       <ListItemIcon>{children}</ListItemIcon>
       <ListItemText primary={name} />
-    </ListItem>
+    </ListItemButton>
   );
 }

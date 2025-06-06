@@ -1,4 +1,4 @@
-import { Box, Chip, Typography } from "@material-ui/core";
+import { Box, Chip, Typography } from "@mui/material";
 import { CliLog } from "models/cliModel";
 import { ReactNode, useMemo, useState } from "react";
 import { logsToRawString } from "utils/parseUtils";
@@ -65,7 +65,7 @@ export default function CliLogsBox({
 }: {
   label: string;
   logs: (CliLog | string)[];
-  topRightButton?: ReactNode
+  topRightButton?: ReactNode;
 }) {
   const [searchQuery, setSearchQuery] = useState<string>("");
 

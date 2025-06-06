@@ -1,12 +1,5 @@
-import {
-  Box,
-  makeStyles,
-  Paper,
-  Tab,
-  Tabs,
-  Typography,
-} from "@material-ui/core";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import { Box, Paper, Tab, Tabs, Typography } from "@mui/material";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useState } from "react";
 import RemainingFundsWillBeUsedAlert from "renderer/components/alert/RemainingFundsWillBeUsedAlert";
 import BitcoinAddressTextField from "renderer/components/inputs/BitcoinAddressTextField";
@@ -15,20 +8,7 @@ import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { buyXmr } from "renderer/rpc";
 import { useAppSelector } from "store/hooks";
 
-const useStyles = makeStyles((theme) => ({
-  initButton: {
-    marginTop: theme.spacing(1),
-  },
-  fieldsOuter: {
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.spacing(1.5),
-  },
-}));
-
 export default function InitPage() {
-  const classes = useStyles();
-
   const [redeemAddress, setRedeemAddress] = useState("");
   const [refundAddress, setRefundAddress] = useState("");
   const [useExternalRefundAddress, setUseExternalRefundAddress] =
@@ -37,9 +17,7 @@ export default function InitPage() {
   const [redeemAddressValid, setRedeemAddressValid] = useState(false);
   const [refundAddressValid, setRefundAddressValid] = useState(false);
 
-  const selectedMaker = useAppSelector(
-    (state) => state.makers.selectedMaker,
-  );
+  const selectedMaker = useAppSelector((state) => state.makers.selectedMaker);
 
   async function init() {
     await buyXmr(
@@ -51,7 +29,13 @@ export default function InitPage() {
 
   return (
     <Box>
-      <Box className={classes.fieldsOuter}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+        }}
+      >
         <RemainingFundsWillBeUsedAlert />
         <MoneroAddressTextField
           label="Monero redeem address"
@@ -104,7 +88,7 @@ export default function InitPage() {
           variant="contained"
           color="primary"
           size="large"
-          className={classes.initButton}
+          sx={{ marginTop: 1 }}
           endIcon={<PlayArrowIcon />}
           onInvoke={init}
           displayErrorSnackbar

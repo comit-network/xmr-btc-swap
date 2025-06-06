@@ -37,7 +37,7 @@ interface State {
   };
   background: {
     [key: string]: TauriBackgroundProgress;
-  }
+  };
 }
 
 export interface RPCSlice {
@@ -68,7 +68,9 @@ export const rpcSlice = createSlice({
     receivedCliLog(slice, action: PayloadAction<TauriLogEvent>) {
       const buffer = action.payload.buffer;
       const logs = parseLogsFromString(buffer);
-      const logsWithoutExisting = logs.filter(log => !slice.logs.includes(log));
+      const logsWithoutExisting = logs.filter(
+        (log) => !slice.logs.includes(log),
+      );
       slice.logs = slice.logs.concat(logsWithoutExisting);
     },
     contextStatusEventReceived(
@@ -79,12 +81,15 @@ export const rpcSlice = createSlice({
     },
     timelockChangeEventReceived(
       slice: RPCSlice,
-      action: PayloadAction<TauriTimelockChangeEvent>
+      action: PayloadAction<TauriTimelockChangeEvent>,
     ) {
       if (slice.state.swapInfos[action.payload.swap_id]) {
-        slice.state.swapInfos[action.payload.swap_id].timelock = action.payload.timelock;
+        slice.state.swapInfos[action.payload.swap_id].timelock =
+          action.payload.timelock;
       } else {
-        logger.warn(`Received timelock change event for unknown swap ${action.payload.swap_id}`);
+        logger.warn(
+          `Received timelock change event for unknown swap ${action.payload.swap_id}`,
+        );
       }
     },
     rpcSetBalance(slice, action: PayloadAction<number>) {
@@ -121,7 +126,10 @@ export const rpcSlice = createSlice({
     rpcResetMoneroRecoveryKeys(slice) {
       slice.state.moneroRecovery = null;
     },
-    rpcSetBackgroundRefundState(slice, action: PayloadAction<{ swap_id: string, state: BackgroundRefundState }>) {
+    rpcSetBackgroundRefundState(
+      slice,
+      action: PayloadAction<{ swap_id: string; state: BackgroundRefundState }>,
+    ) {
       slice.state.backgroundRefund = {
         swapId: action.payload.swap_id,
         state: action.payload.state,
@@ -132,7 +140,10 @@ export const rpcSlice = createSlice({
       const requestId = event.content.request_id;
       slice.state.approvalRequests[requestId] = event;
     },
-    backgroundProgressEventReceived(slice, action: PayloadAction<TauriBackgroundProgressWrapper>) {
+    backgroundProgressEventReceived(
+      slice,
+      action: PayloadAction<TauriBackgroundProgressWrapper>,
+    ) {
       slice.state.background[action.payload.id] = action.payload.event;
     },
     backgroundProgressEventRemoved(slice, action: PayloadAction<string>) {

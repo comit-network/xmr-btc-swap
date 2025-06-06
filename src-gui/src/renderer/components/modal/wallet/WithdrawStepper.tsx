@@ -1,4 +1,4 @@
-import { Step, StepLabel, Stepper } from "@material-ui/core";
+import { Step, StepLabel, Stepper } from "@mui/material";
 
 function getActiveStep(isPending: boolean, withdrawTxId: string | null) {
   if (isPending) {

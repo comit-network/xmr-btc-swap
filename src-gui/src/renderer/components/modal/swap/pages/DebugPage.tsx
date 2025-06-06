@@ -1,4 +1,4 @@
-import { Box, DialogContentText } from "@material-ui/core";
+import { Box, DialogContentText } from "@mui/material";
 import {
   useActiveSwapInfo,
   useActiveSwapLogs,
@@ -35,7 +35,10 @@ export default function DebugPage() {
             data={cliState}
             label="Swap Daemon State (exposed via API)"
           />
-          <CliLogsBox label="Tor Daemon Logs" logs={(torStdOut || "").split("\n")} />
+          <CliLogsBox
+            label="Tor Daemon Logs"
+            logs={(torStdOut || "").split("\n")}
+          />
         </Box>
       </DialogContentText>
     </Box>

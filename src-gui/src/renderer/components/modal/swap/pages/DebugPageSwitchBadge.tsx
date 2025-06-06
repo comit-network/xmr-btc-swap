@@ -1,6 +1,6 @@
-import { Tooltip } from "@material-ui/core";
-import IconButton from "@material-ui/core/IconButton";
-import DeveloperBoardIcon from "@material-ui/icons/DeveloperBoard";
+import { Tooltip } from "@mui/material";
+import IconButton from "@mui/material/IconButton";
+import DeveloperBoardIcon from "@mui/icons-material/DeveloperBoard";
 
 export default function DebugPageSwitchBadge({
   enabled,
@@ -18,6 +18,7 @@ export default function DebugPageSwitchBadge({
       <IconButton
         onClick={handleToggle}
         color={enabled ? "primary" : "default"}
+        size="large"
       >
         <DeveloperBoardIcon />
       </IconButton>
