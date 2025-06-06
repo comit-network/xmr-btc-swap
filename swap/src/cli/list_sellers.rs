@@ -67,7 +67,7 @@ pub struct Seller {
     pub multiaddr: Multiaddr,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, Hash, Copy, Clone, Ord, PartialOrd)]
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Status {
     Online(BidQuote),
     Unreachable,
@@ -284,7 +284,7 @@ impl EventLoop {
 
                                 Ok(Seller {
                                     multiaddr: address.clone(),
-                                    status: Status::Online(*quote),
+                                    status: Status::Online(quote.clone()),
                                 })
                             }
                             QuoteStatus::Received(Status::Unreachable) => {
