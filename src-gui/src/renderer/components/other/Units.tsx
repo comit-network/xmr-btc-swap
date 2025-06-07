@@ -1,5 +1,5 @@
 import { Tooltip } from "@mui/material";
-import { useAppSelector } from "store/hooks";
+import { useAppSelector, useSettings } from "store/hooks";
 import { getMarkup, piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 
 type Amount = number | null | undefined;
@@ -17,10 +17,9 @@ export function AmountWithUnit({
   exchangeRate?: Amount;
   parenthesisText?: string;
 }) {
-  const fetchFiatPrices = useAppSelector(
-    (state) => state.settings.fetchFiatPrices,
+  const [fetchFiatPrices, fiatCurrency] = useSettings(
+    (settings) => [settings.fetchFiatPrices, settings.fiatCurrency],
   );
-  const fiatCurrency = useAppSelector((state) => state.settings.fiatCurrency);
   const title =
     fetchFiatPrices &&
     exchangeRate != null &&

@@ -37,7 +37,6 @@ import {
 } from "store/features/settingsSlice";
 import {
   useAppDispatch,
-  useAppSelector,
   useNodes,
   useSettings,
 } from "store/hooks";
@@ -329,7 +328,7 @@ function MoneroNodeUrlSetting() {
  * A setting that allows you to select the theme of the GUI.
  */
 function ThemeSetting() {
-  const theme = useAppSelector((s) => s.settings.theme);
+  const theme = useSettings((s) => s.theme);
   const dispatch = useAppDispatch();
 
   return (
