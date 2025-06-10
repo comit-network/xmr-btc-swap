@@ -1,4 +1,6 @@
 import { Typography, Box, DialogContent, DialogActions, Button } from '@mui/material'
+import SwapAmountSelector from '../SwapAmountSelector'
+import MakerOfferItem from '../MakerOfferItem'
 
 export default function SelectMaker({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
     return (
@@ -9,8 +11,26 @@ export default function SelectMaker({ onNext, onBack }: { onNext: () => void; on
                     flexDirection: "column",
                     gap: 2,
                 }}>
-                    <Typography variant="h3">Select a Maker</Typography>
-                    {/* Add maker selection UI here */}
+                    <SwapAmountSelector fullWidth/>
+                    <Box sx={{
+                        display: "flex",
+                        flexDirection: "row",
+                        gap: 1,
+                    }}>
+                        <Typography variant="h3">Select a Maker</Typography>
+                        <Button variant="text">Connect to Rendezvous Point</Button>
+                    </Box>
+                    <Typography variant="body1">Best offer</Typography>
+                    <MakerOfferItem />
+                    <Typography variant="body1">Other offers</Typography>
+                    <Box sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                    }}>
+                        <MakerOfferItem />
+                        <MakerOfferItem />
+                    </Box>
                 </Box>
             </DialogContent>
             <DialogActions>
@@ -18,7 +38,7 @@ export default function SelectMaker({ onNext, onBack }: { onNext: () => void; on
                     Back
                 </Button>
                 <Button variant="contained" color="primary" onClick={onNext}>
-                    Next
+                    Get Offer
                 </Button>
             </DialogActions>
         </>
