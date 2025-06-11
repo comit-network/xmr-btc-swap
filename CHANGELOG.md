@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0-beta.1] - 2025-06-11
+
 - BREAKING PROTOCOL CHANGE: Takers/GUIs running `>= 2.0.0` will not be able to initiate new swaps with makers/asbs running `< 2.0.0`. Please upgrade as soon as possible. Already started swaps from older versions are not be affected.
   - Taker and Maker now collaboratively sign a `tx_refund_early` Bitcoin transaction in the negotiation phase which allows the maker to refund the Bitcoin for the taker without having to wait for the 12h cancel timelock to expire.
   - `tx_refund_early` will only be published if the maker has not locked their Monero yet. This allows swaps to be refunded quickly if the maker doesn't have enough funds available or their daemon is not fully synced. The taker can then use the refunded Bitcoin to start a new swap.
@@ -508,7 +510,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.1.7...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/2.0.0-beta.1...HEAD
+[2.0.0-beta.1]: https://github.com/UnstoppableSwap/core/compare/1.1.7...2.0.0-beta.1
 [1.1.7]: https://github.com/UnstoppableSwap/core/compare/1.1.4...1.1.7
 [1.1.4]: https://github.com/UnstoppableSwap/core/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/UnstoppableSwap/core/compare/1.1.2...1.1.3
