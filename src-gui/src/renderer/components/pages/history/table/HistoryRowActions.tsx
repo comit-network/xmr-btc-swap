@@ -76,6 +76,14 @@ export default function HistoryRowActions(swap: GetSwapInfoResponse) {
     );
   }
 
+  if (swap.state_name === BobStateName.BtcEarlyRefunded) {
+    return (
+      <Tooltip title="This swap is completed. Your Bitcoin has been refunded.">
+        <DoneIcon style={{ color: green[500] }} />
+      </Tooltip>
+    );
+  }
+
   if (swap.state_name === BobStateName.BtcPunished) {
     return (
       <Tooltip title="You have been punished. You can attempt to recover the Monero with the help of the other party but that is not guaranteed to work">

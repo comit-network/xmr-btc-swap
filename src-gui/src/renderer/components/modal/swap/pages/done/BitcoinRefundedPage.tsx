@@ -4,14 +4,66 @@ import { useActiveSwapInfo } from "store/hooks";
 import FeedbackInfoBox from "../../../../pages/help/FeedbackInfoBox";
 import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
 
-export default function BitcoinRefundedPage({
+export function BitcoinRefundPublishedPage({
+  btc_refund_txid,
+}: TauriSwapProgressEventContent<"BtcRefundPublished">) {
+  return (
+    <MultiBitcoinRefundedPage
+      btc_refund_txid={btc_refund_txid}
+      btc_refund_finalized={false}
+    />
+  );
+}
+
+export function BitcoinEarlyRefundPublishedPage({
+  btc_early_refund_txid,
+}: TauriSwapProgressEventContent<"BtcEarlyRefundPublished">) {
+  return (
+    <MultiBitcoinRefundedPage
+      btc_refund_txid={btc_early_refund_txid}
+      btc_refund_finalized={false}
+    />
+  );
+}
+
+export function BitcoinRefundedPage({
   btc_refund_txid,
 }: TauriSwapProgressEventContent<"BtcRefunded">) {
-  // TODO: Reimplement this using Tauri
+  return (
+    <MultiBitcoinRefundedPage
+      btc_refund_txid={btc_refund_txid}
+      btc_refund_finalized={true}
+    />
+  );
+}
+
+export function BitcoinEarlyRefundedPage({
+  btc_early_refund_txid,
+}: TauriSwapProgressEventContent<"BtcEarlyRefunded">) {
+  return (
+    <MultiBitcoinRefundedPage
+      btc_refund_txid={btc_early_refund_txid}
+      btc_refund_finalized={true}
+    />
+  );
+}
+
+function MultiBitcoinRefundedPage({
+  btc_refund_txid,
+  btc_refund_finalized,
+}: {
+  btc_refund_txid: string;
+  btc_refund_finalized: boolean;
+}) {
   const swap = useActiveSwapInfo();
-  const additionalContent = swap
-    ? `Refund address: ${swap.btc_refund_address}`
-    : null;
+  const additionalContent = swap ? (
+    <>
+      {!btc_refund_finalized &&
+        "Waiting for refund transaction to be confirmed"}
+      {!btc_refund_finalized && <br />}
+      Refund address: {swap.btc_refund_address}
+    </>
+  ) : null;
 
   return (
     <Box>
@@ -27,13 +79,10 @@ export default function BitcoinRefundedPage({
           gap: "0.5rem",
         }}
       >
-        {
-          // TODO: We should display the confirmation count here
-        }
         <BitcoinTransactionInfoBox
           title="Bitcoin Refund Transaction"
           txId={btc_refund_txid}
-          loading={false}
+          loading={!btc_refund_finalized}
           additionalContent={additionalContent}
         />
         <FeedbackInfoBox />

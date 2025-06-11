@@ -418,7 +418,14 @@ async fn init_bitcoin_wallet(
     let wallet = bitcoin::wallet::WalletBuilder::default()
         .seed(seed.clone())
         .network(env_config.bitcoin_network)
-        .electrum_rpc_url(config.bitcoin.electrum_rpc_url.as_str().to_string())
+        .electrum_rpc_urls(
+            config
+                .bitcoin
+                .electrum_rpc_urls
+                .iter()
+                .map(|url| url.as_str().to_string())
+                .collect::<Vec<String>>(),
+        )
         .persister(bitcoin::wallet::PersisterConfig::SqliteFile {
             data_dir: config.data.dir.clone(),
         })

@@ -238,6 +238,8 @@ jobs:
             concurrent_bobs_after_xmr_lock_proof_sent,
             alice_manually_redeems_after_enc_sig_learned,
             happy_path_bob_offline_while_alice_redeems_btc,
+            alice_empty_balance_after_started_btc_early_refund,
+            alice_broken_wallet_rpc_after_started_btc_early_refund
           ]
     runs-on: ubuntu-latest
     steps:

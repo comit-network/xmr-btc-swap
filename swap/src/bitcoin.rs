@@ -1,6 +1,8 @@
+pub mod electrum_balancer;
 pub mod wallet;
 
 mod cancel;
+mod early_refund;
 mod lock;
 mod punish;
 mod redeem;
@@ -8,6 +10,7 @@ mod refund;
 mod timelocks;
 
 pub use crate::bitcoin::cancel::{CancelTimelock, PunishTimelock, TxCancel};
+pub use crate::bitcoin::early_refund::TxEarlyRefund;
 pub use crate::bitcoin::lock::TxLock;
 pub use crate::bitcoin::punish::TxPunish;
 pub use crate::bitcoin::redeem::TxRedeem;
@@ -435,6 +438,11 @@ pub enum RpcErrorCode {
     RpcVerifyAlreadyInChain,
     /// General error during transaction or block submission
     RpcVerifyError,
+    /// Invalid address or key. Error code -5. Is throwns when a transaction is not found.
+    /// See:
+    /// - https://github.com/bitcoin/bitcoin/blob/ae024137bda9fe189f4e7ccf26dbaffd44cbbeb6/src/rpc/mempool.cpp#L470-L472
+    /// - https://github.com/bitcoin/bitcoin/blob/ae024137bda9fe189f4e7ccf26dbaffd44cbbeb6/src/rpc/rawtransaction.cpp#L352-L368
+    RpcInvalidAddressOrKey,
 }
 
 impl From<RpcErrorCode> for i64 {
@@ -443,11 +451,55 @@ impl From<RpcErrorCode> for i64 {
             RpcErrorCode::RpcVerifyError => -25,
             RpcErrorCode::RpcVerifyRejected => -26,
             RpcErrorCode::RpcVerifyAlreadyInChain => -27,
+            RpcErrorCode::RpcInvalidAddressOrKey => -5,
         }
     }
 }
 
 pub fn parse_rpc_error_code(error: &anyhow::Error) -> anyhow::Result<i64> {
+    // First try to extract an Electrum error from a MultiError if present
+    if let Some(multi_error) = error.downcast_ref::<crate::bitcoin::electrum_balancer::MultiError>()
+    {
+        // Try to find the first Electrum error in the MultiError
+        for single_error in multi_error.iter() {
+            if let bdk_electrum::electrum_client::Error::Protocol(serde_json::Value::String(
+                string,
+            )) = single_error
+            {
+                let json = serde_json::from_str(
+                    &string
+                        .replace("sendrawtransaction RPC error:", "")
+                        .replace("daemon error:", ""),
+                )?;
+
+                let json_map = match json {
+                    serde_json::Value::Object(map) => map,
+                    _ => continue, // Try next error if this one isn't a JSON object
+                };
+
+                let error_code_value = match json_map.get("code") {
+                    Some(val) => val,
+                    None => continue, // Try next error if no error code field
+                };
+
+                let error_code_number = match error_code_value {
+                    serde_json::Value::Number(num) => num,
+                    _ => continue, // Try next error if error code isn't a number
+                };
+
+                if let Some(int) = error_code_number.as_i64() {
+                    return Ok(int);
+                }
+            }
+        }
+        // If we couldn't extract an RPC error code from any error in the MultiError
+        bail!(
+            "Error is of incorrect variant. We expected an Electrum error, but got: {}",
+            error
+        );
+    }
+
+    // Original logic for direct Electrum errors
     let string = match error.downcast_ref::<bdk_electrum::electrum_client::Error>() {
         Some(bdk_electrum::electrum_client::Error::Protocol(serde_json::Value::String(string))) => {
             string
@@ -458,7 +510,11 @@ pub fn parse_rpc_error_code(error: &anyhow::Error) -> anyhow::Result<i64> {
         ),
     };
 
-    let json = serde_json::from_str(&string.replace("sendrawtransaction RPC error:", ""))?;
+    let json = serde_json::from_str(
+        &string
+            .replace("sendrawtransaction RPC error:", "")
+            .replace("daemon error:", ""),
+    )?;
 
     let json_map = match json {
         serde_json::Value::Object(map) => map,
@@ -643,6 +699,128 @@ mod tests {
         assert_weight(cancel_transaction, TxCancel::weight().to_wu(), "TxCancel");
         assert_weight(punish_transaction, TxPunish::weight().to_wu(), "TxPunish");
         assert_weight(refund_transaction, TxRefund::weight().to_wu(), "TxRefund");
+
+        // Test TxEarlyRefund transaction
+        let early_refund_transaction = alice_state3
+            .signed_early_refund_transaction()
+            .unwrap()
+            .unwrap();
+        assert_weight(
+            early_refund_transaction,
+            TxEarlyRefund::weight() as u64,
+            "TxEarlyRefund",
+        );
+    }
+
+    #[tokio::test]
+    async fn tx_early_refund_can_be_constructed_and_signed() {
+        let alice_wallet = TestWalletBuilder::new(Amount::ONE_BTC.to_sat())
+            .build()
+            .await;
+        let bob_wallet = TestWalletBuilder::new(Amount::ONE_BTC.to_sat())
+            .build()
+            .await;
+        let spending_fee = Amount::from_sat(1_000);
+        let btc_amount = Amount::from_sat(500_000);
+        let xmr_amount = crate::monero::Amount::from_piconero(10000);
+
+        let tx_redeem_fee = alice_wallet
+            .estimate_fee(TxRedeem::weight(), Some(btc_amount))
+            .await
+            .unwrap();
+        let tx_punish_fee = alice_wallet
+            .estimate_fee(TxPunish::weight(), Some(btc_amount))
+            .await
+            .unwrap();
+
+        let refund_address = alice_wallet.new_address().await.unwrap();
+        let punish_address = alice_wallet.new_address().await.unwrap();
+
+        let config = Regtest::get_config();
+        let alice_state0 = alice::State0::new(
+            btc_amount,
+            xmr_amount,
+            config,
+            refund_address.clone(),
+            punish_address,
+            tx_redeem_fee,
+            tx_punish_fee,
+            &mut OsRng,
+        );
+
+        let bob_state0 = bob::State0::new(
+            Uuid::new_v4(),
+            &mut OsRng,
+            btc_amount,
+            xmr_amount,
+            config.bitcoin_cancel_timelock,
+            config.bitcoin_punish_timelock,
+            bob_wallet.new_address().await.unwrap(),
+            config.monero_finality_confirmations,
+            spending_fee,
+            spending_fee,
+            spending_fee,
+        );
+
+        // Complete the state machine up to State3
+        let message0 = bob_state0.next_message();
+        let (_, alice_state1) = alice_state0.receive(message0).unwrap();
+        let alice_message1 = alice_state1.next_message();
+
+        let bob_state1 = bob_state0
+            .receive(&bob_wallet, alice_message1)
+            .await
+            .unwrap();
+        let bob_message2 = bob_state1.next_message();
+
+        let alice_state2 = alice_state1.receive(bob_message2).unwrap();
+        let alice_message3 = alice_state2.next_message();
+
+        let bob_state2 = bob_state1.receive(alice_message3).unwrap();
+        let bob_message4 = bob_state2.next_message();
+
+        let alice_state3 = alice_state2.receive(bob_message4).unwrap();
+
+        // Test TxEarlyRefund construction
+        let tx_early_refund = alice_state3.tx_early_refund();
+
+        // Verify basic properties
+        assert_eq!(tx_early_refund.txid(), tx_early_refund.txid()); // Should be deterministic
+        assert!(tx_early_refund.digest() != Sighash::all_zeros()); // Should have valid digest
+
+        // Test that it can be signed and completed
+        let early_refund_transaction = alice_state3
+            .signed_early_refund_transaction()
+            .unwrap()
+            .unwrap();
+
+        // Verify the transaction has expected structure
+        assert_eq!(early_refund_transaction.input.len(), 1); // One input from lock tx
+        assert_eq!(early_refund_transaction.output.len(), 1); // One output to refund address
+        assert_eq!(
+            early_refund_transaction.output[0].script_pubkey,
+            refund_address.script_pubkey()
+        );
+
+        // Verify the input is spending the lock transaction
+        assert_eq!(
+            early_refund_transaction.input[0].previous_output,
+            alice_state3.tx_lock.as_outpoint()
+        );
+
+        // Verify the amount is correct (lock amount minus fee)
+        let expected_amount = alice_state3.tx_lock.lock_amount() - alice_state3.tx_refund_fee;
+        assert_eq!(early_refund_transaction.output[0].value, expected_amount);
+    }
+
+    #[test]
+    fn tx_early_refund_has_correct_weight() {
+        // TxEarlyRefund should have the same weight as other similar transactions
+        assert_eq!(TxEarlyRefund::weight(), 548);
+
+        // It should be the same as TxRedeem and TxRefund weights since they have similar structure
+        assert_eq!(TxEarlyRefund::weight() as u64, TxRedeem::weight().to_wu());
+        assert_eq!(TxEarlyRefund::weight() as u64, TxRefund::weight().to_wu());
     }
 
     // Weights fluctuate because of the length of the signatures. Valid ecdsa

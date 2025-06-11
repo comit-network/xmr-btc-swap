@@ -177,10 +177,52 @@ mod addr_list {
     }
 }
 
+mod electrum_urls {
+    use serde::de::Unexpected;
+    use serde::{de, Deserialize, Deserializer};
+    use serde_json::Value;
+    use url::Url;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = Value::deserialize(deserializer)?;
+        return match s {
+            Value::String(s) => {
+                let list: Result<Vec<_>, _> = s
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().parse().map_err(de::Error::custom))
+                    .collect();
+                Ok(list?)
+            }
+            Value::Array(a) => {
+                let list: Result<Vec<_>, _> = a
+                    .iter()
+                    .map(|v| {
+                        if let Value::String(s) = v {
+                            s.trim().parse().map_err(de::Error::custom)
+                        } else {
+                            Err(de::Error::custom("expected a string"))
+                        }
+                    })
+                    .collect();
+                Ok(list?)
+            }
+            value => Err(de::Error::invalid_type(
+                Unexpected::Other(&value.to_string()),
+                &"a string or array",
+            )),
+        };
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
-    pub electrum_rpc_url: Url,
+    #[serde(deserialize_with = "electrum_urls::deserialize")]
+    pub electrum_rpc_urls: Vec<Url>,
     pub target_block: u16,
     pub finality_confirmations: Option<u32>,
     #[serde(with = "crate::bitcoin::network")]
@@ -309,10 +351,40 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
         .map(|str| str.parse())
         .collect::<Result<Vec<Multiaddr>, _>>()?;
 
+    let mut electrum_rpc_urls = Vec::new();
+    let mut electrum_number = 1;
+    let mut electrum_done = false;
+
+    println!(
+        "You can configure multiple Electrum servers for redundancy. At least one is required."
+    );
+
+    // Ask for the first electrum URL with a default
     let electrum_rpc_url = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Electrum RPC URL or hit return to use default")
+        .with_prompt("Enter first Electrum RPC URL or hit return to use default")
         .default(defaults.electrum_rpc_url)
         .interact_text()?;
+    electrum_rpc_urls.push(electrum_rpc_url);
+    electrum_number += 1;
+
+    // Ask for additional electrum URLs
+    while !electrum_done {
+        let prompt = format!(
+            "Enter additional Electrum RPC URL ({electrum_number}). Or just hit Enter to continue."
+        );
+        let electrum_url = Input::<Url>::with_theme(&ColorfulTheme::default())
+            .with_prompt(prompt)
+            .allow_empty(true)
+            .interact_text()?;
+        if electrum_url.as_str().is_empty() {
+            electrum_done = true;
+        } else if electrum_rpc_urls.contains(&electrum_url) {
+            println!("That Electrum URL is already in the list.");
+        } else {
+            electrum_rpc_urls.push(electrum_url);
+            electrum_number += 1;
+        }
+    }
 
     let monero_wallet_rpc_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
@@ -379,7 +451,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             external_addresses: vec![],
         },
         bitcoin: Bitcoin {
-            electrum_rpc_url,
+            electrum_rpc_urls,
             target_block,
             finality_confirmations: None,
             network: bitcoin_network,
@@ -424,7 +496,7 @@ mod tests {
                 dir: Default::default(),
             },
             bitcoin: Bitcoin {
-                electrum_rpc_url: defaults.electrum_rpc_url,
+                electrum_rpc_urls: vec![defaults.electrum_rpc_url],
                 target_block: defaults.bitcoin_confirmation_target,
                 finality_confirmations: None,
                 network: bitcoin::Network::Testnet,
@@ -469,7 +541,7 @@ mod tests {
                 dir: Default::default(),
             },
             bitcoin: Bitcoin {
-                electrum_rpc_url: defaults.electrum_rpc_url,
+                electrum_rpc_urls: vec![defaults.electrum_rpc_url],
                 target_block: defaults.bitcoin_confirmation_target,
                 finality_confirmations: None,
                 network: bitcoin::Network::Bitcoin,
@@ -524,7 +596,7 @@ mod tests {
         let expected = Config {
             data: Data { dir },
             bitcoin: Bitcoin {
-                electrum_rpc_url: defaults.electrum_rpc_url,
+                electrum_rpc_urls: vec![defaults.electrum_rpc_url],
                 target_block: defaults.bitcoin_confirmation_target,
                 finality_confirmations: None,
                 network: bitcoin::Network::Bitcoin,

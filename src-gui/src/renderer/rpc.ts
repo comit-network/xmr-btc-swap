@@ -218,39 +218,40 @@ export async function initializeContext() {
   const testnet = isTestnet();
   const useTor = store.getState().settings.enableTor;
 
-  // This looks convoluted but it does the following:
-  // - Fetch the status of all nodes for each blockchain in parallel
-  // - Return the first available node for each blockchain
-  // - If no node is available for a blockchain, return null for that blockchain
-  const [bitcoinNode, moneroNode] = await Promise.all(
-    [Blockchain.Bitcoin, Blockchain.Monero].map(async (blockchain) => {
-      const nodes = store.getState().settings.nodes[network][blockchain];
+  // Get all Bitcoin nodes without checking availability
+  // The backend ElectrumBalancer will handle load balancing and failover
+  const bitcoinNodes =
+    store.getState().settings.nodes[network][Blockchain.Bitcoin];
 
-      if (nodes.length === 0) {
-        return null;
-      }
+  // For Monero nodes, check availability and use the first working one
+  const moneroNodes =
+    store.getState().settings.nodes[network][Blockchain.Monero];
+  let moneroNode = null;
 
-      try {
-        return await Promise.any(
-          nodes.map(async (node) => {
-            const isAvailable = await getNodeStatus(node, blockchain, network);
+  if (moneroNodes.length > 0) {
+    try {
+      moneroNode = await Promise.any(
+        moneroNodes.map(async (node) => {
+          const isAvailable = await getNodeStatus(
+            node,
+            Blockchain.Monero,
+            network,
+          );
+          if (isAvailable) {
+            return node;
+          }
+          throw new Error(`Monero node ${node} is not available`);
+        }),
+      );
+    } catch {
+      // If no Monero node is available, use null
+      moneroNode = null;
+    }
+  }
 
-            if (isAvailable) {
-              return node;
-            }
-
-            throw new Error(`No available ${blockchain} node found`);
-          }),
-        );
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  // Initialize Tauri settings with null values
+  // Initialize Tauri settings
   const tauriSettings: TauriSettings = {
-    electrum_rpc_url: bitcoinNode,
+    electrum_rpc_urls: bitcoinNodes,
     monero_node_url: moneroNode,
     use_tor: useTor,
   };
@@ -324,12 +325,11 @@ export async function updateAllNodeStatuses() {
   const network = getNetwork();
   const settings = store.getState().settings;
 
-  // For all nodes, check if they are available and store the new status (in parallel)
+  // Only check Monero nodes, skip Bitcoin nodes since we pass all electrum servers
+  // to the backend without checking them (ElectrumBalancer handles failover)
   await Promise.all(
-    Object.values(Blockchain).flatMap((blockchain) =>
-      settings.nodes[network][blockchain].map((node) =>
-        updateNodeStatus(node, blockchain, network),
-      ),
+    settings.nodes[network][Blockchain.Monero].map((node) =>
+      updateNodeStatus(node, Blockchain.Monero, network),
     ),
   );
 }

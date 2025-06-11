@@ -37,7 +37,7 @@ dialoguer = "0.11"
 directories-next = "2"
 ecdsa_fun = { version = "0.10", default-features = false, features = ["libsecp_compat", "serde", "adaptor"] }
 ed25519-dalek = "1"
-futures = { version = "0.3", default-features = false }
+futures = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 libp2p = { version = "0.53.2", features = ["tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa"] }
 libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", branch = "main", features = ["listen-onion-service"] }

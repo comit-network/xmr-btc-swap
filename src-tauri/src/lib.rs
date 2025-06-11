@@ -374,7 +374,7 @@ async fn initialize_context(
 
     let context_result = ContextBuilder::new(testnet)
         .with_bitcoin(Bitcoin {
-            bitcoin_electrum_rpc_url: settings.electrum_rpc_url.clone(),
+            bitcoin_electrum_rpc_urls: settings.electrum_rpc_urls.clone(),
             bitcoin_target_block: None,
         })
         .with_monero(Monero {

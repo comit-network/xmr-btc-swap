@@ -1,4 +1,10 @@
-import { Button, Dialog, DialogActions, DialogContent } from "@mui/material";
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+} from "@mui/material";
 import { useState } from "react";
 import { swapReset } from "store/features/swapSlice";
 import { useAppDispatch, useAppSelector, useIsSwapRunning } from "store/hooks";
@@ -49,15 +55,25 @@ export default function SwapDialog({
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          flex: 1,
+          gap: "1rem",
         }}
       >
         {debug ? (
           <DebugPage />
         ) : (
-          <>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              justifyContent: "space-between",
+              flex: 1,
+            }}
+          >
             <SwapStatePage state={swap.state} />
             <SwapStateStepper state={swap.state} />
-          </>
+          </Box>
         )}
       </DialogContent>
 

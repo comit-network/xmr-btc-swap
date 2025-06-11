@@ -16,6 +16,8 @@ pub struct Config {
     pub bitcoin_network: bitcoin::Network,
     pub monero_avg_block_time: Duration,
     pub monero_finality_confirmations: u64,
+    // If Alice does manage to lock her Monero within this timeout, she will initiate an early refund of the Bitcoin.
+    pub monero_lock_retry_timeout: Duration,
     #[serde(with = "monero_network")]
     pub monero_network: monero::Network,
 }
@@ -54,6 +56,11 @@ impl GetConfig for Mainnet {
             bitcoin_punish_timelock: PunishTimelock::new(144),
             bitcoin_network: bitcoin::Network::Bitcoin,
             monero_avg_block_time: 2.std_minutes(),
+            // If Alice has enough funds and an internet connection,
+            // she should be able to lock her Monero within 5 minutes
+            // One issue is that we do not do output management in a good way right now
+            // which is why we sometimes have to wait for 20 minutes for funds to become spendable
+            monero_lock_retry_timeout: 22.std_minutes(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet,
         }
@@ -71,6 +78,7 @@ impl GetConfig for Testnet {
             bitcoin_punish_timelock: PunishTimelock::new(24),
             bitcoin_network: bitcoin::Network::Testnet,
             monero_avg_block_time: 2.std_minutes(),
+            monero_lock_retry_timeout: 25.std_minutes(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Stagenet,
         }
@@ -88,6 +96,7 @@ impl GetConfig for Regtest {
             bitcoin_punish_timelock: PunishTimelock::new(50),
             bitcoin_network: bitcoin::Network::Regtest,
             monero_avg_block_time: 1.std_seconds(),
+            monero_lock_retry_timeout: 1.std_minutes(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet, // yes this is strange
         }

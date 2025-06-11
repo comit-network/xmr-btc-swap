@@ -35,6 +35,13 @@ const baseTheme: ThemeOptions = {
         },
       },
     },
+    MuiDialogContentText: {
+      styleOverrides: {
+        root: {
+          marginBottom: "0.5rem",
+        },
+      },
+    },
     MuiTextField: {
       styleOverrides: {
         root: {

@@ -56,14 +56,16 @@ pub async fn refund(
         AliceState::BtcRedeemTransactionPublished { .. }
         | AliceState::BtcRedeemed
         | AliceState::XmrRefunded
+        | AliceState::BtcEarlyRefundable { .. }
+        | AliceState::BtcEarlyRefunded(_)
         | AliceState::BtcPunished { .. }
         | AliceState::SafelyAborted => bail!(Error::SwapNotRefundable(state)),
     };
 
     tracing::info!(%swap_id, "Trying to manually refund swap");
 
-    let spend_key = if let Ok(published_refund_tx) =
-        state3.fetch_tx_refund(bitcoin_wallet.as_ref()).await
+    let spend_key = if let Some(published_refund_tx) =
+        state3.fetch_tx_refund(bitcoin_wallet.as_ref()).await?
     {
         tracing::debug!(%swap_id, "Bitcoin refund transaction found, extracting key to refund Monero");
         state3.extract_monero_private_key(published_refund_tx)?

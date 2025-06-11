@@ -1,6 +1,7 @@
 mod bitcoind;
 mod electrs;
 
+use ::monero::Address;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -12,6 +13,7 @@ use monero_harness::{image, Monero};
 use std::cmp::Ordering;
 use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
@@ -315,7 +317,7 @@ async fn init_test_wallets(
     let btc_wallet = swap::bitcoin::wallet::WalletBuilder::default()
         .seed(seed.clone())
         .network(env_config.bitcoin_network)
-        .electrum_rpc_url(electrum_rpc_url.as_str().to_string())
+        .electrum_rpc_urls(vec![electrum_rpc_url.as_str().to_string()])
         .persister(swap::bitcoin::wallet::PersisterConfig::InMemorySqlite)
         .finality_confirmations(1_u32)
         .target_block(1_u32)
@@ -832,6 +834,49 @@ impl TestContext {
         let lock_tx_bitcoin_fee = self.bob_bitcoin_wallet.transaction_fee(lock_tx_id).await?;
 
         Ok(self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee)
+    }
+
+    pub async fn stop_alice_monero_wallet_rpc(&self) {
+        self.alice_monero_wallet.lock().await.stop().await.unwrap();
+
+        // Wait until the monero-wallet-rpc is fully stopped
+        // stop_wallet() internally sets a flag in the monero-wallet-rpc (`m_stop`) which
+        // is only checked every once in a while
+        loop {
+            if !self
+                .alice_monero_wallet
+                .lock()
+                .await
+                .is_alive()
+                .await
+                .unwrap()
+            {
+                tracing::info!("Alice Monero Wallet RPC stopped");
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+
+    pub async fn empty_alice_monero_wallet(&self) {
+        self.alice_monero_wallet
+            .lock()
+            .await
+            .re_open()
+            .await
+            .unwrap();
+        self.alice_monero_wallet.lock().await.sweep_all(Address::from_str("49LEH26DJGuCyr8xzRAzWPUryzp7bpccC7Hie1DiwyfJEyUKvMFAethRLybDYrFdU1eHaMkKQpUPebY4WT3cSjEvThmpjPa").unwrap()).await.unwrap();
+    }
+
+    pub async fn assert_alice_monero_wallet_empty(&self) {
+        assert_eventual_balance(
+            &*self.alice_monero_wallet.lock().await,
+            Ordering::Equal,
+            monero::Amount::ZERO,
+        )
+        .await
+        .unwrap();
     }
 }
 

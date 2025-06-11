@@ -46,12 +46,15 @@ pub async fn cancel(
         BobState::CancelTimelockExpired(state6) => state6,
         BobState::BtcRefunded(state6) => state6,
         BobState::BtcCancelled(state6) => state6,
+        BobState::BtcRefundPublished(state6) => state6,
+        BobState::BtcEarlyRefundPublished(state6) => state6,
 
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
+        | BobState::BtcEarlyRefunded { .. }
         | BobState::SafelyAborted => bail!(
             "Cannot cancel swap {} because it is in state {} which is not cancellable.",
             swap_id,
@@ -75,11 +78,12 @@ pub async fn cancel(
         // 2. The cancel transaction has already been published by Alice
         Err(err) => {
             // Check if Alice has already published the cancel transaction while we were absent
-            if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
+            if let Some(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await? {
                 let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 tracing::info!("Alice has already cancelled the swap");
+
                 return Ok((tx.compute_txid(), state));
             }
 
@@ -140,10 +144,13 @@ pub async fn refund(
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
         BobState::BtcCancelled(state6) => state6,
+        BobState::BtcRefunded(state6) => state6,
+        BobState::BtcRefundPublished(state6) => state6,
+        BobState::BtcEarlyRefundPublished(state6) => state6,
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
-        | BobState::BtcRefunded(_)
+        | BobState::BtcEarlyRefunded { .. }
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
         | BobState::SafelyAborted => bail!(

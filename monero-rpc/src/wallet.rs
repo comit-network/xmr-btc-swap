@@ -13,6 +13,7 @@ pub trait MoneroWalletRpc {
     async fn get_accounts(&self, tag: String) -> GetAccounts;
     async fn open_wallet(&self, filename: String) -> WalletOpened;
     async fn close_wallet(&self) -> WalletClosed;
+    async fn stop_wallet(&self) -> WalletStopped;
     async fn create_wallet(&self, filename: String, language: String) -> WalletCreated;
     async fn transfer(
         &self,
@@ -224,6 +225,7 @@ pub struct Version {
 pub type WalletCreated = Empty;
 pub type WalletClosed = Empty;
 pub type WalletOpened = Empty;
+pub type WalletStopped = Empty;
 
 /// Zero-sized struct to allow serde to deserialize an empty JSON object.
 ///

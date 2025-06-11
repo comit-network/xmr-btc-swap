@@ -283,6 +283,11 @@ impl Wallet {
         Ok(self.inner.get_height().await?)
     }
 
+    /// Checks if the wallet-rpc is alive by checking if the version is available
+    pub async fn is_alive(&self) -> Result<bool> {
+        Ok(self.inner.get_version().await.is_ok())
+    }
+
     pub fn get_main_address(&self) -> Address {
         self.main_address
     }
@@ -325,6 +330,12 @@ impl Wallet {
             tokio::time::sleep(RETRY_INTERVAL).await;
         }
         unreachable!("Loop should have returned by now");
+    }
+
+    pub async fn stop(&self) -> Result<()> {
+        self.inner.stop_wallet().await?;
+
+        Ok(())
     }
 }
 

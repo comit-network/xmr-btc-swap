@@ -74,6 +74,7 @@ pub struct Message3 {
 pub struct Message4 {
     tx_punish_sig: bitcoin::Signature,
     tx_cancel_sig: bitcoin::Signature,
+    tx_early_refund_sig: bitcoin::Signature,
 }
 
 #[allow(clippy::large_enum_variant)]

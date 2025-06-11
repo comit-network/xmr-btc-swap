@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- BREAKING PROTOCOL CHANGE: Takers/GUIs running `>= 2.0.0` will not be able to initiate new swaps with makers/asbs running `< 2.0.0`. Please upgrade as soon as possible. Already started swaps from older versions are not be affected.
+  - Taker and Maker now collaboratively sign a `tx_refund_early` Bitcoin transaction in the negotiation phase which allows the maker to refund the Bitcoin for the taker without having to wait for the 12h cancel timelock to expire.
+  - `tx_refund_early` will only be published if the maker has not locked their Monero yet. This allows swaps to be refunded quickly if the maker doesn't have enough funds available or their daemon is not fully synced. The taker can then use the refunded Bitcoin to start a new swap.
 - ASB: The maker will take Monero funds needed for ongoing swaps into consideration when making a quote. A warning will be displayed if the Monero funds do not cover all ongoing swaps.
 - ASB: Return a zero quote when quoting fails instead of letting the request time out
+- GUI + CLI + ASB: We now do load balancing over multiple Electrum servers. This improves the reliability of all our interactions with the Bitcoin network. When transactions are published they are broadcast to all servers in parallel.
+- ASB: The `electrum_rpc_url` option has been removed. A new `electrum_rpc_urls` option has been added. Use it to specify a list of Electrum servers to use. If you want you can continue using a single server by providing a single URL. For most makers we recommend:
+  - Running your own [electrs](https://github.com/romanz/electrs/) server
+  - Optionally providing 2-5 fallback servers. The order of the servers does matter. Electrum servers at the front of the list have priority and will be tried first. You should place your own server at the front of the list.
+  - A list of public Electrum servers can be found [here](https://1209k.com/bitcoin-eye/ele.php?chain=btc)
 
 ## [1.1.7] - 2025-06-04
 

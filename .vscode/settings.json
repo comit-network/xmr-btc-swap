@@ -1,2 +1,5 @@
 {
+    "rust-analyzer.check.command": "check",
+    "rust-analyzer.check.extraArgs": ["--lib", "--bins"],
+    "rust-analyzer.cargo.buildScripts.enable": true
 }

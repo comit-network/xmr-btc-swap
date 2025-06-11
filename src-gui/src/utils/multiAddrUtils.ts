@@ -4,7 +4,8 @@ import semver from "semver";
 import { isTestnet } from "store/config";
 
 // const MIN_ASB_VERSION = "1.0.0-alpha.1" // First version to support new libp2p protocol
-const MIN_ASB_VERSION = "1.1.0-rc.3"; // First version with support for bdk > 1.0
+// const MIN_ASB_VERSION = "1.1.0-rc.3" // First version with support for bdk > 1.0
+const MIN_ASB_VERSION = "2.0.0-beta.1"; // First version with support for tx_early_refund
 
 export function providerToConcatenatedMultiAddr(provider: Maker) {
   return new Multiaddr(provider.multiAddr)

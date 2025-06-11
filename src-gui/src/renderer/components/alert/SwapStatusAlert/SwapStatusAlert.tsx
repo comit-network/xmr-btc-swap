@@ -91,16 +91,13 @@ function BitcoinLockedNoTimelockExpiredStateAlert({
   return (
     <MessageList
       messages={[
-        isRunning
-          ? "We are waiting for the other party to lock their Monero"
-          : null,
         <>
           If the swap isn't completed in{" "}
           <HumanizedBitcoinBlockDuration
             blocks={timelock.content.blocks_left}
             displayBlocks={false}
           />
-          , it needs to be refunded
+          , it will be refunded
         </>,
         "For that, you need to have the app open sometime within the refund period",
         <>
@@ -187,6 +184,8 @@ export function StateAlert({
     case BobStateName.EncSigSent:
     case BobStateName.CancelTimelockExpired:
     case BobStateName.BtcCancelled:
+    case BobStateName.BtcRefundPublished: // Even if the transactions have been published, it cannot be
+    case BobStateName.BtcEarlyRefundPublished: // guaranteed that they will be confirmed in time
       if (swap.timelock != null) {
         switch (swap.timelock.type) {
           case "None":
@@ -220,6 +219,13 @@ export function StateAlert({
   }
 }
 
+// How many blocks need to be left for the timelock to be considered unusual
+// A bit arbitrary but we don't want to alarm the user
+// 72 is the default cancel timelock in blocks
+// 4 blocks are around 40 minutes
+// If the swap has taken longer than 40 minutes, we consider it unusual
+const UNUSUAL_AMOUNT_OF_TIME_HAS_PASSED_THRESHOLD = 72 - 4;
+
 /**
  * Main component for displaying the swap status alert.
  * @param swap - The swap information.
@@ -228,9 +234,11 @@ export function StateAlert({
 export default function SwapStatusAlert({
   swap,
   isRunning,
+  onlyShowIfUnusualAmountOfTimeHasPassed,
 }: {
   swap: GetSwapInfoResponseExt;
   isRunning: boolean;
+  onlyShowIfUnusualAmountOfTimeHasPassed?: boolean;
 }): JSX.Element | null {
   // If the swap is completed, we do not need to display anything
   if (!isGetSwapInfoResponseRunningSwap(swap)) {
@@ -239,6 +247,16 @@ export default function SwapStatusAlert({
 
   // If we don't have a timelock for the swap, we cannot display the alert
   if (!isGetSwapInfoResponseWithTimelock(swap)) {
+    return null;
+  }
+
+  // If we are only showing if an unusual amount of time has passed, we need to check if the swap has been running for a while
+  if (
+    onlyShowIfUnusualAmountOfTimeHasPassed &&
+    swap.timelock.type === "None" &&
+    swap.timelock.content.blocks_left >
+      UNUSUAL_AMOUNT_OF_TIME_HAS_PASSED_THRESHOLD
+  ) {
     return null;
   }
 

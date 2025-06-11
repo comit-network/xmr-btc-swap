@@ -16,7 +16,7 @@ export default function ReceivedQuotePage() {
 
     return (
       <LinearProgressWithSubtitle
-        description={`Syncing Bitcoin wallet (${percentage}%)`}
+        description={`Syncing Bitcoin wallet`}
         value={percentage}
       />
     );

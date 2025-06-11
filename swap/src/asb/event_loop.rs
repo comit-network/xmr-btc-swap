@@ -1149,7 +1149,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Failed to get unlocked Monero balance to construct quote"));
+            .contains("Failed to get unlocked Monero balance"));
     }
 
     #[tokio::test]

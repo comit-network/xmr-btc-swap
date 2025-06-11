@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use super::extract_ecdsa_sig;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TxRefund {
     inner: Transaction,
     digest: Sighash,

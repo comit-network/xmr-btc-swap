@@ -33,14 +33,41 @@ pub fn init(
     tauri_handle: Option<TauriHandle>,
     trace_stdout: bool,
 ) -> Result<()> {
-    let ALL_CRATES: Vec<&str> = vec![
-        "swap",
-        "asb",
+    let TOR_CRATES: Vec<&str> = vec!["arti"];
+
+    let LIBP2P_CRATES: Vec<&str> = vec![
+        // Main libp2p crates
+        "libp2p",
+        "libp2p_swarm",
+        "libp2p_core",
+        "libp2p_tcp",
+        "libp2p_noise",
         "libp2p_community_tor",
-        "unstoppableswap-gui-rs",
-        "arti",
+        // Specific libp2p module targets that appear in logs
+        "libp2p_core::transport",
+        "libp2p_core::transport::choice",
+        "libp2p_core::transport::dummy",
+        "libp2p_swarm::connection",
+        "libp2p_swarm::dial",
+        "libp2p_tcp::transport",
+        "libp2p_noise::protocol",
+        "libp2p_identify",
+        "libp2p_ping",
+        "libp2p_request_response",
+        "libp2p_kad",
+        "libp2p_dns",
+        "libp2p_yamux",
+        "libp2p_quic",
+        "libp2p_websocket",
+        "libp2p_relay",
+        "libp2p_autonat",
+        "libp2p_mdns",
+        "libp2p_gossipsub",
+        "libp2p_rendezvous",
+        "libp2p_dcutr",
     ];
-    let OUR_CRATES: Vec<&str> = vec!["swap", "asb"];
+
+    let OUR_CRATES: Vec<&str> = vec!["swap", "asb", "unstoppableswap-gui-rs"];
 
     // General log file for non-verbose logs
     let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
@@ -66,15 +93,20 @@ pub fn init(
         .with_filter(env_filter(level_filter, OUR_CRATES.clone())?);
 
     // Layer for writing to the verbose log file
-    // Crates: swap, asb, libp2p_community_tor, unstoppableswap-gui-rs, arti (all relevant crates)
-    // Level: TRACE
+    // Crates: All crates with different levels (libp2p at INFO+, others at TRACE)
+    // Level: TRACE for our crates, INFO for libp2p, TRACE for tor
     let tracing_file_layer = fmt::layer()
         .with_writer(tracing_file_appender)
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
         .json()
-        .with_filter(env_filter(LevelFilter::TRACE, ALL_CRATES.clone())?);
+        .with_filter(env_filter_with_libp2p_info(
+            LevelFilter::TRACE,
+            OUR_CRATES.clone(),
+            LIBP2P_CRATES.clone(),
+            TOR_CRATES.clone(),
+        )?);
 
     // Layer for writing to the terminal
     // Crates: swap, asb
@@ -87,20 +119,30 @@ pub fn init(
         .with_target(false);
 
     // Layer for writing to the Tauri guest. This will be displayed in the GUI.
-    // Crates: swap, asb, libp2p_community_tor, unstoppableswap-gui-rs, arti
-    // Level: Passed in
+    // Crates: All crates with libp2p at INFO+ level
+    // Level: Passed in for our crates, INFO for libp2p
     let tauri_layer = fmt::layer()
         .with_writer(TauriWriter::new(tauri_handle))
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(true)
         .json()
-        .with_filter(env_filter(level_filter, ALL_CRATES.clone())?);
+        .with_filter(env_filter_with_libp2p_info(
+            level_filter,
+            OUR_CRATES.clone(),
+            LIBP2P_CRATES.clone(),
+            TOR_CRATES.clone(),
+        )?);
 
     // If trace_stdout is true, we log all messages to the terminal
     // Otherwise, we only log the bare minimum
     let terminal_layer_env_filter = match trace_stdout {
-        true => env_filter(LevelFilter::TRACE, ALL_CRATES.clone())?,
+        true => env_filter_with_libp2p_info(
+            LevelFilter::TRACE,
+            OUR_CRATES.clone(),
+            LIBP2P_CRATES.clone(),
+            TOR_CRATES.clone(),
+        )?,
         false => env_filter(level_filter, OUR_CRATES.clone())?,
     };
     let final_terminal_layer = match format {
@@ -133,6 +175,37 @@ fn env_filter(level_filter: LevelFilter, crates: Vec<&str>) -> Result<EnvFilter>
 
     // Add directives for each crate in the provided list
     for crate_name in crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    Ok(filter)
+}
+
+/// This function controls which crate's logs actually get logged and from which level, with libp2p crates at INFO level or higher.
+fn env_filter_with_libp2p_info(
+    level_filter: LevelFilter,
+    our_crates: Vec<&str>,
+    libp2p_crates: Vec<&str>,
+    tor_crates: Vec<&str>,
+) -> Result<EnvFilter> {
+    let mut filter = EnvFilter::from_default_env();
+
+    // Add directives for each crate in the provided list
+    for crate_name in our_crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    for crate_name in libp2p_crates {
+        filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
+    }
+
+    for crate_name in tor_crates {
         filter = filter.add_directive(Directive::from_str(&format!(
             "{}={}",
             crate_name, &level_filter

@@ -29,7 +29,10 @@ export enum BobStateName {
   BtcRedeemed = "btc is redeemed",
   CancelTimelockExpired = "cancel timelock is expired",
   BtcCancelled = "btc is cancelled",
+  BtcRefundPublished = "btc refund is published",
+  BtcEarlyRefundPublished = "btc early refund is published",
   BtcRefunded = "btc is refunded",
+  BtcEarlyRefunded = "btc is early refunded",
   XmrRedeemed = "xmr is redeemed",
   BtcPunished = "btc is punished",
   SafelyAborted = "safely aborted",
@@ -55,8 +58,14 @@ export function bobStateNameToHumanReadable(stateName: BobStateName): string {
       return "Cancel timelock expired";
     case BobStateName.BtcCancelled:
       return "Bitcoin cancelled";
+    case BobStateName.BtcRefundPublished:
+      return "Bitcoin refund published";
+    case BobStateName.BtcEarlyRefundPublished:
+      return "Bitcoin early refund published";
     case BobStateName.BtcRefunded:
       return "Bitcoin refunded";
+    case BobStateName.BtcEarlyRefunded:
+      return "Bitcoin early refunded";
     case BobStateName.XmrRedeemed:
       return "Monero redeemed";
     case BobStateName.BtcPunished:
@@ -102,6 +111,7 @@ export type BobStateNameRunningSwap = Exclude<
   | BobStateName.Started
   | BobStateName.SwapSetupCompleted
   | BobStateName.BtcRefunded
+  | BobStateName.BtcEarlyRefunded
   | BobStateName.BtcPunished
   | BobStateName.SafelyAborted
   | BobStateName.XmrRedeemed
@@ -122,6 +132,7 @@ export function isBobStateNameRunningSwap(
     BobStateName.Started,
     BobStateName.SwapSetupCompleted,
     BobStateName.BtcRefunded,
+    BobStateName.BtcEarlyRefunded,
     BobStateName.BtcPunished,
     BobStateName.SafelyAborted,
     BobStateName.XmrRedeemed,
@@ -131,6 +142,7 @@ export function isBobStateNameRunningSwap(
 export type BobStateNameCompletedSwap =
   | BobStateName.XmrRedeemed
   | BobStateName.BtcRefunded
+  | BobStateName.BtcEarlyRefunded
   | BobStateName.BtcPunished
   | BobStateName.SafelyAborted;
 
@@ -140,6 +152,7 @@ export function isBobStateNameCompletedSwap(
   return [
     BobStateName.XmrRedeemed,
     BobStateName.BtcRefunded,
+    BobStateName.BtcEarlyRefunded,
     BobStateName.BtcPunished,
     BobStateName.SafelyAborted,
   ].includes(state);
@@ -150,7 +163,9 @@ export type BobStateNamePossiblyCancellableSwap =
   | BobStateName.XmrLockProofReceived
   | BobStateName.XmrLocked
   | BobStateName.EncSigSent
-  | BobStateName.CancelTimelockExpired;
+  | BobStateName.CancelTimelockExpired
+  | BobStateName.BtcRefundPublished
+  | BobStateName.BtcEarlyRefundPublished;
 
 /**
 Checks if a swap is in a state where it can possibly be cancelled
@@ -161,6 +176,7 @@ The following conditions must be met:
  - The bitcoin must not be cancelled
  - The bitcoin must not be refunded
  - The bitcoin must not be punished
+ - The bitcoin must not be early refunded
 
 See: https://github.com/comit-network/xmr-btc-swap/blob/7023e75bb51ab26dff4c8fcccdc855d781ca4b15/swap/src/cli/cancel.rs#L16-L35
  */
@@ -173,6 +189,8 @@ export function isBobStateNamePossiblyCancellableSwap(
     BobStateName.XmrLocked,
     BobStateName.EncSigSent,
     BobStateName.CancelTimelockExpired,
+    BobStateName.BtcRefundPublished,
+    BobStateName.BtcEarlyRefundPublished,
   ].includes(state);
 }
 
@@ -182,7 +200,9 @@ export type BobStateNamePossiblyRefundableSwap =
   | BobStateName.XmrLocked
   | BobStateName.EncSigSent
   | BobStateName.CancelTimelockExpired
-  | BobStateName.BtcCancelled;
+  | BobStateName.BtcCancelled
+  | BobStateName.BtcRefundPublished
+  | BobStateName.BtcEarlyRefundPublished;
 
 /**
 Checks if a swap is in a state where it can possibly be refunded (meaning it's not impossible)
@@ -205,6 +225,8 @@ export function isBobStateNamePossiblyRefundableSwap(
     BobStateName.EncSigSent,
     BobStateName.CancelTimelockExpired,
     BobStateName.BtcCancelled,
+    BobStateName.BtcRefundPublished,
+    BobStateName.BtcEarlyRefundPublished,
   ].includes(state);
 }
 

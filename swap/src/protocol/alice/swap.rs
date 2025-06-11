@@ -96,6 +96,7 @@ where
         }
         AliceState::BtcLockTransactionSeen { state3 } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+
             match timeout(
                 env_config.bitcoin_lock_confirmed_timeout,
                 tx_lock_status.wait_until_final(),
@@ -108,7 +109,8 @@ where
                         minutes = %env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0,
                         "TxLock lock did not get enough confirmations in time",
                     );
-                    AliceState::SafelyAborted
+
+                    AliceState::BtcEarlyRefundable { state3 }
                 }
                 Ok(res) => {
                     res?;
@@ -117,11 +119,13 @@ where
             }
         }
         AliceState::BtcLocked { state3 } => {
-            // We will retry indefinitely to lock the Monero funds, until the swap is cancelled
             // Sometimes locking the Monero can fail e.g due to the daemon not being fully synced
+            // We will retry indefinitely to lock the Monero funds, until either:
+            // - the cancel timelock expires
+            // - we do not manage to lock the Monero funds within the timeout
             let backoff = backoff::ExponentialBackoffBuilder::new()
-                .with_max_elapsed_time(None)
-                .with_max_interval(Duration::from_secs(60))
+                .with_max_elapsed_time(Some(env_config.monero_lock_retry_timeout))
+                .with_max_interval(Duration::from_secs(30))
                 .build();
 
             let transfer_proof = backoff::future::retry_notify(backoff, || async {
@@ -129,7 +133,7 @@ where
                 // If the swap is cancelled, there is no need to lock the Monero funds anymore
                 // because there is no way for the swap to succeed.
                 if !matches!(
-                    state3.expired_timelocks(bitcoin_wallet).await?,
+                    state3.expired_timelocks(bitcoin_wallet).await.context("Failed to check for expired timelocks before locking Monero").map_err(backoff::Error::transient)?,
                     ExpiredTimelocks::None { .. }
                 ) {
                     return Ok(None);
@@ -160,12 +164,11 @@ where
                     wait_time.as_secs()
                 )
             })
-            .await
-            .expect("We should never run out of retries while locking Monero");
+            .await;
 
             match transfer_proof {
                 // If the transfer was successful, we transition to the next state
-                Some((monero_wallet_restore_blockheight, transfer_proof)) => {
+                Ok(Some((monero_wallet_restore_blockheight, transfer_proof))) => {
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
@@ -174,13 +177,49 @@ where
                 }
                 // If we were not able to lock the Monero funds before the timelock expired,
                 // we can safely abort the swap because we did not lock any funds
-                None => {
+                // We do not do an early refund because Bob can refund himself (timelock expired)
+                Ok(None) => {
                     tracing::info!(
                         swap_id = %swap_id,
                         "We did not manage to lock the Monero funds before the timelock expired. Aborting swap."
                     );
+
                     AliceState::SafelyAborted
                 }
+                Err(e) => {
+                    tracing::error!(
+                        swap_id = %swap_id,
+                        error = ?e,
+                        "Failed to lock Monero within {} seconds. We will do an early refund of the Bitcoin. We didn't lock any Monero funds so this is safe.",
+                        env_config.monero_lock_retry_timeout.as_secs()
+                    );
+
+                    AliceState::BtcEarlyRefundable { state3 }
+                }
+            }
+        }
+        AliceState::BtcEarlyRefundable { state3 } => {
+            if let Some(tx_early_refund) = state3.signed_early_refund_transaction() {
+                let tx_early_refund = tx_early_refund?;
+                let tx_early_refund_txid = tx_early_refund.compute_txid();
+
+                // Broadcast the early refund transaction
+                let (_, _) = bitcoin_wallet
+                    .broadcast(tx_early_refund, "early_refund")
+                    .await?;
+
+                tracing::info!(
+                    %tx_early_refund_txid,
+                    "Refunded Bitcoin early for Bob"
+                );
+
+                AliceState::BtcEarlyRefunded(state3)
+            } else {
+                // We do not have Bob's signature for the early refund transaction
+                // Therefore we cannot do an early refund.
+                // We abort the swap on our side.
+                // Bob will have to wait for the timelock to expire then refund himself.
+                AliceState::SafelyAborted
             }
         }
         AliceState::XmrLockTransactionSent {
@@ -391,12 +430,17 @@ where
             transfer_proof,
             state3,
         } => {
-            if state3.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+            if state3.check_for_tx_cancel(bitcoin_wallet).await?.is_none() {
                 // If Bob hasn't yet broadcasted the cancel transaction, Alice has to publish it
                 // to be able to eventually punish. Since the punish timelock is
                 // relative to the publication of the cancel transaction we have to ensure it
                 // gets published once the cancel timelock expires.
+
                 if let Err(e) = state3.submit_tx_cancel(bitcoin_wallet).await {
+                    // TODO: Actually ensure the transaction is published
+                    // What about a wrapper function ensure_tx_published that repeats the tx submission until
+                    // our subscription sees it in the mempool?
+
                     tracing::debug!(
                         "Assuming cancel transaction is already broadcasted because we failed to publish: {:#}",
                         e
@@ -415,17 +459,11 @@ where
             transfer_proof,
             state3,
         } => {
-            let (tx_refund_status, tx_cancel_status) = tokio::join!(
-                bitcoin_wallet.subscribe_to(state3.tx_refund()),
-                bitcoin_wallet.subscribe_to(state3.tx_cancel())
-            );
+            let tx_cancel_status = bitcoin_wallet.subscribe_to(state3.tx_cancel()).await;
 
             select! {
-                seen_refund = tx_refund_status.wait_until_seen() => {
-                    seen_refund.context("Failed to monitor refund transaction")?;
-
-                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(state3.tx_refund().txid()).await?;
-                    let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
+                spend_key = state3.watch_for_btc_tx_refund(bitcoin_wallet) => {
+                    let spend_key = spend_key?;
 
                     AliceState::BtcRefunded {
                         monero_wallet_restore_blockheight,
@@ -511,7 +549,8 @@ where
                     let published_refund_tx = bitcoin_wallet
                         .get_raw_transaction(state3.tx_refund().txid())
                         .await
-                        .context("Failed to fetch refund transaction after assuming it was included because the punish transaction failed")?;
+                        .context("Failed to fetch refund transaction after assuming it was included because the punish transaction failed")?
+                        .context("Bitcoin refund transaction not found")?;
 
                     let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
 
@@ -527,6 +566,7 @@ where
         AliceState::XmrRefunded => AliceState::XmrRefunded,
         AliceState::BtcRedeemed => AliceState::BtcRedeemed,
         AliceState::BtcPunished { state3 } => AliceState::BtcPunished { state3 },
+        AliceState::BtcEarlyRefunded(state3) => AliceState::BtcEarlyRefunded(state3),
         AliceState::SafelyAborted => AliceState::SafelyAborted,
     })
 }
@@ -538,6 +578,7 @@ pub fn is_complete(state: &AliceState) -> bool {
             | AliceState::BtcRedeemed
             | AliceState::BtcPunished { .. }
             | AliceState::SafelyAborted
+            | AliceState::BtcEarlyRefunded(_)
     )
 }
 
