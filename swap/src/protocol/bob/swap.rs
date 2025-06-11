@@ -232,10 +232,14 @@ async fn next_state(
 
             // Check explicitly whether the cancel timelock has expired
             // (Most likely redundant but cannot hurt)
-            if state3
+            // We only warn if this fails
+            if let Ok(true) = state3
                 .expired_timelock(bitcoin_wallet)
-                .await?
-                .cancel_timelock_expired()
+                .await
+                .inspect_err(|err| {
+                    tracing::warn!(?err, "Failed to check for cancel timelock expiration");
+                })
+                .map(|expired_timelocks| expired_timelocks.cancel_timelock_expired())
             {
                 let state4 = state3.cancel(monero_wallet_restore_blockheight);
                 return Ok(BobState::CancelTimelockExpired(state4));
