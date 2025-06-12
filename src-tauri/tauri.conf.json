@@ -29,21 +29,7 @@
   "bundle": {
     "createUpdaterArtifacts": true,
     "active": true,
-    "targets": ["appimage", "flatpak", "dmg", "nsis", "app", "deb"],
-    "linux": {
-      "flatpak": {
-        "id": "net.unstoppableswap.UnstoppableSwap",
-        "runtime": "org.freedesktop.Platform",
-        "sdk": "org.freedesktop.Sdk",
-        "runtimeVersion": "23.08",
-        "finishArgs": [
-          "--socket=wayland",
-          "--socket=x11",
-          "--share=network",
-          "--device=all"
-        ]
-      }
-    },
+    "targets": ["appimage", "dmg", "nsis", "app", "deb"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
