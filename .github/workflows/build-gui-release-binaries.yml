@@ -69,9 +69,9 @@ jobs:
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           flatpak --version
-          flatpak remote-add --if-not-exists flathub \
+          sudo flatpak remote-add --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak update -y
+          sudo flatpak update -y
 
       - name: work around spurious network errors in curl 8.0
         shell: bash
