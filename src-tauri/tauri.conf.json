@@ -30,9 +30,6 @@
     "createUpdaterArtifacts": true,
     "active": true,
     "targets": ["appimage", "flatpak", "dmg", "nsis", "app", "deb"],
-
-    /* Flatpak-specific settings
-     * These are ignored by the other targets. */
     "flatpak": {
       "id": "net.unstoppableswap.UnstoppableSwap",
       "runtime": "org.freedesktop.Platform",
