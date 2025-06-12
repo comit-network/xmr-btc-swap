@@ -66,6 +66,7 @@ export default function UpdaterDialog() {
     // Check for updates when component mounts
     check()
       .then((updateResponse) => {
+        console.log("updateResponse", updateResponse);
         setAvailableUpdate(updateResponse);
       })
       .catch((err) => {
@@ -76,7 +77,7 @@ export default function UpdaterDialog() {
   }, []);
 
   // If no update is available, don't render the dialog
-  if (!availableUpdate?.available) return null;
+  if (availableUpdate === null) return null;
 
   function hideNotification() {
     setAvailableUpdate(null);
