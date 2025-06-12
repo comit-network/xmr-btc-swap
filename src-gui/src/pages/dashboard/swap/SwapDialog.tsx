@@ -3,10 +3,9 @@ import DialogTitle from "@mui/material/DialogTitle";
 import { Typography } from "@mui/material";
 import GetBitcoin from "./getBitcoin/GetBitcoin";
 import SelectMaker from "./selectMaker/SelectMaker";
-import { useState } from "react";
 import Offer from "./offer/Offer";
-
-type Step = "getBitcoin" | "selectMaker" | "offer";
+import { useAppDispatch, useAppSelector } from "store/hooks";
+import { setStep, StartSwapStep } from "store/features/startSwapSlice";
 
 export default function SwapDialog({
   open,
@@ -15,23 +14,21 @@ export default function SwapDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [currentStep, setCurrentStep] = useState<Step>("getBitcoin");
-
+  const step = useAppSelector((state) => state.startSwap.step);
+  const dispatch = useAppDispatch();
   const handleNext = () => {
-    if (currentStep === "getBitcoin") {
-      setCurrentStep("selectMaker");
-    }
-    if (currentStep === "selectMaker") {
-      setCurrentStep("offer");
+    if (step === StartSwapStep.DepositBitcoin) {
+      dispatch(setStep(StartSwapStep.SelectMaker));
+    } else if (step === StartSwapStep.SelectMaker) {
+      dispatch(setStep(StartSwapStep.ReviewOffer));
     }
   };
 
   const handleBack = () => {
-    if (currentStep === "selectMaker") {
-      setCurrentStep("getBitcoin");
-    }
-    if (currentStep === "offer") {
-      setCurrentStep("selectMaker");
+    if (step === StartSwapStep.SelectMaker) {
+      dispatch(setStep(StartSwapStep.DepositBitcoin));
+    } else if (step === StartSwapStep.ReviewOffer) {
+      dispatch(setStep(StartSwapStep.SelectMaker));
     }
   };
 
@@ -40,11 +37,11 @@ export default function SwapDialog({
       <DialogTitle>
         <Typography variant="h2">Swap</Typography>
       </DialogTitle>
-      {currentStep === "getBitcoin" && <GetBitcoin onNext={handleNext} />}
-      {currentStep === "selectMaker" && (
+      {step === StartSwapStep.DepositBitcoin && <GetBitcoin onNext={handleNext} />}
+      {step === StartSwapStep.SelectMaker && (
         <SelectMaker onNext={handleNext} onBack={handleBack} />
       )}
-      {currentStep === "offer" && (
+      {step === StartSwapStep.ReviewOffer && (
         <Offer onNext={handleNext} onBack={handleBack} />
       )}
     </Dialog>

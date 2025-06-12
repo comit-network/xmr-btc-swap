@@ -1,6 +1,6 @@
 import { Box, TextField, Tooltip, Typography } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "store/hooks";
 import FiatPriceLabel from "./FiatPriceLabel";
 import { Currency } from "./FiatPriceLabel";
@@ -18,30 +18,35 @@ export default function SwapAmountSelector({
     btc: btcAmount, 
     xmr: 0
   });
+  
+  // Track which field was last updated to prevent infinite loops
+  const lastUpdatedField = useRef<'btc' | 'xmr' | null>(null);
 
-  // Update BTC amount when XMR changes
+  // Update BTC amount when XMR changes (only if XMR was the last updated field)
   useEffect(() => {
-    if (xmrBtcRate && amounts.xmr !== undefined && amounts.xmr !== null) {
+    if (xmrBtcRate && amounts.xmr !== undefined && amounts.xmr !== null && lastUpdatedField.current === 'xmr') {
       const newBtc = Number((amounts.xmr * xmrBtcRate).toFixed(8));
       dispatch(setBtcAmount(newBtc));
       setAmounts(prev => ({
         ...prev,
         btc: newBtc
       }));
+      lastUpdatedField.current = null; // Reset to prevent further updates
     }
-  }, [amounts.xmr, xmrBtcRate]);
+  }, [amounts.xmr, xmrBtcRate, dispatch]);
 
-  // Update XMR amount when BTC changes
+  // Update XMR amount when BTC changes (only if BTC was the last updated field)
   useEffect(() => {
-    if (xmrBtcRate && amounts.btc !== undefined && amounts.btc !== null) {
+    if (xmrBtcRate && amounts.btc !== undefined && amounts.btc !== null && lastUpdatedField.current === 'btc') {
       dispatch(setBtcAmount(amounts.btc));
       const newXmr = Number((amounts.btc / xmrBtcRate).toFixed(12));
       setAmounts(prev => ({
         ...prev,
         xmr: newXmr
       }));
+      lastUpdatedField.current = null; // Reset to prevent further updates
     }
-  }, [amounts.btc, xmrBtcRate]);
+  }, [amounts.btc, xmrBtcRate, dispatch]);
 
   return (
     <Box
@@ -60,6 +65,7 @@ export default function SwapAmountSelector({
         onChange={(e) => {
           const value = Number(e.target.value);
           if (!isNaN(value)) {
+            lastUpdatedField.current = 'btc'; // Mark BTC as last updated
             setAmounts(prev => ({ ...prev, btc: value }));
           }
         }}
@@ -105,6 +111,7 @@ export default function SwapAmountSelector({
           onChange={(e) => {
             const value = Number(e.target.value);
             if (!isNaN(value)) {
+              lastUpdatedField.current = 'xmr'; // Mark XMR as last updated
               setAmounts(prev => ({ ...prev, xmr: value }));
             }
           }}

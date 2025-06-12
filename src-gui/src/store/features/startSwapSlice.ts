@@ -1,6 +1,13 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+export enum StartSwapStep {
+  DepositBitcoin = "depositBitcoin",
+  SelectMaker = "selectMaker",
+  ReviewOffer = "reviewOffer",
+}
+
 export interface StartSwapSlice {
+  step: StartSwapStep;
   btcAmount: number;
   redeemAddress: string;
   offer: null;
@@ -8,6 +15,7 @@ export interface StartSwapSlice {
 }
 
 const initialState: StartSwapSlice = {
+  step: StartSwapStep.DepositBitcoin,
   btcAmount: 0,
   redeemAddress: "",
   offer: null,
@@ -30,11 +38,14 @@ export const startSwapSlice = createSlice({
     setMaker(state, action: PayloadAction<any>) {
       state.maker = action.payload;
     },
+    setStep(state, action: PayloadAction<StartSwapStep>) {
+      state.step = action.payload;
+    },
     reset() {
       return initialState;
     },
   },
 });
 
-export const { setBtcAmount, setRedeemAddress, setOffer, setMaker, reset } = startSwapSlice.actions;
+export const { setBtcAmount, setRedeemAddress, setOffer, setMaker, setStep, reset } = startSwapSlice.actions;
 export default startSwapSlice.reducer;
