@@ -949,7 +949,14 @@ mod tests {
         factory.add_client(MockElectrumClient::new(urls[1].clone()));
         factory.add_client(MockElectrumClient::new(urls[2].clone()));
 
-        let balancer = ElectrumBalancer::new_with_factory(urls, factory.clone())
+        // Use config with min_retries = 0 to test basic switching behavior
+        // This ensures total_attempts = max(0, 3) = 3, but behavior is cleaner
+        let config = ElectrumBalancerConfig {
+            request_timeout: 5,
+            min_retries: 0,
+        };
+
+        let balancer = ElectrumBalancer::new_with_config_and_factory(urls, config, factory.clone())
             .await
             .unwrap();
 
@@ -961,7 +968,7 @@ mod tests {
             .await;
         assert!(result1.is_ok());
 
-        // Second call should stick with client 1 since it works
+        // Second call should also try client 0 first (fails), then client 1 (succeeds)
         let result2 = balancer
             .call("test", |client| {
                 client.transaction_broadcast(&create_dummy_transaction())
@@ -969,10 +976,11 @@ mod tests {
             .await;
         assert!(result2.is_ok());
 
-        // Verify call counts: client 0 called once (failed), client 1 called twice (succeeded both times)
-        assert_eq!(factory.get_client(0).unwrap().call_count(), 1);
-        assert_eq!(factory.get_client(1).unwrap().call_count(), 2);
-        assert_eq!(factory.get_client(2).unwrap().call_count(), 0);
+        // Verify call counts:
+        // Both calls try client 0 first (fails both times), then client 1 (succeeds both times)
+        assert_eq!(factory.get_client(0).unwrap().call_count(), 2); // Called on both attempts
+        assert_eq!(factory.get_client(1).unwrap().call_count(), 2); // Called on both attempts after client 0 fails
+        assert_eq!(factory.get_client(2).unwrap().call_count(), 0); // Never called
     }
 
     #[tokio::test]
