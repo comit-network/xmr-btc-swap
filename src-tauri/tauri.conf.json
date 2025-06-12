@@ -30,17 +30,19 @@
     "createUpdaterArtifacts": true,
     "active": true,
     "targets": ["appimage", "flatpak", "dmg", "nsis", "app", "deb"],
-    "flatpak": {
-      "id": "net.unstoppableswap.UnstoppableSwap",
-      "runtime": "org.freedesktop.Platform",
-      "sdk": "org.freedesktop.Sdk",
-      "runtimeVersion": "23.08",
-      "finishArgs": [
-        "--socket=wayland",
-        "--socket=x11",
-        "--share=network",
-        "--device=all"
-      ]
+    "linux": {
+      "flatpak": {
+        "id": "net.unstoppableswap.UnstoppableSwap",
+        "runtime": "org.freedesktop.Platform",
+        "sdk": "org.freedesktop.Sdk",
+        "runtimeVersion": "23.08",
+        "finishArgs": [
+          "--socket=wayland",
+          "--socket=x11",
+          "--share=network",
+          "--device=all"
+        ]
+      }
     },
     "icon": [
       "icons/32x32.png",
