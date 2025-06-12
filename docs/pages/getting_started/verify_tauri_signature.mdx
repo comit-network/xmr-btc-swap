@@ -1,0 +1,72 @@
+# Verifying the signature of the GUI
+
+Verifying downloads is a good habit. The signature files that accompany our GUI binaries are wrapped in an additional `base64` layer. This guide shows how to decode that wrapper and then verify the Minisign file.
+
+## Prerequisites
+
+| Tool | Purpose | Install (cmd examples) |
+| --- | --- | --- |
+| **minisign** | Signature verification | `brew install minisign` or `apt install minisign` |
+| **base64** | Decode a double-encoded sig | Comes with most Unix systems |
+
+## Files involved
+
+```text
+UnstoppableSwap_2.0.0-beta.2_amd64.AppImage        # the binary you will verify
+UnstoppableSwap_2.0.0-beta.2_amd64.AppImage.sig    # contains a base64 encoded signature
+```
+
+## Step-by-step
+
+1. **Decode base64**:
+
+   ```bash
+   base64 -D -i UnstoppableSwap_2.0.0-beta.2_amd64.AppImage.sig \
+     > UnstoppableSwap_2.0.0-beta.2_amd64.AppImage.minisig
+   ```
+
+   The new file will start with the classic two-line Minisign header:
+
+   ```
+   untrusted comment: signature from tauri secret key
+   RURc8dYGEB0I…
+   trusted comment: timestamp:1749671728    file:UnstoppableSwap_2.0.0-beta.2_amd64.AppImage
+   4LKsm8VRcErR…
+   ```
+
+2. **Grab the public key** (two options):
+
+   *From code:* `tauri.conf.json → plugins.updater.pubkey`
+
+   ```bash
+   # prints raw 56-byte key
+   jq -r '.plugins.updater.pubkey' src-tauri/tauri.conf.json | base64 -D
+   ```
+
+   *or* copy the key from below:
+
+   ```text
+   RWRc8dYGEB0Ipl37n2fWnO3gtVgUoPkY6XUS0C1ppRsgRUYsmSGtcECA
+   ```
+
+4. **Verify the signature**:
+
+   ```bash
+   minisign -Vm UnstoppableSwap_2.0.0-beta.2_amd64.AppImage \
+            -x  UnstoppableSwap_2.0.0-beta.2_amd64.AppImage.minisig \
+            -P  RWRc8dYGEB0Ipl37n2fWnO3gtVgUoPkY6XUS0C1ppRsgRUYsmSGtcECA
+   ```
+
+   Expected output:
+
+   ```
+   Signature and comment signature verified
+   Trusted comment: timestamp:1749671728    file:UnstoppableSwap_2.0.0-beta.2_amd64.AppImage
+   ```
+
+## Troubleshooting cheatsheet
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `Untrusted signature comment too long` | Fed Minisign the *outer* base64 file | Decode the `.sig` first (Step 1) |
+| `Signature mismatch` | Wrong public key | Re-extract the key from `tauri.conf.json` and make sure there’s no extra whitespace |
