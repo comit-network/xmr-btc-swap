@@ -120,7 +120,7 @@ export default function UpdaterDialog() {
     <Dialog
       fullWidth
       maxWidth="sm"
-      open={availableUpdate.available}
+      open={availableUpdate?.available}
       onClose={hideNotification}
     >
       <DialogTitle>Update Available</DialogTitle>

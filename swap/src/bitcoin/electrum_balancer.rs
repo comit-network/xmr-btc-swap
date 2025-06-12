@@ -553,8 +553,8 @@ pub struct ElectrumBalancerConfig {
 impl Default for ElectrumBalancerConfig {
     fn default() -> Self {
         Self {
-            request_timeout: 5,
-            min_retries: 5,
+            request_timeout: 7,
+            min_retries: 10,
         }
     }
 }

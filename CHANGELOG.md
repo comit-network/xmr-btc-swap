@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB + GUI + CLI: Increase request_timeout to 7s, min_retries to 10 for Electrum load balancer
+
 ## [2.0.0] - 2025-06-12
 
 - GUI: Build Flatpak bundle in release workflow
