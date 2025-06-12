@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- docs: add instructions for verifying Tauri signature files
+- GUI: Build Flatpak bundle in release workflow
+- docs: Instructions for verifying GUI (Tauri) signature files
 
 ## [2.0.0-beta.2] - 2025-06-11
 

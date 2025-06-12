@@ -21,7 +21,7 @@ jobs:
           - platform: "macos-13" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
           - platform: "ubuntu-24.04" # We build on an older version to support older glib versions
-            args: ""
+            args: "--bundles deb,appimage,flatpak"
           - platform: "windows-latest"
             args: ""
 
@@ -57,12 +57,21 @@ jobs:
             librsvg2-dev;
 
           sudo apt install -y \
+            flatpak flatpak-builder \
             libwebkit2gtk-4.1-0=2.44.0-2 \
             libwebkit2gtk-4.1-dev=2.44.0-2 \
             libjavascriptcoregtk-4.1-0=2.44.0-2 \
             libjavascriptcoregtk-4.1-dev=2.44.0-2 \
             gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
             gir1.2-webkit2-4.1=2.44.0-2;
+
+      - name: prepare flatpak runtime
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          flatpak --version
+          flatpak remote-add --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak update -y
 
       - name: work around spurious network errors in curl 8.0
         shell: bash

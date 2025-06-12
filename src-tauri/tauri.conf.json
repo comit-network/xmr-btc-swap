@@ -29,7 +29,22 @@
   "bundle": {
     "createUpdaterArtifacts": true,
     "active": true,
-    "targets": ["appimage", "dmg", "nsis", "app", "deb"],
+    "targets": ["appimage", "flatpak", "dmg", "nsis", "app", "deb"],
+
+    /* Flatpak-specific settings
+     * These are ignored by the other targets. */
+    "flatpak": {
+      "id": "net.unstoppableswap.UnstoppableSwap",
+      "runtime": "org.freedesktop.Platform",
+      "sdk": "org.freedesktop.Sdk",
+      "runtimeVersion": "23.08",
+      "finishArgs": [
+        "--socket=wayland",
+        "--socket=x11",
+        "--share=network",
+        "--device=all"
+      ]
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
