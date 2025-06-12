@@ -17,9 +17,10 @@ export function AmountWithUnit({
   exchangeRate?: Amount;
   parenthesisText?: string;
 }) {
-  const [fetchFiatPrices, fiatCurrency] = useSettings(
-    (settings) => [settings.fetchFiatPrices, settings.fiatCurrency],
-  );
+  const [fetchFiatPrices, fiatCurrency] = useSettings((settings) => [
+    settings.fetchFiatPrices,
+    settings.fiatCurrency,
+  ]);
   const title =
     fetchFiatPrices &&
     exchangeRate != null &&

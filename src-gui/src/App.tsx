@@ -6,7 +6,9 @@ import {
 } from "@mui/material/styles";
 import "@tauri-apps/plugin-shell";
 import { Route, MemoryRouter as Router, Routes } from "react-router-dom";
-import Navigation, { drawerWidth } from "./renderer/components/navigation/Navigation";
+import Navigation, {
+  drawerWidth,
+} from "./renderer/components/navigation/Navigation";
 import SettingsPage from "./renderer/components/pages/help/SettingsPage";
 import HistoryPage from "./renderer/components/pages/history/HistoryPage";
 import SwapPage from "./renderer/components/pages/swap/SwapPage";

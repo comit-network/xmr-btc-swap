@@ -35,11 +35,7 @@ import {
   Network,
   setTheme,
 } from "store/features/settingsSlice";
-import {
-  useAppDispatch,
-  useNodes,
-  useSettings,
-} from "store/hooks";
+import { useAppDispatch, useNodes, useSettings } from "store/hooks";
 import ValidatedTextField from "renderer/components/other/ValidatedTextField";
 import HelpIcon from "@mui/icons-material/HelpOutline";
 import { ReactNode, useState } from "react";
