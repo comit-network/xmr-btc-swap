@@ -299,7 +299,7 @@ where
 
                     errors.push(err);
 
-                    return Err(BackoffError::transient(()));
+                    Err(BackoffError::transient(()))
                 }
             }
         };
