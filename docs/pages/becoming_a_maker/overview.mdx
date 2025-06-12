@@ -142,8 +142,9 @@ We do not recommend changing these settings, however we document them for comple
 # ...
 
 [bitcoin]
-target_block = 1 
-electrum_rpc_url = "tcp://mainnet_electrs:50001"
+target_block = 1
+electrum_rpc_urls = ["tcp://mainnet_electrs:50001"]
+use_mempool_space_fee_estimation = true
 network = "Mainnet"
 
 # ...
@@ -151,8 +152,9 @@ network = "Mainnet"
 
 | Option | Description |
 | --- | --- |
-| `target_block` | This determines the block height that the asb will try to get it's Bitcoin transactions confirmed at. The default value of `1` means the asb will try to get it's transactions confirmed in the next block.  |
-| `electrum_rpc_url` | The URL of the _electrs_ server the asb will connect to. The _electrs_ server is is used to interact with the Bitcoin blockchain. The default URL points to the docker-hosted _electrs_ server. |
+| `target_block` | This determines the block height that the asb will try to get it's Bitcoin transactions confirmed at. The default value of `1` means the asb will try to get it's transactions confirmed in the next block. |
+| `electrum_rpc_urls` | A list of Electrum servers used to interact with the Bitcoin blockchain. If multiple servers are specified they are tried in order. The default contains the docker-hosted _electrs_ server. |
+| `use_mempool_space_fee_estimation` | Whether the asb should fall back to the mempool.space API when fee estimation from Electrum fails. Defaults to `true`. |
 | `network` | The Bitcoin network the asb will connect to. |
 
 ### Monero Section
@@ -252,8 +254,9 @@ price_ticker_ws_url = "wss://ws.kraken.com/"
 external_bitcoin_address = "bc1..."
 
 [bitcoin]
-electrum_rpc_url = "tcp://mainnet_electrs:50001"
-target_block = 1 
+electrum_rpc_urls = ["tcp://mainnet_electrs:50001"]
+target_block = 1
+use_mempool_space_fee_estimation = true
 network = "Mainnet"
 
 [monero]
