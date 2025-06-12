@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "2.0.0-beta.2"
+version = "2.0.0"
 authors = ["The COMIT guys <hello@comit.network>"]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."

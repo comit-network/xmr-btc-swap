@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-06-12
+
 - GUI: Build Flatpak bundle in release workflow
 - docs: add instructions for verifying Tauri signature files
 - docs: document new `electrum_rpc_urls` and `use_mempool_space_fee_estimation` options
@@ -517,7 +519,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/2.0.0-beta.2...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/UnstoppableSwap/core/compare/2.0.0-beta.2...2.0.0
 [2.0.0-beta.2]: https://github.com/UnstoppableSwap/core/compare/2.0.0-beta.1...2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/UnstoppableSwap/core/compare/1.1.7...2.0.0-beta.1
 [1.1.7]: https://github.com/UnstoppableSwap/core/compare/1.1.4...1.1.7
