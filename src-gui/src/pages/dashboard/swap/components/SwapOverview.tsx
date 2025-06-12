@@ -1,6 +1,7 @@
 import { Alert, Box, Typography } from "@mui/material";
 import SwapAmountSelector from "./SwapAmountSelector";
 import ReceiveAddressSelector from "./ReceiveAddressSelector";
+import MissingBtcAlert from "./MissingBtcAlert";
 
 export default function SwapOverview() {
   return (
@@ -13,10 +14,7 @@ export default function SwapOverview() {
     >
       <ReceiveAddressSelector />
       <SwapAmountSelector fullWidth />
-      <Alert severity="info" variant="outlined">
-        Your Wallet has 0.00000000 BTC. You need an additional 0.00000000 BTC to
-        swap your desired XMR amount.
-      </Alert>
+      <MissingBtcAlert />
     </Box>
   );
 }

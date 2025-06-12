@@ -7,6 +7,7 @@ import torSlice from "./features/torSlice";
 import settingsSlice from "./features/settingsSlice";
 import nodesSlice from "./features/nodesSlice";
 import conversationsSlice from "./features/conversationsSlice";
+import startSwapSlice from "./features/startSwapSlice";
 
 export const reducers = {
   swap: swapReducer,
@@ -18,4 +19,5 @@ export const reducers = {
   settings: settingsSlice,
   nodes: nodesSlice,
   conversations: conversationsSlice,
+  startSwap: startSwapSlice,
 };
