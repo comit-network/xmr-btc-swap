@@ -1,4 +1,4 @@
-import { Box, TextField, Typography } from "@mui/material";
+import { Box, TextField, Tooltip, Typography } from "@mui/material";
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 export default function SwapAmountSelector({ fullWidth }: { fullWidth?: boolean }) {
@@ -28,15 +28,14 @@ export default function SwapAmountSelector({ fullWidth }: { fullWidth?: boolean 
           gridRow: "2",
         }}/>
 
-        <Typography sx={{
-          gridColumn: "3 / 4",
-          gridRow: "1",
-        }} variant="caption">The actual Monero amount might vary slightly</Typography>
+        <Tooltip title="The actual Monero amount might vary slightly" enterDelay={1500} enterNextDelay={500} leaveDelay={500}>
 
-        <TextField label="XMR" fullWidth={fullWidth} sx={{
-          gridColumn: "3 / 4",
-          gridRow: "2",
-        }}/>
+          <TextField label="XMR" fullWidth={fullWidth} sx={{
+            gridColumn: "3 / 4",
+            gridRow: "2",
+          }}
+          />
+          </Tooltip>
 
         <Typography sx={{
           gridColumn: "3 / 4",

@@ -3,7 +3,7 @@ import Avatar from 'boring-avatars'
 import { AccessTimeOutlined as ClockIcon } from '@mui/icons-material'
 import { MonetizationOnOutlined as MoneyIcon } from '@mui/icons-material'
 import { CurrencyBitcoinOutlined as BitcoinIcon } from '@mui/icons-material'
-import IconChip from './IconChip'
+import IconChip from '../IconChip'
 
 export default function MakerOfferItem() {
     return (

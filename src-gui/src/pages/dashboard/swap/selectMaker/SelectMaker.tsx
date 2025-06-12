@@ -1,6 +1,6 @@
 import { Typography, Box, DialogContent, DialogActions, Button } from '@mui/material'
-import SwapAmountSelector from '../SwapAmountSelector'
-import MakerOfferItem from '../MakerOfferItem'
+import MakerOfferItem from '../components/MakerOfferItem'
+import SwapOverview from '../components/SwapOverview'
 
 export default function SelectMaker({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
     return (
@@ -11,7 +11,7 @@ export default function SelectMaker({ onNext, onBack }: { onNext: () => void; on
                     flexDirection: "column",
                     gap: 2,
                 }}>
-                    <SwapAmountSelector fullWidth/>
+                    <SwapOverview />
                     <Box sx={{
                         display: "flex",
                         flexDirection: "row",

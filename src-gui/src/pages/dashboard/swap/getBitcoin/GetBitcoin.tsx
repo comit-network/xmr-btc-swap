@@ -1,7 +1,7 @@
 import { Typography, Box, Alert, DialogContent, DialogActions, Button } from '@mui/material'
 import BitcoinQrCode from 'renderer/components/modal/swap/BitcoinQrCode'
 import ActionableMonospaceTextBox from 'renderer/components/other/ActionableMonospaceTextBox'
-import SwapAmountSelector from '../SwapAmountSelector'
+import SwapOverview from '../components/SwapOverview'
 
 export default function GetBitcoin({ onNext }: { onNext: () => void }) {
     return (
@@ -12,11 +12,7 @@ export default function GetBitcoin({ onNext }: { onNext: () => void }) {
                     flexDirection: "column",
                     gap: 2,
                 }}>
-                    <SwapAmountSelector fullWidth/>
-                    <Alert severity="info" variant="outlined">
-                        Your Wallet has 0.00000000 BTC. You need an additional
-                        0.00000000 BTC to swap your desired XMR amount.
-                    </Alert>
+                    <SwapOverview />
                     <Typography variant="h3">Get Bitcoin</Typography>
                     <Typography variant="body1">Send Bitcoin to your internal wallet</Typography>
                     <Box

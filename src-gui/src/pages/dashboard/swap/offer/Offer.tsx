@@ -1,7 +1,7 @@
 import { DialogContent, DialogActions, Button, Typography, Box, Divider, IconButton } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import MakerOfferItem from '../MakerOfferItem'
+import MakerOfferItem from '../components/MakerOfferItem'
 import { useState } from 'react';
 
 export default function Offer({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
