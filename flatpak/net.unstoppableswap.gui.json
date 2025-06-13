@@ -1,0 +1,36 @@
+{
+  "id": "net.unstoppableswap.gui",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "47",
+  "sdk": "org.gnome.Sdk",
+  "command": "unstoppableswap-gui-rs",
+  "finish-args": [
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri",
+    "--share=ipc",
+    "--share=network",
+    "--talk-name=org.kde.StatusNotifierWatcher",
+    "--filesystem=xdg-run/tray-icon:create",
+    "--filesystem=~/.local/share/xmr-btc-swap"
+  ],
+  "modules": [
+    {
+      "name": "binary",
+      "buildsystem": "simple",
+      "sources": [
+        {
+          "type": "file",
+          "url": "https://github.com/UnstoppableSwap/core/releases/download/2.0.3/UnstoppableSwap_2.0.3_amd64.deb",
+          "sha256": "dae3ac67a22f6907acf8560643470d625c92ce3c8dc1fff77ea9370c9ccdf962",
+          "only-arches": ["x86_64"]
+        }
+      ],
+      "build-commands": [
+        "ar -x *.deb",
+        "tar -xf data.tar.gz",
+        "install -Dm755 usr/bin/unstoppableswap-gui-rs /app/bin/unstoppableswap-gui-rs"
+      ]
+    }
+  ]
+}

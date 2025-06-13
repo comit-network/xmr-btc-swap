@@ -105,3 +105,75 @@ jobs:
           projectPath: src-tauri
           args: ${{ matrix.args }}
           tauriScript: cargo tauri
+
+  flatpak-build:
+    name: Build Flatpak + update repo
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    container:
+      # Image already contains flatpak, flatpak-builder and runtimes
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-47
+      options: --privileged      # sandbox needs it
+    permissions:
+      contents: write            # to upload bundle to the release
+      id-token: write            # for Pages deploy
+      pages: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # 1. Download the .deb we just published on the release
+    - name: Grab release asset
+      run: |
+        ASSET="UnstoppableSwap_${{ github.ref_name }}_amd64.deb"
+        gh release download ${{ github.event.release.id }} --pattern "$ASSET"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # 2. Update URL + SHA256 inside the manifest (yq = cleaner than sed)
+    - name: Rewrite manifest for new version
+      run: |
+        SHA=$(sha256sum UnstoppableSwap_*.deb | cut -d' ' -f1)
+        yq -i '
+          .modules[0].sources[0].url = "https://github.com/UnstoppableSwap/core/releases/download/${{ github.ref_name }}/UnstoppableSwap_${{ github.ref_name }}_amd64.deb" |
+          .modules[0].sources[0].sha256 = strenv(SHA)
+        ' flatpak/net.unstoppableswap.gui.json
+
+    # 3. Import signing key (one-liner GPG action)
+    - uses: crazy-max/ghaction-import-gpg@v5
+      id: gpg
+      with:
+        gpg_private_key: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+        passphrase:      ${{ secrets.GPG_PASSPHRASE }}
+
+    # 4. Build, export repo & one-click installer
+    - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        manifest-path: flatpak/net.unstoppableswap.gui.json
+        arch: x86_64
+        bundle: net.unstoppableswap.gui.flatpakref   # produces bundle + repo
+        gpg-sign: ${{ steps.gpg.outputs.fingerprint }}
+        build-bundle: true
+        upload-artifact: false   # we'll attach manually below
+
+    # 5. Attach bundle to the release so CLI users can "install --from"
+    - name: Upload .flatpakref to release
+      run: gh release upload ${{ github.event.release.id }} *.flatpakref --clobber
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # 6. Stage repo for GitHub Pages
+    #    flatpak-builder exported everything into "repo"
+    - name: Prepare Pages artifact
+      run: |
+        mkdir -p public
+        cp -a repo/* public
+        # include the descriptor for GUI stores / CLI
+        cp net.unstoppableswap.gui.flatpakref public/
+      # Upload as Pages artifact
+    - uses: actions/upload-pages-artifact@v2
+      with:
+        path: public
+
+    # 7. Deploy to Pages
+    - uses: actions/deploy-pages@v1
