@@ -144,7 +144,7 @@ jobs:
       id: gpg
       with:
         gpg_private_key: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
-        passphrase:      ${{ secrets.GPG_PASSPHRASE }}
+        passphrase:      ${{ secrets.FLATPAK_GPG_PASSPHRASE }}
 
     # 4. Build, export repo & one-click installer
     - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
