@@ -203,17 +203,61 @@ where
                 let tx_early_refund = tx_early_refund?;
                 let tx_early_refund_txid = tx_early_refund.compute_txid();
 
-                // Broadcast the early refund transaction
-                let (_, _) = bitcoin_wallet
-                    .broadcast(tx_early_refund, "early_refund")
-                    .await?;
+                // Bob might cancel the swap and refund for himself. We won't need to early refund anymore.
+                let tx_cancel_status = bitcoin_wallet.subscribe_to(state3.tx_cancel()).await;
 
-                tracing::info!(
-                    %tx_early_refund_txid,
-                    "Refunded Bitcoin early for Bob"
-                );
+                let backoff = backoff::ExponentialBackoffBuilder::new()
+                    // We give up after 6 hours
+                    // (Most likely Bob the a Replace-by-Fee on the tx_lock transaction)
+                    .with_max_elapsed_time(Some(Duration::from_secs(6 * 60 * 60)))
+                    // We wait a while between retries
+                    .with_max_interval(Duration::from_secs(10 * 60))
+                    .build();
 
-                AliceState::BtcEarlyRefunded(state3)
+                // Concurrently retry to broadcast the early refund transaction
+                // and wait for the cancel transaction to be broadcasted.
+                tokio::select! {
+                    // If Bob cancels the swap, he can refund himself.
+                    // Nothing for us to do anymore.
+                    result = tx_cancel_status.wait_until_seen() => {
+                        result?;
+                        AliceState::SafelyAborted
+                    }
+
+                    // Retry repeatedly to broadcast tx_early_refund
+                    result = async {
+                        backoff::future::retry_notify(backoff, || async {
+                            bitcoin_wallet.broadcast(tx_early_refund.clone(), "early_refund").await.map_err(backoff::Error::transient)
+                        }, |e, wait_time: Duration| {
+                            tracing::warn!(
+                                %tx_early_refund_txid,
+                                error = ?e,
+                                "Failed to broadcast early refund transaction. We will retry in {} seconds",
+                                wait_time.as_secs()
+                            )
+                        })
+                        .await
+                    } => {
+                        match result {
+                            Ok((_txid, _subscription)) => {
+                                tracing::info!(
+                                    %tx_early_refund_txid,
+                                    "Refunded Bitcoin early for Bob"
+                                );
+
+                                AliceState::BtcEarlyRefunded(state3)
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    %tx_early_refund_txid,
+                                    error = ?e,
+                                    "Failed to broadcast early refund transaction after retries exhausted. Bob will have to wait for the timelock to expire then refund himself."
+                                );
+                                AliceState::SafelyAborted
+                            }
+                        }
+                    }
+                }
             } else {
                 // We do not have Bob's signature for the early refund transaction
                 // Therefore we cannot do an early refund.

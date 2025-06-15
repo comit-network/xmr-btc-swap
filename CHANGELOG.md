@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - GUI: Improved peer discovery: We can now connect to multiple rendezvous points at once. We also cache peers we have previously connected to locally and will attempt to connect to them again in the future, even if they aren't registered with a rendezvous point anymore.
+- ASB: We now retry for 6 hours to broadcast the early refund transaction. After that, we give up and Bob will have to wait for the timelock to expire then refund himself. If we detect that Bob has cancelled the swap, we will abort the swap on our side and let Bob refund himself.
 
 ## [2.0.3] - 2025-06-12
 
