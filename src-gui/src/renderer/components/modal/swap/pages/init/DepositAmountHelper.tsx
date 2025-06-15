@@ -76,7 +76,6 @@ export default function DepositAmountHelper({
           "& input[type=number]": {
             MozAppearance: "textfield",
           },
-          maxWidth: 16,
         }}
       />
       <Typography variant="subtitle2">
