@@ -247,9 +247,11 @@ where
                     .await?,
             );
 
-            ListSellersArgs { rendezvous_point }
-                .request(context.clone())
-                .await?;
+            ListSellersArgs {
+                rendezvous_points: vec![rendezvous_point],
+            }
+            .request(context.clone())
+            .await?;
 
             Ok(context)
         }

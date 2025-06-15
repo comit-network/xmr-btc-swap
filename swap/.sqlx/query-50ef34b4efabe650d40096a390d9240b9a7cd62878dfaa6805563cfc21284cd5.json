@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        insert or ignore into peer_addresses (\n            peer_id,\n            address\n            ) values (?, ?);\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "50ef34b4efabe650d40096a390d9240b9a7cd62878dfaa6805563cfc21284cd5"
+}

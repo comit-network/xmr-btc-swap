@@ -14,10 +14,7 @@ import { ExtendedMakerStatus } from "models/apiModel";
 import { ChangeEvent, useEffect, useState } from "react";
 import { useAppSelector } from "store/hooks";
 import { satsToBtc } from "utils/conversionUtils";
-import {
-  ListSellersDialogOpenButton,
-  MakerSubmitDialogOpenButton,
-} from "../../modal/provider/MakerListDialog";
+import { MakerSubmitDialogOpenButton } from "../../modal/provider/MakerListDialog";
 import MakerSelect from "../../modal/provider/MakerSelect";
 import SwapDialog from "../../modal/swap/SwapDialog";
 
@@ -162,7 +159,7 @@ function HasNoMakersSwapWidget() {
           </ul>
         </Typography>
         <Box>
-          <ListSellersDialogOpenButton />
+          <MakerSubmitDialogOpenButton />
         </Box>
       </Box>
     </Alert>
@@ -180,7 +177,6 @@ function HasNoMakersSwapWidget() {
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <MakerSubmitDialogOpenButton />
-          <ListSellersDialogOpenButton />
         </Box>
       </Box>
     </Alert>

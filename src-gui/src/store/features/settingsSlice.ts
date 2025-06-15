@@ -1,6 +1,12 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Theme } from "renderer/components/theme";
 
+const DEFAULT_RENDEZVOUS_POINTS = [
+  "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
+  "/dns4/discover2.unstoppableswap.net/tcp/8888/p2p/12D3KooWGRvf7qVQDrNR5nfYD6rKrbgeTi9x8RrbdxbmsPvxL4mw",
+  "/dns4/darkness.su/tcp/8888/p2p/12D3KooWFQAgVVS9t9UgL6v1sLprJVM7am5hFK7vy9iBCCoCBYmU",
+];
+
 export interface SettingsState {
   /// This is an ordered list of node urls for each network and blockchain
   nodes: Record<Network, Record<Blockchain, string[]>>;
@@ -12,6 +18,8 @@ export interface SettingsState {
   /// Whether to enable Tor for p2p connections
   enableTor: boolean;
   userHasSeenIntroduction: boolean;
+  /// List of rendezvous points
+  rendezvousPoints: string[];
 }
 
 export enum FiatCurrency {
@@ -112,6 +120,7 @@ const initialState: SettingsState = {
   fiatCurrency: FiatCurrency.Usd,
   enableTor: true,
   userHasSeenIntroduction: false,
+  rendezvousPoints: DEFAULT_RENDEZVOUS_POINTS,
 };
 
 const alertsSlice = createSlice({
@@ -146,6 +155,14 @@ const alertsSlice = createSlice({
     },
     setFiatCurrency(slice, action: PayloadAction<FiatCurrency>) {
       slice.fiatCurrency = action.payload;
+    },
+    addRendezvousPoint(slice, action: PayloadAction<string>) {
+      slice.rendezvousPoints.push(action.payload);
+    },
+    removeRendezvousPoint(slice, action: PayloadAction<string>) {
+      slice.rendezvousPoints = slice.rendezvousPoints.filter(
+        (point) => point !== action.payload,
+      );
     },
     addNode(
       slice,
@@ -202,6 +219,8 @@ export const {
   setFiatCurrency,
   setTorEnabled,
   setUserHasSeenIntroduction,
+  addRendezvousPoint,
+  removeRendezvousPoint,
 } = alertsSlice.actions;
 
 export default alertsSlice.reducer;

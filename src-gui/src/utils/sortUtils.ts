@@ -19,6 +19,8 @@ export function sortMakerList(list: ExtendedMakerStatus[]) {
           (m) => (m.relevancy == null ? 1 : 0),
           // Prefer makers with a higher relevancy score
           (m) => -(m.relevancy ?? 0),
+          // Prefer makers with a minimum quantity > 0
+          (m) => ((m.minSwapAmount ?? 0) > 0 ? 0 : 1),
           // Prefer makers with a lower price
           (m) => m.price,
         ],

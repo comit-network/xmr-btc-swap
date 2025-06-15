@@ -2,7 +2,8 @@ use super::tauri_bindings::TauriHandle;
 use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
-use crate::cli::{list_sellers as list_sellers_impl, EventLoop, Seller, SellerStatus};
+use crate::cli::list_sellers::{QuoteWithAddress, UnreachableSeller};
+use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
 use crate::common::{get_logs, redact};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::monero::wallet_rpc::MoneroDaemon;
@@ -172,14 +173,16 @@ impl Request for WithdrawBtcArgs {
 #[typeshare]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ListSellersArgs {
-    #[typeshare(serialized_as = "string")]
-    pub rendezvous_point: Multiaddr,
+    /// The rendezvous points to search for sellers
+    /// The address must contain a peer ID
+    #[typeshare(serialized_as = "Vec<string>")]
+    pub rendezvous_points: Vec<Multiaddr>,
 }
 
 #[typeshare]
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ListSellersResponse {
-    sellers: Vec<Seller>,
+    sellers: Vec<SellerStatus>,
 }
 
 impl Request for ListSellersArgs {
@@ -1079,10 +1082,11 @@ pub async fn list_sellers(
     list_sellers: ListSellersArgs,
     context: Arc<Context>,
 ) -> Result<ListSellersResponse> {
-    let ListSellersArgs { rendezvous_point } = list_sellers;
-    let rendezvous_node_peer_id = rendezvous_point
-        .extract_peer_id()
-        .context("Rendezvous node address must contain peer ID")?;
+    let ListSellersArgs { rendezvous_points } = list_sellers;
+    let rendezvous_nodes: Vec<_> = rendezvous_points
+        .iter()
+        .filter_map(|rendezvous_point| rendezvous_point.split_peer_id())
+        .collect();
 
     let identity = context
         .config
@@ -1092,30 +1096,46 @@ pub async fn list_sellers(
         .derive_libp2p_identity();
 
     let sellers = list_sellers_impl(
-        rendezvous_node_peer_id,
-        rendezvous_point,
+        rendezvous_nodes,
         context.config.namespace,
         context.tor_client.clone(),
         identity,
+        Some(context.db.clone()),
+        context.tauri_handle(),
     )
     .await?;
 
     for seller in &sellers {
-        match seller.status {
-            SellerStatus::Online(quote) => {
-                tracing::info!(
+        match seller {
+            SellerStatus::Online(QuoteWithAddress {
+                quote,
+                multiaddr,
+                peer_id,
+                version,
+            }) => {
+                tracing::debug!(
+                    status = "Online",
                     price = %quote.price.to_string(),
                     min_quantity = %quote.min_quantity.to_string(),
                     max_quantity = %quote.max_quantity.to_string(),
-                    status = "Online",
-                    address = %seller.multiaddr.to_string(),
+                    address = %multiaddr.clone().to_string(),
+                    peer_id = %peer_id,
+                    version = %version,
                     "Fetched peer status"
                 );
+
+                // Add the peer as known to the database
+                // This'll allow us to later request a quote again
+                // without having to re-discover the peer at the rendezvous point
+                context
+                    .db
+                    .insert_address(*peer_id, multiaddr.clone())
+                    .await?;
             }
-            SellerStatus::Unreachable => {
-                tracing::info!(
+            SellerStatus::Unreachable(UnreachableSeller { peer_id }) => {
+                tracing::debug!(
                     status = "Unreachable",
-                    address = %seller.multiaddr.to_string(),
+                    peer_id = %peer_id.to_string(),
                     "Fetched peer status"
                 );
             }

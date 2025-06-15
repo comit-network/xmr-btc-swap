@@ -154,7 +154,7 @@ impl Database for SqliteDatabase {
 
         sqlx::query!(
             r#"
-        insert into peer_addresses (
+        insert or ignore into peer_addresses (
             peer_id,
             address
             ) values (?, ?);
@@ -191,6 +191,42 @@ impl Database for SqliteDatabase {
             .collect::<Result<Vec<Multiaddr>>>();
 
         addresses
+    }
+
+    async fn get_all_peer_addresses(&self) -> Result<Vec<(PeerId, Vec<Multiaddr>)>> {
+        let rows = sqlx::query!("SELECT peer_id, address FROM peer_addresses")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut peer_map: std::collections::HashMap<PeerId, Vec<Multiaddr>> =
+            std::collections::HashMap::new();
+
+        for row in rows.iter() {
+            match (
+                PeerId::from_str(&row.peer_id),
+                Multiaddr::from_str(&row.address),
+            ) {
+                (Ok(peer_id), Ok(multiaddr)) => {
+                    peer_map.entry(peer_id).or_default().push(multiaddr);
+                }
+                (Err(e), _) => {
+                    tracing::warn!(
+                        peer_id = %row.peer_id,
+                        error = %e,
+                        "Failed to parse peer ID, skipping entry"
+                    );
+                }
+                (_, Err(e)) => {
+                    tracing::warn!(
+                        address = %row.address,
+                        error = %e,
+                        "Failed to parse multiaddr, skipping entry"
+                    );
+                }
+            }
+        }
+
+        Ok(peer_map.into_iter().collect())
     }
 
     async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String> {

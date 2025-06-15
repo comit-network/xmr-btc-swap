@@ -1033,7 +1033,7 @@
   dependencies:
     "@tauri-apps/api" "^2.0.0"
 
-"@tauri-apps/plugin-updater@>=2.7.1":
+"@tauri-apps/plugin-updater@2.7.1":
   version "2.7.1"
   resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-updater/-/plugin-updater-2.7.1.tgz#82adcfd06cdd4bc6d64343c8934b700c9174913a"
   integrity sha512-1OPqEY/z7NDVSeTEMIhD2ss/vXWdpfZ5Th2Mk0KtPR/RA6FKuOTDGZQhxoyYBk0pcZJ+nNZUbl/IujDCLBApjA==

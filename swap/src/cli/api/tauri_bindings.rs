@@ -546,6 +546,7 @@ pub enum TauriBackgroundProgress {
     SyncingBitcoinWallet(PendingCompleted<TauriBitcoinSyncProgress>),
     FullScanningBitcoinWallet(PendingCompleted<TauriBitcoinFullScanProgress>),
     BackgroundRefund(PendingCompleted<BackgroundRefundProgress>),
+    ListSellers(PendingCompleted<ListSellersProgress>),
 }
 
 #[typeshare]
@@ -706,4 +707,15 @@ pub struct TauriSettings {
     pub electrum_rpc_urls: Vec<String>,
     /// Whether to initialize and use a tor client.
     pub use_tor: bool,
+}
+
+#[typeshare]
+#[derive(Debug, Serialize, Clone)]
+pub struct ListSellersProgress {
+    pub rendezvous_points_connected: u32,
+    pub rendezvous_points_total: u32,
+    pub rendezvous_points_failed: u32,
+    pub peers_discovered: u32,
+    pub quotes_received: u32,
+    pub quotes_failed: u32,
 }

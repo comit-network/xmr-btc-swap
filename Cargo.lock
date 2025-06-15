@@ -9296,6 +9296,7 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "rustls 0.23.27",
+ "semver",
  "serde",
  "serde_cbor",
  "serde_json",

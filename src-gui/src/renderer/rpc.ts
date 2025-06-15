@@ -43,13 +43,13 @@ import { CliLog } from "models/cliModel";
 import { logsToRawString, parseLogsFromString } from "utils/parseUtils";
 
 export const PRESET_RENDEZVOUS_POINTS = [
-  "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
+  "/dnsaddr/xxmr.cheap/p2p/12D3KooWMk3QyPS8D1d1vpHZoY7y2MnXdPE5yV6iyPvyuj4zcdxT",
 ];
 
 export async function fetchSellersAtPresetRendezvousPoints() {
   await Promise.all(
     PRESET_RENDEZVOUS_POINTS.map(async (rendezvousPoint) => {
-      const response = await listSellersAtRendezvousPoint(rendezvousPoint);
+      const response = await listSellersAtRendezvousPoint([rendezvousPoint]);
       store.dispatch(discoveredMakersByRendezvous(response.sellers));
 
       logger.info(
@@ -206,10 +206,10 @@ export async function redactLogs(
 }
 
 export async function listSellersAtRendezvousPoint(
-  rendezvousPointAddress: string,
+  rendezvousPointAddresses: string[],
 ): Promise<ListSellersResponse> {
   return await invoke<ListSellersArgs, ListSellersResponse>("list_sellers", {
-    rendezvous_point: rendezvousPointAddress,
+    rendezvous_points: rendezvousPointAddresses,
   });
 }
 

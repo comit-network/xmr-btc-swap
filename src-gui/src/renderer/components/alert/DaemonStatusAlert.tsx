@@ -1,4 +1,4 @@
-import { Box, Button, LinearProgress, Badge } from "@mui/material";
+import { Box, Button, LinearProgress, Badge, Typography } from "@mui/material";
 import { Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAppSelector, usePendingBackgroundProcesses } from "store/hooks";
@@ -159,6 +159,35 @@ function PartialInitStatus({
           </>
         </LoadingSpinnerAlert>
       );
+    case "ListSellers": {
+      const progress = status.progress.content;
+      const totalExpected =
+        progress.rendezvous_points_total + progress.peers_discovered;
+      const totalCompleted =
+        progress.rendezvous_points_connected +
+        progress.quotes_received +
+        progress.quotes_failed;
+      const progressValue =
+        totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+
+      return (
+        <AlertWithLinearProgress
+          title={
+            <>
+              Discovering peers
+              <Box display="flex" justifyContent="space-between">
+                <Box color="success.main">
+                  {progress.quotes_received} online
+                </Box>
+                <Box color="error.main">{progress.quotes_failed} offline</Box>
+              </Box>
+            </>
+          }
+          progress={progressValue}
+          count={totalOfType}
+        />
+      );
+    }
     default:
       return exhaustiveGuard(status);
   }
@@ -181,11 +210,7 @@ export default function DaemonStatusAlert() {
 
   switch (contextStatus) {
     case TauriContextStatusEvent.Initializing:
-      return (
-        <LoadingSpinnerAlert severity="warning">
-          Core components are loading
-        </LoadingSpinnerAlert>
-      );
+      return null;
     case TauriContextStatusEvent.Available:
       return <Alert severity="success">The daemon is running</Alert>;
     case TauriContextStatusEvent.Failed:

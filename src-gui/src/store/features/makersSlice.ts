@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { ExtendedMakerStatus, MakerStatus } from "models/apiModel";
-import { Seller } from "models/tauriModel";
+import { SellerStatus } from "models/tauriModel";
 import { getStubTestnetMaker } from "store/config";
 import { rendezvousSellerToMakerStatus } from "utils/conversionUtils";
 import { isMakerOutdated } from "utils/multiAddrUtils";
@@ -60,7 +60,7 @@ export const makersSlice = createSlice({
   name: "providers",
   initialState,
   reducers: {
-    discoveredMakersByRendezvous(slice, action: PayloadAction<Seller[]>) {
+    discoveredMakersByRendezvous(slice, action: PayloadAction<SellerStatus[]>) {
       action.payload.forEach((discoveredSeller) => {
         const discoveredMakerStatus =
           rendezvousSellerToMakerStatus(discoveredSeller);

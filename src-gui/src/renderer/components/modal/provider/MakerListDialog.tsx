@@ -15,7 +15,6 @@ import { ExtendedMakerStatus } from "models/apiModel";
 import { useState } from "react";
 import { setSelectedMaker } from "store/features/makersSlice";
 import { useAllMakers, useAppDispatch } from "store/hooks";
-import ListSellersDialog from "../listSellers/ListSellersDialog";
 import MakerInfo from "./MakerInfo";
 import MakerSubmitDialog from "./MakerSubmitDialog";
 
@@ -50,30 +49,6 @@ export function MakerSubmitDialogOpenButton() {
   );
 }
 
-export function ListSellersDialogOpenButton() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <ListItemButton
-      autoFocus
-      onClick={() => {
-        // Prevents background from being clicked and reopening dialog
-        if (!open) {
-          setOpen(true);
-        }
-      }}
-    >
-      <ListSellersDialog open={open} onClose={() => setOpen(false)} />
-      <ListItemAvatar>
-        <Avatar>
-          <SearchIcon />
-        </Avatar>
-      </ListItemAvatar>
-      <ListItemText primary="Discover makers by connecting to a rendezvous point" />
-    </ListItemButton>
-  );
-}
-
 export default function MakerListDialog({
   open,
   onClose,
@@ -99,7 +74,6 @@ export default function MakerListDialog({
               <MakerInfo maker={maker} key={maker.peerId} />
             </ListItemButton>
           ))}
-          <ListSellersDialogOpenButton />
           <MakerSubmitDialogOpenButton />
         </List>
       </DialogContent>

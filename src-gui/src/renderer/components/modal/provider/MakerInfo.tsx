@@ -86,14 +86,12 @@ export default function MakerInfo({ maker }: { maker: ExtendedMakerStatus }) {
             <Chip label={`${Math.round(maker.uptime * 100)}% uptime`} />
           </Tooltip>
         )}
-        {maker.age ? (
+        {maker.age && (
           <Chip
             label={`Went online ${Math.round(secondsToDays(maker.age))} ${
               maker.age === 1 ? "day" : "days"
             } ago`}
           />
-        ) : (
-          <Chip label="Discovered via rendezvous point" />
         )}
         {maker.recommended === true && (
           <Tooltip title="This maker has shown to be exceptionally reliable">
@@ -103,6 +101,11 @@ export default function MakerInfo({ maker }: { maker: ExtendedMakerStatus }) {
         {isOutdated && (
           <Tooltip title="This maker is running an older version of the software. Outdated makers may be unreliable and cause swaps to take longer to complete or fail entirely.">
             <Chip label="Outdated" icon={<WarningIcon />} color="primary" />
+          </Tooltip>
+        )}
+        {maker.version && (
+          <Tooltip title="The version of the maker's software">
+            <Chip label={`v${maker.version}`} />
           </Tooltip>
         )}
         <MakerMarkupChip maker={maker} />

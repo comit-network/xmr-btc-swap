@@ -22,18 +22,19 @@ import {
   SelectChangeEvent,
 } from "@mui/material";
 import {
-  removeNode,
-  resetSettings,
-  setFetchFiatPrices,
-  setFiatCurrency,
-} from "store/features/settingsSlice";
-import {
   addNode,
+  addRendezvousPoint,
   Blockchain,
   FiatCurrency,
   moveUpNode,
   Network,
+  removeNode,
+  removeRendezvousPoint,
+  resetSettings,
+  setFetchFiatPrices,
+  setFiatCurrency,
   setTheme,
+  setTorEnabled,
 } from "store/features/settingsSlice";
 import { useAppDispatch, useNodes, useSettings } from "store/hooks";
 import ValidatedTextField from "renderer/components/other/ValidatedTextField";
@@ -49,8 +50,8 @@ import {
 } from "@mui/icons-material";
 import { getNetwork } from "store/config";
 import { currencySymbol } from "utils/formatUtils";
-import { setTorEnabled } from "store/features/settingsSlice";
 import InfoBox from "renderer/components/modal/swap/InfoBox";
+import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
 
 const PLACEHOLDER_ELECTRUM_RPC_URL = "ssl://blockstream.info:700";
 const PLACEHOLDER_MONERO_NODE_URL = "http://xmr-node.cakewallet.com:18081";
@@ -85,6 +86,7 @@ export default function SettingsBox() {
                 <MoneroNodeUrlSetting />
                 <FetchFiatPricesSetting />
                 <ThemeSetting />
+                <RendezvousPointsSetting />
               </TableBody>
             </Table>
           </TableContainer>
@@ -586,6 +588,124 @@ export function TorSettings() {
 
       <TableCell>
         <Switch checked={torEnabled} onChange={handleChange} color="primary" />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/**
+ * A setting that allows you to manage rendezvous points for maker discovery
+ */
+function RendezvousPointsSetting() {
+  const [tableVisible, setTableVisible] = useState(false);
+  const rendezvousPoints = useSettings((s) => s.rendezvousPoints);
+  const dispatch = useAppDispatch();
+  const [newPoint, setNewPoint] = useState("");
+
+  const onAddNewPoint = () => {
+    dispatch(addRendezvousPoint(newPoint));
+    setNewPoint("");
+  };
+
+  const onRemovePoint = (point: string) => {
+    dispatch(removeRendezvousPoint(point));
+  };
+
+  return (
+    <TableRow>
+      <TableCell>
+        <SettingLabel
+          label="Rendezvous Points"
+          tooltip="These are the points where makers can be discovered. Add custom rendezvous points here to expand your maker discovery options."
+        />
+      </TableCell>
+      <TableCell>
+        <IconButton onClick={() => setTableVisible(true)}>
+          <Edit />
+        </IconButton>
+        {tableVisible && (
+          <Dialog
+            open={true}
+            onClose={() => setTableVisible(false)}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle>Rendezvous Points</DialogTitle>
+            <DialogContent>
+              <Typography variant="subtitle2">
+                Add or remove rendezvous points where makers can be discovered.
+                These points help you find trading partners in a decentralized
+                way.
+              </Typography>
+              <TableContainer
+                component={Paper}
+                style={{ marginTop: "1rem" }}
+                elevation={0}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell style={{ width: "85%" }}>
+                        Rendezvous Point
+                      </TableCell>
+                      <TableCell style={{ width: "15%" }} align="right">
+                        Actions
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rendezvousPoints.map((point, index) => (
+                      <TableRow key={index}>
+                        <TableCell style={{ wordBreak: "break-all" }}>
+                          <Typography variant="overline">{point}</Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Remove this rendezvous point">
+                            <IconButton onClick={() => onRemovePoint(point)}>
+                              <Delete />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell>
+                        <ValidatedTextField
+                          label="Add new rendezvous point"
+                          value={newPoint}
+                          onValidatedChange={setNewPoint}
+                          placeholder="/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE"
+                          fullWidth
+                          isValid={isValidMultiAddressWithPeerId}
+                          variant="outlined"
+                          noErrorWhenEmpty
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Add this rendezvous point">
+                          <IconButton
+                            onClick={onAddNewPoint}
+                            disabled={
+                              !isValidMultiAddressWithPeerId(newPoint) ||
+                              newPoint.length === 0
+                            }
+                          >
+                            <Add />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setTableVisible(false)} size="large">
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
       </TableCell>
     </TableRow>
   );

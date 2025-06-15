@@ -20,6 +20,7 @@ import {
   checkContextAvailability,
   getSwapInfo,
   initializeContext,
+  listSellersAtRendezvousPoint,
   updateAllNodeStatuses,
 } from "./rpc";
 import { store } from "./store/storeRenderer";
@@ -29,6 +30,9 @@ const TAURI_UNIFIED_EVENT_CHANNEL_NAME = "tauri-unified-event";
 
 // Update the public registry every 5 minutes
 const PROVIDER_UPDATE_INTERVAL = 5 * 60 * 1_000;
+
+// Discover peers every 5 minutes
+const DISCOVER_PEERS_INTERVAL = 5 * 60 * 1_000;
 
 // Update node statuses every 2 minutes
 const STATUS_UPDATE_INTERVAL = 2 * 60 * 1_000;
@@ -50,6 +54,11 @@ export async function setupBackgroundTasks(): Promise<void> {
   setIntervalImmediate(updateAllNodeStatuses, STATUS_UPDATE_INTERVAL);
   setIntervalImmediate(updateRates, UPDATE_RATE_INTERVAL);
   setIntervalImmediate(fetchAllConversations, FETCH_CONVERSATIONS_INTERVAL);
+  setIntervalImmediate(
+    () =>
+      listSellersAtRendezvousPoint(store.getState().settings.rendezvousPoints),
+    DISCOVER_PEERS_INTERVAL,
+  );
 
   // Fetch all alerts
   updateAlerts();
