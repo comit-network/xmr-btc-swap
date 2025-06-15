@@ -358,7 +358,7 @@ where
         T: Send + 'static,
     {
         let start_time = Instant::now();
-        debug!(
+        trace!(
             operation = kind,
             total_clients = self.client_count(),
             "Executing parallel requests on electrum clients"
