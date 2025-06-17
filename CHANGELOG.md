@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-beta] - 2025-06-17
+
 - We now call Monero function directly (via FFI bindings) instead of using `monero-wallet-rpc`.
 - ASB: Since we don't communicate with `monero-wallet-rpc` anymore, the Monero wallet's will no longer be accessible by connecting to it. If you are using the asb-docker-compose setup, run this command to migrate the wallet files from the volume of the monero-wallet-rpc container to the volume of the asb container:
   ```bash

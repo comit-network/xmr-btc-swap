@@ -1,6 +1,6 @@
 {
   "productName": "UnstoppableSwap",
-  "version": "2.1.0-beta.2",
+  "version": "2.2.0-beta",
   "identifier": "net.unstoppableswap.gui",
   "build": {
     "devUrl": "http://localhost:1420",
