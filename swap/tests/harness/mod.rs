@@ -1,7 +1,6 @@
 mod bitcoind;
 mod electrs;
 
-
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -314,6 +313,7 @@ async fn init_test_wallets(
         monero_daemon,
         monero::Network::Mainnet,
         true,
+        None,
     )
     .await
     .unwrap();
@@ -877,26 +877,33 @@ impl TestContext {
 
     pub async fn stop_alice_monero_wallet_rpc(&self) {
         tracing::info!("Killing monerod container");
-        
+
         // Use Docker CLI to forcefully kill the container
         let output = tokio::process::Command::new("docker")
-            .args(&["kill", &self.monerod_container_id])
+            .args(["kill", &self.monerod_container_id])
             .output()
             .await
             .expect("Failed to execute docker kill command");
-            
+
         if output.status.success() {
-            tracing::info!("Successfully killed monerod container: {}", &self.monerod_container_id);
+            tracing::info!(
+                "Successfully killed monerod container: {}",
+                &self.monerod_container_id
+            );
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::error!("Failed to kill monerod container {}: {}", &self.monerod_container_id, stderr);
+            tracing::error!(
+                "Failed to kill monerod container {}: {}",
+                &self.monerod_container_id,
+                stderr
+            );
         }
     }
 
     pub async fn empty_alice_monero_wallet(&self) {
         let burn_address = monero::Address::from_str("49LEH26DJGuCyr8xzRAzWPUryzp7bpccC7Hie1DiwyfJEyUKvMFAethRLybDYrFdU1eHaMkKQpUPebY4WT3cSjEvThmpjPa").unwrap();
         let wallet = self.alice_monero_wallet.main_wallet().await;
-        
+
         wallet
             .sweep(&burn_address)
             .await
@@ -905,13 +912,9 @@ impl TestContext {
 
     pub async fn assert_alice_monero_wallet_empty(&self) {
         let wallet = self.alice_monero_wallet.main_wallet().await;
-        assert_eventual_balance(
-            &*wallet,
-            Ordering::Equal,
-            monero::Amount::ZERO,
-        )
-        .await
-        .unwrap();
+        assert_eventual_balance(&*wallet, Ordering::Equal, monero::Amount::ZERO)
+            .await
+            .unwrap();
     }
 }
 

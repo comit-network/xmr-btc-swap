@@ -535,7 +535,7 @@ async fn init_monero_wallet(
     data_dir: &Path,
     monero_daemon_address: impl Into<Option<String>>,
     env_config: EnvConfig,
-    _tauri_handle: Option<TauriHandle>,
+    tauri_handle: Option<TauriHandle>,
 ) -> Result<Arc<Wallets>> {
     let network = env_config.monero_network;
 
@@ -586,6 +586,7 @@ async fn init_monero_wallet(
         daemon,
         network,
         false,
+        tauri_handle,
     )
     .await
     .context("Failed to initialize Monero wallets")?;

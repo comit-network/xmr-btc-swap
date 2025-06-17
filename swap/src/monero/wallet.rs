@@ -12,19 +12,28 @@ use monero::{Address, Network};
 pub use monero_sys::{Daemon, WalletHandle as Wallet};
 use uuid::Uuid;
 
+use crate::cli::api::tauri_bindings::TauriHandle;
+
 use super::{BlockHeight, TransferProof, TxHash};
 
 /// Entrance point to the Monero blockchain.
 /// You can use this struct to open specific wallets and monitor the blockchain.
 pub struct Wallets {
+    /// The directory we store the wallets in.
     wallet_dir: PathBuf,
+    /// The network we're on.
     network: Network,
+    /// The monero node we connect to.
     daemon: Daemon,
+    /// Keep the main wallet open and synced.
     main_wallet: Arc<Wallet>,
-    /// Whether we're running in regtest mode.
     /// Since Network::Regtest isn't a thing we have to use an extra flag.
-    /// When we're in regtest mode, we need to unplug some safty nets to make the Wallet work.
+    /// When we're in regtest mode, we need to unplug some safty nets to make the wallet work.
     regtest: bool,
+    /// A handle we use to send status updates to the UI i.e. when
+    /// waiting for a transaction to be confirmed.
+    #[expect(dead_code)]
+    tauri_handle: Option<TauriHandle>,
 }
 
 /// A request to watch for a transfer.
@@ -59,6 +68,7 @@ impl Wallets {
         daemon: Daemon,
         network: Network,
         regtest: bool,
+        tauri_handle: Option<TauriHandle>,
     ) -> Result<Self> {
         let main_wallet = Wallet::open_or_create(
             wallet_dir.join(&main_wallet_name).display().to_string(),
@@ -81,6 +91,7 @@ impl Wallets {
             daemon,
             main_wallet,
             regtest,
+            tauri_handle,
         };
 
         Ok(wallets)

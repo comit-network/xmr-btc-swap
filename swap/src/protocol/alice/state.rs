@@ -3,7 +3,7 @@ use crate::bitcoin::{
     TxEarlyRefund, TxPunish, TxRedeem, TxRefund, Txid,
 };
 use crate::env::Config;
-use crate::monero::wallet::{no_listener, TransferRequest, WatchRequest};
+use crate::monero::wallet::{TransferRequest, WatchRequest};
 use crate::monero::BlockHeight;
 use crate::monero::TransferProof;
 use crate::monero_ext::ScalarExt;
@@ -571,15 +571,14 @@ impl State3 {
 
         // Ensure that the XMR to be refunded are spendable by awaiting 10 confirmations
         // on the lock transaction.
-        // We pass Mutex<Wallet> instead of a &mut Wallet to
-        // enable releasing the lock and avoid starving other tasks while waiting
-        // for the confirmations.
         tracing::info!("Waiting for Monero lock transaction to be confirmed");
         let transfer_proof_2 = transfer_proof.clone();
         monero_wallet
             .wait_until_confirmed(
                 self.lock_xmr_watch_request(transfer_proof_2, 10),
-                no_listener(),
+                Some(move |confirmations| {
+                    tracing::debug!(%confirmations, "Monero lock transaction confirmed");
+                }),
             )
             .await
             .context("Failed to wait for Monero lock transaction to be confirmed")?;

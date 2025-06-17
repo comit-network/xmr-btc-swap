@@ -14,9 +14,11 @@ mod bridge;
 
 use std::{
     any::Any, cmp::Ordering, fmt::Display, ops::Deref, path::PathBuf, pin::Pin, str::FromStr,
+    time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use backoff::{future, retry_notify};
 use cxx::let_cxx_string;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -376,14 +378,31 @@ impl WalletHandle {
         amount: monero::Amount,
     ) -> anyhow::Result<TxReceipt> {
         let address = *address;
-        self.call(move |wallet| wallet.transfer(&address, amount))
-            .await
+
+        future::retry_notify(backoff(None, None), || async {
+            self.call(move |wallet| wallet.transfer(&address, amount))
+                .await
+                .map_err(backoff::Error::transient)
+        }, |error, duration: Duration| {
+            tracing::error!(error=%error, "Failed to transfer funds, retrying in {} secs", duration.as_secs());
+        })
+        .await
+        .map_err(|e| anyhow!("Failed to transfer funds after multiple attempts: {e}"))
     }
 
     /// Sweep all funds to an address.
     pub async fn sweep(&self, address: &monero::Address) -> anyhow::Result<Vec<String>> {
         let address = *address;
-        self.call(move |wallet| wallet.sweep(&address)).await
+
+        future::retry_notify(backoff(None, None), || async {
+            self.call(move |wallet| wallet.sweep(&address))
+                .await
+                .map_err(backoff::Error::transient)
+        }, |error, duration: Duration| {
+            tracing::error!(error=%error, "Failed to sweep funds, retrying in {} secs", duration.as_secs());
+        })
+        .await
+        .map_err(|e| anyhow!("Failed to sweep funds after multiple attempts: {e}"))
     }
 
     /// Get the seed of the wallet.
@@ -472,8 +491,8 @@ impl WalletHandle {
         // Initiate the sync (make sure to drop the lock right after)
         {
             self.call(move |wallet| {
-                wallet.start_refresh();
-                wallet.refresh_async();
+                wallet.start_refresh_thread();
+                wallet.force_background_refresh();
             })
             .await;
             tracing::debug!("Wallet refresh initiated");
@@ -530,7 +549,7 @@ impl WalletHandle {
             tokio::time::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MILLIS)).await;
         }
 
-        tracing::debug!("Wallet synced");
+        tracing::info!("Wallet synced");
 
         Ok(())
     }
@@ -563,6 +582,8 @@ impl WalletHandle {
         confirmations: u64,
         listener: Option<impl Fn(u64) + Send + 'static>,
     ) -> anyhow::Result<()> {
+        tracing::info!(%txid, %destination_address, amount=%expected_amount, %confirmations, "Waiting until transaction is confirmed");
+
         const DEFAULT_CHECK_INTERVAL_SECS: u64 = 15;
 
         let mut poll_interval = tokio::time::interval(tokio::time::Duration::from_secs(
@@ -610,6 +631,8 @@ impl WalletHandle {
             if tx_status.confirmations >= confirmations {
                 break;
             }
+
+            tracing::trace!("Transaction not confirmed yet, polling again later");
         }
 
         // Signal success
@@ -696,6 +719,8 @@ impl WalletManager {
         background_sync: bool,
         daemon: Daemon,
     ) -> anyhow::Result<FfiWallet> {
+        tracing::debug!(%path, "Opening or creating wallet");
+
         // If we haven't loaded the wallet, but it already exists, open it.
         if self.wallet_exists(path) {
             tracing::debug!(wallet=%path, "Wallet already exists, opening it");
@@ -752,6 +777,8 @@ impl WalletManager {
         background_sync: bool,
         daemon: Daemon,
     ) -> Result<FfiWallet> {
+        tracing::debug!(%path, "Creating wallet from keys");
+
         if self.wallet_exists(path) {
             tracing::info!(wallet=%path, "Wallet already exists, opening it");
 
@@ -825,6 +852,8 @@ impl WalletManager {
         background_sync: bool,
         daemon: Daemon,
     ) -> anyhow::Result<FfiWallet> {
+        tracing::debug!(%path, "Recovering wallet from seed");
+
         let_cxx_string!(path = path);
         let_cxx_string!(password = password.unwrap_or(""));
         let_cxx_string!(mnemonic = mnemonic);
@@ -854,6 +883,8 @@ impl WalletManager {
 
     /// Close a wallet, storing the wallet state.
     fn close_wallet(&mut self, wallet: &mut FfiWallet) -> anyhow::Result<()> {
+        tracing::info!(wallet=%wallet.filename(), "Closing wallet");
+
         // Safety: we know we have a valid, unique pointer to the wallet
         let success = unsafe { self.inner.pinned().closeWallet(wallet.inner.inner, true) }
             .context("Failed to close wallet: Ffi call failed with exception")?;
@@ -876,6 +907,8 @@ impl WalletManager {
         background_sync: bool,
         daemon: Daemon,
     ) -> anyhow::Result<FfiWallet> {
+        tracing::debug!(%path, "Opening wallet");
+
         let_cxx_string!(path = path);
         let_cxx_string!(password = password.unwrap_or(""));
         let network_type = network_type.into();
@@ -919,6 +952,8 @@ impl WalletManager {
 
     /// Check if a wallet exists at the given path.
     pub fn wallet_exists(&mut self, path: &str) -> bool {
+        tracing::debug!(%path, "Checking if wallet exists");
+
         let_cxx_string!(path = path);
         self.inner
             .pinned()
@@ -964,10 +999,17 @@ impl FfiWallet {
 
         tracing::debug!(address=%wallet.main_address(), "Initializing wallet");
 
-        wallet
-            .init(&daemon.address, daemon.ssl)
-            .context("Failed to initialize wallet")?;
-
+        retry_notify(
+            backoff(None, None),
+            || {
+                wallet
+                    .init(&daemon.address, daemon.ssl)
+                    .context("Failed to initialize wallet")
+                    .map_err(backoff::Error::transient)
+            },
+            |e, duration: Duration| tracing::error!(error=%e, "Failed to initialize wallet, retrying in {} secs", duration.as_secs()),
+        )
+        .map_err(|e| anyhow!("Failed to initialize wallet: {e}"))?;
         tracing::debug!("Initialized wallet, setting daemon address");
 
         wallet.set_daemon_address(&daemon.address)?;
@@ -975,8 +1017,8 @@ impl FfiWallet {
         if background_sync {
             tracing::debug!("Background sync enabled, starting refresh thread");
 
-            wallet.start_refresh();
-            wallet.refresh_async();
+            wallet.start_refresh_thread();
+            wallet.force_background_refresh();
         }
 
         // Check for errors on general principles
@@ -993,6 +1035,14 @@ impl FfiWallet {
             .to_string()
     }
 
+    /// Get the filename of the wallet.
+    pub fn filename(&self) -> String {
+        ffi::walletFilename(&self.inner)
+            .context("Failed to get wallet filename: FFI call failed with exception")
+            .expect("Wallet filename should never fail")
+            .to_string()
+    }
+
     /// Get the address for the given account and address index.
     /// address(0, 0) is the main address.
     /// We don't use anything besides the main address so this is a private method (for now).
@@ -1005,6 +1055,8 @@ impl FfiWallet {
     }
 
     fn set_daemon_address(&mut self, address: &str) -> anyhow::Result<()> {
+        tracing::debug!(%address, "Setting daemon address");
+
         let_cxx_string!(address = address);
         let raw_wallet = &mut self.inner;
 
@@ -1027,6 +1079,8 @@ impl FfiWallet {
     /// Initialize the wallet and download initial values from the remote node.
     /// Does not actuallyt sync the wallet, use any of the refresh methods to do that.
     fn init(&mut self, daemon_address: &str, ssl: bool) -> anyhow::Result<()> {
+        tracing::debug!(%daemon_address, %ssl, "Initializing wallet");
+
         let_cxx_string!(daemon_address = daemon_address);
         let_cxx_string!(daemon_username = "");
         let_cxx_string!(daemon_password = "");
@@ -1070,7 +1124,11 @@ impl FfiWallet {
             return SyncProgress::zero();
         }
 
-        SyncProgress::new(current_block, target_block)
+        let progress = SyncProgress::new(current_block, target_block);
+
+        tracing::trace!(%progress, "Sync progress");
+
+        progress
     }
 
     fn connected(&self) -> bool {
@@ -1080,15 +1138,24 @@ impl FfiWallet {
             .context("Failed to get connection status: FFI call failed with exception")
             .expect("Shouldn't panic")
         {
-            ffi::ConnectionStatus::Connected => true,
+            ffi::ConnectionStatus::Connected => {
+                tracing::trace!("Daemon is connected");
+                true
+            }
             ffi::ConnectionStatus::WrongVersion => {
-                tracing::warn!("Version mismatch with daemon");
+                tracing::error!("Version mismatch with daemon, interpreting as disconnected");
                 false
             }
-            ffi::ConnectionStatus::Disconnected => false,
+            ffi::ConnectionStatus::Disconnected => {
+                tracing::trace!("Daemon is disconnected");
+                false
+            }
             // Fallback since C++ allows any other value.
             status => {
-                tracing::error!("Unknown connection status: `{}`", status.repr);
+                tracing::error!(
+                    "Unknown connection status, interpreting as disconnected: `{}`",
+                    status.repr
+                );
                 false
             }
         }
@@ -1118,7 +1185,7 @@ impl FfiWallet {
     }
 
     /// Start the background refresh thread (refreshes every 10 seconds).
-    fn start_refresh(&mut self) {
+    fn start_refresh_thread(&mut self) {
         self.inner
             .pinned()
             .startRefresh()
@@ -1129,7 +1196,7 @@ impl FfiWallet {
     /// Refresh the wallet asynchronously.
     /// Same as start_refresh except that the background thread only
     /// refreshes once. Maybe?
-    fn refresh_async(&mut self) {
+    fn force_background_refresh(&mut self) {
         self.inner
             .pinned()
             .refreshAsync()
@@ -1599,4 +1666,22 @@ impl Deref for PendingTransaction {
                 .expect("pending transaction pointer not to be null")
         }
     }
+}
+
+/// Create a backoff strategy for retrying a function.
+/// Default max elapsed time is 5 minutes, default max interval is 30 seconds.
+fn backoff(
+    max_elapsed_time_secs: impl Into<Option<u64>>,
+    max_interval_secs: impl Into<Option<u64>>,
+) -> backoff::ExponentialBackoff {
+    let max_elapsed_time_secs: Option<u64> = max_elapsed_time_secs.into();
+    let max_elapsed_time = Duration::from_secs(max_elapsed_time_secs.unwrap_or(5 * 60));
+
+    let max_interval_secs: Option<u64> = max_interval_secs.into();
+    let max_interval = Duration::from_secs(max_interval_secs.unwrap_or(30));
+
+    backoff::ExponentialBackoffBuilder::new()
+        .with_max_elapsed_time(Some(max_elapsed_time))
+        .with_max_interval(max_interval)
+        .build()
 }

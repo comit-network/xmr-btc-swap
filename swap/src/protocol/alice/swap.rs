@@ -8,7 +8,6 @@ use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::common::retry;
 use crate::env::Config;
-use crate::monero::wallet::no_listener;
 use crate::monero::TransferProof;
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, monero};
@@ -301,15 +300,18 @@ where
             state3,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None { .. } => {
+                tracing::info!("Locked Monero, waiting for confirmations");
                 monero_wallet
                     .wait_until_confirmed(
                         state3.lock_xmr_watch_request(transfer_proof.clone(), 1),
-                        no_listener(), // TODO: Add a listener with status updates
+                        Some(|confirmations| {
+                            tracing::debug!(%confirmations, "Monero lock tx got new confirmation")
+                        }),
                     )
                     .await
                     .with_context(|| {
                         format!(
-                            "Failed to watch for transfer of XMR in transaction {}",
+                            "Failed to wait until Monero transaction was confirmed ({})",
                             transfer_proof.tx_hash()
                         )
                     })?;

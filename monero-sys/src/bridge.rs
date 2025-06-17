@@ -126,6 +126,9 @@ pub mod ffi {
         /// Get the path of the wallet.
         fn walletPath(wallet: &Wallet) -> Result<UniquePtr<CxxString>>;
 
+        /// Get the filename of the wallet.
+        fn walletFilename(wallet: &Wallet) -> Result<UniquePtr<CxxString>>;
+
         /// Get the status of the wallet and an error string if there is one.
         fn statusWithErrorString(
             self: &Wallet,

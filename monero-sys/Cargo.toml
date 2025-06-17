@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.98"
+backoff = "0.4.0"
 cxx = "1.0.137"
 monero = { version = "0.12", features = ["serde_support"] }
 tokio = { version = "1.44.2", features = ["sync", "time", "rt"] }
