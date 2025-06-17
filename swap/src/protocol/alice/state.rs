@@ -3,19 +3,18 @@ use crate::bitcoin::{
     TxEarlyRefund, TxPunish, TxRedeem, TxRefund, Txid,
 };
 use crate::env::Config;
-use crate::monero::wallet::{watch_for_transfer, TransferRequest, WatchRequest};
+use crate::monero::wallet::{no_listener, TransferRequest, WatchRequest};
+use crate::monero::BlockHeight;
 use crate::monero::TransferProof;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
-use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +53,7 @@ pub enum AliceState {
         state3: Box<State3>,
     },
     BtcRedeemTransactionPublished {
+        transfer_proof: TransferProof,
         state3: Box<State3>,
     },
     BtcRedeemed,
@@ -82,6 +82,7 @@ pub enum AliceState {
     },
     BtcPunished {
         state3: Box<State3>,
+        transfer_proof: TransferProof,
     },
     SafelyAborted,
 }
@@ -469,7 +470,7 @@ impl State3 {
         TransferRequest {
             public_spend_key,
             public_view_key,
-            amount: self.xmr,
+            amount: self.xmr.into(),
         }
     }
 
@@ -482,12 +483,13 @@ impl State3 {
 
         let public_spend_key = S_a + self.S_b_monero;
         let public_view_key = self.v.public();
+
         WatchRequest {
             public_spend_key,
             public_view_key,
             transfer_proof,
-            conf_target,
-            expected: self.xmr,
+            confirmation_target: conf_target,
+            expected_amount: self.xmr.into(),
         }
     }
 
@@ -560,9 +562,8 @@ impl State3 {
 
     pub async fn refund_xmr(
         &self,
-        monero_wallet: Arc<Mutex<monero::Wallet>>,
-        monero_wallet_restore_blockheight: BlockHeight,
-        file_name: String,
+        monero_wallet: Arc<monero::Wallets>,
+        swap_id: Uuid,
         spend_key: monero::PrivateKey,
         transfer_proof: TransferProof,
     ) -> Result<()> {
@@ -573,22 +574,38 @@ impl State3 {
         // We pass Mutex<Wallet> instead of a &mut Wallet to
         // enable releasing the lock and avoid starving other tasks while waiting
         // for the confirmations.
-        watch_for_transfer(
-            monero_wallet.clone(),
-            self.lock_xmr_watch_request(transfer_proof, 10),
-        )
-        .await?;
-
+        tracing::info!("Waiting for Monero lock transaction to be confirmed");
+        let transfer_proof_2 = transfer_proof.clone();
         monero_wallet
-            .lock()
-            .await
-            .create_from_keys_and_sweep(
-                file_name,
-                spend_key,
-                view_key,
-                monero_wallet_restore_blockheight,
+            .wait_until_confirmed(
+                self.lock_xmr_watch_request(transfer_proof_2, 10),
+                no_listener(),
             )
-            .await?;
+            .await
+            .context("Failed to wait for Monero lock transaction to be confirmed")?;
+
+        tracing::info!("Refunding Monero");
+
+        tracing::debug!(%swap_id, "Opening temporary Monero wallet from keys");
+        let swap_wallet = monero_wallet
+            .swap_wallet(swap_id, spend_key, view_key, transfer_proof.tx_hash())
+            .await
+            .context(format!("Failed to open/create swap wallet `{}`", swap_id))?;
+
+        // Update blockheight to ensure that the wallet knows the funds are unlocked
+        tracing::debug!(%swap_id, "Updating temporary Monero wallet's blockheight");
+        let _ = swap_wallet
+            .blockchain_height()
+            .await
+            .context("Couldn't get Monero blockheight")?;
+
+        tracing::debug!(%swap_id, "Sweeping Monero to redeem address");
+        let main_address = monero_wallet.main_wallet().await.main_address().await;
+
+        swap_wallet
+            .sweep(&main_address)
+            .await
+            .context("Failed to sweep Monero to redeem address")?;
 
         Ok(())
     }

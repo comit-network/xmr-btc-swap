@@ -4,9 +4,7 @@ pub mod wallet_rpc;
 pub use ::monero::network::Network;
 pub use ::monero::{Address, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
-use typeshare::typeshare;
-pub use wallet::Wallet;
-pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
+pub use wallet::{Daemon, Wallet, Wallets, WatchRequest};
 
 use crate::bitcoin;
 use anyhow::{bail, Result};
@@ -18,6 +16,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
+use typeshare::typeshare;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
@@ -28,6 +27,18 @@ pub enum network {
     Mainnet,
     Stagenet,
     Testnet,
+}
+
+/// A Monero block height.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlockHeight {
+    pub height: u64,
+}
+
+impl fmt::Display for BlockHeight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.height)
+    }
 }
 
 pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey {
@@ -86,6 +97,8 @@ impl From<PublicViewKey> for PublicKey {
 #[derive(Clone, Copy, Debug)]
 pub struct PublicViewKey(PublicKey);
 
+/// Our own monero amount type, which we need because the monero crate
+/// doesn't implement Serialize and Deserialize.
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd)]
 #[typeshare(serialized_as = "number")]
 pub struct Amount(u64);
@@ -237,6 +250,18 @@ impl From<Amount> for u64 {
     }
 }
 
+impl From<::monero::Amount> for Amount {
+    fn from(from: ::monero::Amount) -> Self {
+        Amount::from_piconero(from.as_pico())
+    }
+}
+
+impl From<Amount> for ::monero::Amount {
+    fn from(from: Amount) -> Self {
+        ::monero::Amount::from_pico(from.as_piconero())
+    }
+}
+
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut decimal = Decimal::from(self.0);
@@ -267,12 +292,18 @@ impl TransferProof {
 }
 
 // TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxHash(pub String);
 
 impl From<TxHash> for String {
     fn from(from: TxHash) -> Self {
         from.0
+    }
+}
+
+impl fmt::Debug for TxHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

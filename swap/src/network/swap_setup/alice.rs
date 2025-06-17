@@ -1,5 +1,4 @@
 use crate::asb::LatestRate;
-use crate::monero::Amount;
 use crate::network::swap_setup;
 use crate::network::swap_setup::{
     protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,
@@ -41,7 +40,7 @@ pub enum OutEvent {
 
 #[derive(Debug)]
 pub struct WalletSnapshot {
-    balance: monero_rpc::wallet::GetBalance,
+    unlocked_balance: monero::Amount,
     lock_fee: monero::Amount,
 
     // TODO: Consider using the same address for punish and redeem (they are mutually exclusive, so
@@ -56,11 +55,15 @@ pub struct WalletSnapshot {
 impl WalletSnapshot {
     pub async fn capture(
         bitcoin_wallet: &bitcoin::Wallet,
-        monero_wallet: &monero::Wallet,
+        monero_wallet: &monero::Wallets,
         external_redeem_address: &Option<bitcoin::Address>,
         transfer_amount: bitcoin::Amount,
     ) -> Result<Self> {
-        let balance = monero_wallet.get_balance().await?;
+        let unlocked_balance = monero_wallet.main_wallet().await.unlocked_balance().await;
+        let total_balance = monero_wallet.main_wallet().await.total_balance().await;
+
+        tracing::info!(%unlocked_balance, %total_balance, "Capturing monero wallet snapshot");
+
         let redeem_address = external_redeem_address
             .clone()
             .unwrap_or(bitcoin_wallet.new_address().await?);
@@ -76,7 +79,7 @@ impl WalletSnapshot {
             .await?;
 
         Ok(Self {
-            balance,
+            unlocked_balance: unlocked_balance.into(),
             lock_fee: monero::CONSERVATIVE_MONERO_FEE,
             redeem_address,
             punish_address,
@@ -375,12 +378,17 @@ where
                             .sell_quote(btc)
                             .map_err(Error::SellQuoteCalculationFailed)?;
 
-                        let unlocked =
-                            Amount::from_piconero(wallet_snapshot.balance.unlocked_balance);
+                        let unlocked = wallet_snapshot.unlocked_balance;
 
-                        if unlocked < xmr + wallet_snapshot.lock_fee {
+                        let needed_balance = xmr + wallet_snapshot.lock_fee;
+                        if unlocked.as_piconero() < needed_balance.as_piconero() {
+                            tracing::warn!(
+                                unlocked_balance = %unlocked,
+                                needed_balance = %needed_balance,
+                                "Rejecting swap, unlocked balance too low"
+                            );
                             return Err(Error::BalanceTooLow {
-                                balance: wallet_snapshot.balance,
+                                balance: wallet_snapshot.unlocked_balance,
                                 buy: btc,
                             });
                         }
@@ -537,7 +545,7 @@ pub enum Error {
     },
     #[error("Unlocked balance ({balance}) too low to fulfill swapping {buy}")]
     BalanceTooLow {
-        balance: monero_rpc::wallet::GetBalance,
+        balance: monero::Amount,
         buy: bitcoin::Amount,
     },
     #[error("Failed to fetch latest rate")]

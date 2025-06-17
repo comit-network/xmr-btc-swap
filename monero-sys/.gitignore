@@ -1,0 +1,9 @@
+# IDE specific files
+.vscode/
+.idea/
+
+# Cargo specific
+.cargo/
+/target/
+**/*.rs.bk
+Cargo.lock

@@ -9,7 +9,9 @@ pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 /// For `monero-wallet-rpc` we always need to specify a port. To make things
 /// simpler, we just specify the same one. They are in different containers so
 /// this doesn't matter.
-pub const RPC_PORT: u16 = 18081;
+///
+/// Make sure this port is actually exposed from the docker container.
+pub const RPC_PORT: u16 = 18089;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Monerod;
@@ -18,11 +20,11 @@ impl Image for Monerod {
     type Args = MonerodArgs;
 
     fn name(&self) -> String {
-        "rinocommunity/monero".into()
+        "ghcr.io/sethforprivacy/simple-monerod".into()
     }
 
     fn tag(&self) -> String {
-        "v0.18.1.2".into()
+        "v0.18.4.0".into()
     }
 
     fn ready_conditions(&self) -> Vec<WaitFor> {
@@ -42,11 +44,11 @@ impl Image for MoneroWalletRpc {
     type Args = MoneroWalletRpcArgs;
 
     fn name(&self) -> String {
-        "rinocommunity/monero".into()
+        "ghcr.io/sethforprivacy/simple-monero-wallet-rpc".into()
     }
 
     fn tag(&self) -> String {
-        "v0.18.1.2".into()
+        "v0.18.4.0".into()
     }
 
     fn ready_conditions(&self) -> Vec<WaitFor> {
@@ -77,6 +79,7 @@ pub struct MonerodArgs {
     pub rpc_bind_ip: String,
     pub fixed_difficulty: u32,
     pub data_dir: String,
+    pub disable_rpc_ban: bool,
 }
 
 impl Default for MonerodArgs {
@@ -90,7 +93,8 @@ impl Default for MonerodArgs {
             hide_my_port: true,
             rpc_bind_ip: "0.0.0.0".to_string(),
             fixed_difficulty: 1,
-            data_dir: "/monero".to_string(),
+            data_dir: "/tmp/monero".to_string(),
+            disable_rpc_ban: true,
         }
     }
 }
@@ -132,6 +136,7 @@ impl IntoIterator for MonerodArgs {
 
         if !self.rpc_bind_ip.is_empty() {
             args.push(format!("--rpc-bind-ip={}", self.rpc_bind_ip));
+            args.push(format!("--rpc-bind-port={}", RPC_PORT));
         }
 
         if !self.data_dir.is_empty() {
@@ -140,6 +145,10 @@ impl IntoIterator for MonerodArgs {
 
         if self.fixed_difficulty != 0 {
             args.push(format!("--fixed-difficulty={}", self.fixed_difficulty));
+        }
+
+        if self.disable_rpc_ban {
+            args.push("--disable-rpc-ban".to_string());
         }
 
         args.into_iter()

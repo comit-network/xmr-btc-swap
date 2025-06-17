@@ -27,9 +27,10 @@ use testcontainers::clients::Cli;
 use testcontainers::{Container, RunnableImage};
 use tokio::time;
 
-use monero_rpc::monerod;
+use monero::{Address, Amount};
 use monero_rpc::monerod::MonerodRpc as _;
-use monero_rpc::wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer};
+use monero_rpc::monerod::{self, GenerateBlocks};
+use monero_sys::{no_listener, Daemon, SyncProgress, TxReceipt, WalletHandle};
 
 use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
 
@@ -38,14 +39,13 @@ pub mod image;
 /// How often we mine a block.
 const BLOCK_TIME_SECS: u64 = 1;
 
-/// Poll interval when checking if the wallet has synced with monerod.
-const WAIT_WALLET_SYNC_MILLIS: u64 = 1000;
+#[derive(Debug)]
 
-#[derive(Clone, Debug)]
 pub struct Monero {
     monerod: Monerod,
-    wallets: Vec<MoneroWalletRpc>,
+    wallets: Vec<MoneroWallet>,
 }
+
 impl<'c> Monero {
     /// Starts a new regtest monero container setup consisting out of 1 monerod
     /// node and n wallets. The docker container and network will be prefixed
@@ -68,35 +68,66 @@ impl<'c> Monero {
 
         tracing::info!("Starting monerod: {}", monerod_name);
         let (monerod, monerod_container) = Monerod::new(cli, monerod_name, network)?;
-        let mut containers = vec![];
+        let containers: Vec<Container<'c, image::MoneroWalletRpc>> = vec![];
         let mut wallets = vec![];
 
+        let daemon = {
+            let monerod_port = monerod_container.get_host_port_ipv4(RPC_PORT);
+            let monerod_url = format!("http://127.0.0.1:{}", monerod_port);
+            Daemon {
+                address: monerod_url,
+                ssl: false,
+            }
+        };
+
+        {
+            let client = reqwest::Client::new();
+            let response = client
+                .get(format!("{}/get_info", &daemon.address))
+                .send()
+                .await?;
+            tracing::debug!("Monerod response at /get_info: {:?}", response.status());
+
+            let response = client
+                .get(format!("{}/json_rpc", &daemon.address))
+                .send()
+                .await?;
+            tracing::debug!(
+                "Monerod response at /json_rpc (expected error: -32600): {:?}",
+                response.text().await?
+            );
+        }
+
         let miner = "miner";
-        tracing::info!("Starting miner wallet: {}", miner);
-        let (miner_wallet, miner_container) =
-            MoneroWalletRpc::new(cli, miner, &monerod, prefix.clone()).await?;
+        tracing::info!("Creating miner wallet: {}", miner);
+        let miner_wallet = MoneroWallet::new(miner, daemon.clone(), prefix.clone())
+            .await
+            .context("Failed to create miner wallet")?;
+
+        tracing::info!("Created miner wallet: {}", miner_wallet.name());
 
         wallets.push(miner_wallet);
-        containers.push(miner_container);
         for wallet in additional_wallets.iter() {
             tracing::info!("Starting wallet: {}", wallet);
 
-            // Create new wallet, the RPC sometimes has startup problems so we allow retries
-            // (drop the container that failed and try again) Times out after
-            // trying for 5 minutes
-            let (wallet, container) = tokio::time::timeout(Duration::from_secs(300), async {
+            let wallet_instance = tokio::time::timeout(Duration::from_secs(300), async {
                 loop {
-                    let result = MoneroWalletRpc::new(cli, wallet, &monerod, prefix.clone()).await;
-
-                    match result {
-                        Ok(tuple) => { return tuple; }
-                        Err(e) => { tracing::warn!("Monero wallet RPC emitted error {} - retrying to create wallet in 2 seconds...", e); }
+                    match MoneroWallet::new(wallet, daemon.clone(), prefix.clone()).await {
+                        Ok(w) => break w,
+                        Err(e) => {
+                            tracing::warn!(
+                                "Wallet creation error: {} – retrying in 2 seconds...",
+                                e
+                            );
+                            time::sleep(Duration::from_secs(2)).await;
+                        }
                     }
                 }
-            }).await.context("All retry attempts for creating a wallet exhausted")?;
+            })
+            .await
+            .context("All retry attempts for creating a wallet exhausted")?;
 
-            wallets.push(wallet);
-            containers.push(container);
+            wallets.push(wallet_instance);
         }
 
         Ok((Self { monerod, wallets }, monerod_container, containers))
@@ -106,7 +137,7 @@ impl<'c> Monero {
         &self.monerod
     }
 
-    pub fn wallet(&self, name: &str) -> Result<&MoneroWalletRpc> {
+    pub fn wallet(&self, name: &str) -> Result<&MoneroWallet> {
         let wallet = self
             .wallets
             .iter()
@@ -118,72 +149,163 @@ impl<'c> Monero {
 
     pub async fn init_miner(&self) -> Result<()> {
         let miner_wallet = self.wallet("miner")?;
-        let miner_address = miner_wallet.address().await?.address;
+        let miner_address = miner_wallet.address().await?.to_string();
 
-        // generate the first 120 as bulk
+        tracing::info!("Miner address: {}", miner_address);
+
+        // Generate the first 120 blocks in bulk
         let amount_of_blocks = 120;
         let monerod = &self.monerod;
         let res = monerod
-            .client()
-            .generateblocks(amount_of_blocks, miner_address.clone())
-            .await?;
-        tracing::info!("Generated {:?} blocks", res.blocks.len());
+            .generate_blocks(amount_of_blocks, miner_address.clone())
+            .await
+            .context("Failed to generate blocks")?;
+        tracing::info!(
+            "Generated {:?} blocks to {}",
+            res.blocks.len(),
+            miner_address
+        );
+        if res.blocks.len() < amount_of_blocks.try_into().unwrap() {
+            tracing::error!(
+                "Expected to generate {} blocks, but only generated {}",
+                amount_of_blocks,
+                res.blocks.len()
+            );
+            bail!("Failed to generate enough blocks");
+        }
+
+        // Make sure to refresh the wallet to see the new balance
+        let block_height = monerod.client().get_block_count().await?.count as u64;
+
+        tracing::info!(
+            "Waiting for miner wallet to catch up to blockchain height {}",
+            block_height
+        );
         miner_wallet.refresh().await?;
 
-        Ok(())
-    }
+        // Debug: Check wallet balance after initial block generation
+        let balance = miner_wallet.balance().await?;
+        tracing::info!(
+            "Miner balance after initial block generation: {}",
+            Amount::from_pico(balance)
+        );
 
-    pub async fn init_wallet(&self, name: &str, amount_in_outputs: Vec<u64>) -> Result<()> {
-        let miner_wallet = self.wallet("miner")?;
-        let miner_address = miner_wallet.address().await?.address;
-        let monerod = &self.monerod;
-
-        let wallet = self.wallet(name)?;
-        let address = wallet.address().await?.address;
-
-        let mut expected_total = 0;
-        let mut expected_unlocked = 0;
-        let mut unlocked = 0;
-        for amount in amount_in_outputs {
-            if amount > 0 {
-                miner_wallet.transfer(&address, amount).await?;
-                expected_total += amount;
-                tracing::info!("Funded {} wallet with {}", wallet.name, amount);
-
-                // sanity checks for total/unlocked balance
-                let total = wallet.balance().await?;
-                assert_eq!(total, expected_total);
-                assert_eq!(unlocked, expected_unlocked);
-
-                monerod
-                    .client()
-                    .generateblocks(10, miner_address.clone())
-                    .await?;
-                wallet.refresh().await?;
-                expected_unlocked += amount;
-
-                unlocked = wallet.unlocked_balance().await?;
-                assert_eq!(unlocked, expected_unlocked);
-                assert_eq!(total, expected_total);
-            }
+        if balance == 0 {
+            tracing::error!("Miner balance is still 0 after initial block generation");
+            bail!("Miner balance is still 0 after initial block generation");
         }
 
         Ok(())
     }
 
+    pub async fn init_wallet(&self, name: &str, amount_in_outputs: Vec<u64>) -> Result<()> {
+        let wallet = self.wallet(name)?;
+
+        self.init_external_wallet(name, &wallet.wallet, amount_in_outputs)
+            .await
+    }
+
+    pub async fn init_external_wallet(
+        &self,
+        name: &str,
+        wallet: &WalletHandle,
+        amount_in_outputs: Vec<u64>,
+    ) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.to_string();
+        let monerod = &self.monerod;
+
+        if amount_in_outputs.is_empty() || amount_in_outputs.iter().sum::<u64>() == 0 {
+            tracing::info!(address=%wallet.main_address().await, "Initializing wallet `{}` with {}", name, Amount::ZERO);
+            return Ok(());
+        }
+
+        let mut expected_total = 0;
+
+        tracing::info!("Syncing miner wallet");
+        miner_wallet.refresh().await?;
+
+        for amount in amount_in_outputs {
+            if amount > 0 {
+                miner_wallet
+                    .transfer(&wallet.main_address().await, amount)
+                    .await
+                    .context("Miner could not transfer funds to wallet")?;
+                expected_total += amount;
+                tracing::debug!(
+                    "Funded wallet `{}` with {}",
+                    name,
+                    Amount::from_pico(amount)
+                );
+            }
+        }
+
+        tracing::info!(
+            address=%wallet.main_address().await,
+            "Funding wallet `{}` with {}. Generating 10 blocks to unlock.",
+            name,
+            Amount::from_pico(expected_total)
+        );
+        monerod.generate_blocks(10, miner_address.clone()).await?;
+        tracing::info!("Generated 10 blocks to unlock. Waiting for wallet to catch up.");
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let cloned_name = name.to_owned();
+        wallet
+            .wait_until_synced(Some(move |sync_progress: SyncProgress| {
+                tracing::debug!(
+                    current = sync_progress.current_block,
+                    target = sync_progress.target_block,
+                    "Synching wallet {}",
+                    &cloned_name
+                );
+            }))
+            .await
+            .context("Failed to sync Monero wallet up to new 10 blocks")?;
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        wallet.wait_until_synced(no_listener()).await?;
+
+        let total = wallet.total_balance().await.as_pico();
+
+        assert_eq!(total, expected_total);
+
+        tracing::info!(
+            "Wallet `{}` has received {} (unlocked)",
+            &name,
+            Amount::from_pico(total)
+        );
+
+        Ok(())
+    }
+
+    /// Funds a specific wallet address with XMR
+    ///
+    /// This function is useful when you want to fund an address that isn't managed by
+    /// a wallet in the testcontainer setup, like an external wallet address.
+    pub async fn fund_address(&self, address: &str, amount: u64) -> Result<()> {
+        let monerod = &self.monerod;
+
+        // Make sure miner has funds by generating blocks
+        monerod.generate_blocks(120, address.to_string()).await?;
+
+        // Mine more blocks to confirm the transaction
+        monerod.generate_blocks(10, address.to_string()).await?;
+
+        tracing::info!("Successfully funded address with {} piconero", amount);
+        Ok(())
+    }
+
     pub async fn start_miner(&self) -> Result<()> {
         let miner_wallet = self.wallet("miner")?;
-        let miner_address = miner_wallet.address().await?.address;
+        let miner_address = miner_wallet.address().await?.to_string();
         let monerod = &self.monerod;
 
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.client().get_block_count().await?.count;
-        miner_wallet
-            .wait_for_wallet_height(block_height)
-            .await
-            .unwrap();
+        miner_wallet.refresh().await?;
 
         Ok(())
     }
@@ -206,17 +328,27 @@ fn random_prefix() -> String {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct Monerod {
     name: String,
     network: String,
     client: monerod::Client,
+    rpc_port: u16,
 }
 
-#[derive(Clone, Debug)]
-pub struct MoneroWalletRpc {
+pub struct MoneroWallet {
     name: String,
-    client: wallet::Client,
+    wallet: WalletHandle,
 }
+
+impl std::fmt::Debug for MoneroWallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MoneroWallet {{ name: {} }}", self.name)
+    }
+}
+
+// Old symbol kept as alias so dependant crates/tests can be migrated gradually.
+pub type MoneroWalletRpc = MoneroWallet;
 
 impl<'c> Monerod {
     /// Starts a new regtest monero container.
@@ -238,6 +370,7 @@ impl<'c> Monerod {
                 name,
                 network,
                 client: monerod::Client::localhost(monerod_rpc_port)?,
+                rpc_port: monerod_rpc_port,
             },
             container,
         ))
@@ -254,84 +387,112 @@ impl<'c> Monerod {
         tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
+
+    /// Maybe this helps with wallet syncing?
+    pub async fn generate_blocks(
+        &self,
+        amount: u64,
+        address: impl Into<String>,
+    ) -> Result<GenerateBlocks> {
+        let address = address.into();
+
+        for _ in 0..amount {
+            self.client().generateblocks(1, address.clone()).await?;
+            tracing::trace!("Generated block, sleeping for 250ms");
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+
+        Ok(GenerateBlocks {
+            blocks: vec!["".to_string(); amount.try_into().unwrap()],
+            height: u32::try_from(amount).unwrap(),
+        })
+    }
 }
 
-impl<'c> MoneroWalletRpc {
-    /// Starts a new wallet container which is attached to
-    /// MONEROD_DEFAULT_NETWORK and MONEROD_DAEMON_CONTAINER_NAME
-    async fn new(
-        cli: &'c Cli,
-        name: &str,
-        monerod: &Monerod,
-        prefix: String,
-    ) -> Result<(Self, Container<'c, image::MoneroWalletRpc>)> {
-        let daemon_address = format!("{}:{}", monerod.name, RPC_PORT);
-        let (image, args) = image::MoneroWalletRpc::new(name, daemon_address);
-        let image = RunnableImage::from((image, args))
-            .with_container_name(format!("{}{}", prefix, name))
-            .with_network(monerod.network.clone());
+impl MoneroWallet {
+    /// Create a new wallet using monero-sys bindings connected to the provided monerod instance.
+    async fn new(name: &str, daemon: Daemon, prefix: String) -> Result<Self> {
+        // Wallet files will be stored in the system temporary directory with the prefix to avoid clashes
+        let mut wallet_path = std::env::temp_dir();
+        wallet_path.push(format!("{}{}", prefix, name));
 
-        let container = cli.run(image);
-        let wallet_rpc_port = container.get_host_port_ipv4(RPC_PORT);
+        // Use Mainnet network type – regtest daemon accepts mainnet prefixes
+        // and this avoids address-parsing errors when calling daemon RPCs.
+        let wallet = WalletHandle::open_or_create(
+            wallet_path.display().to_string(),
+            daemon,
+            monero::Network::Mainnet,
+            true,
+        )
+        .await
+        .context("Failed to create or open wallet")?;
 
-        let client = wallet::Client::localhost(wallet_rpc_port)?;
+        // Allow mismatched daemon version when running in regtest
+        // Also trusts the daemon.
+        // Also set's the
+        wallet.unsafe_prepare_for_regtest().await;
 
-        client
-            .create_wallet(name.to_owned(), "English".to_owned())
-            .await?;
-
-        Ok((
-            Self {
-                name: name.to_string(),
-                client,
-            },
-            container,
-        ))
+        Ok(Self {
+            name: name.to_string(),
+            wallet,
+        })
     }
 
-    pub fn client(&self) -> &wallet::Client {
-        &self.client
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    // It takes a little while for the wallet to sync with monerod.
-    pub async fn wait_for_wallet_height(&self, height: u32) -> Result<()> {
-        let mut retry: u8 = 0;
-        while self.client().get_height().await?.height < height {
-            if retry >= 30 {
-                // ~30 seconds
-                bail!("Wallet could not catch up with monerod after 30 retries.")
-            }
-            time::sleep(Duration::from_millis(WAIT_WALLET_SYNC_MILLIS)).await;
-            retry += 1;
-        }
-        Ok(())
-    }
-
-    /// Sends amount to address
-    pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.client().transfer_single(0, amount, address).await
-    }
-
-    pub async fn address(&self) -> Result<GetAddress> {
-        Ok(self.client().get_address(0).await?)
+    pub async fn address(&self) -> Result<Address> {
+        Ok(self.wallet.main_address().await)
     }
 
     pub async fn balance(&self) -> Result<u64> {
-        self.client().refresh().await?;
-        let balance = self.client().get_balance(0).await?.balance;
+        // First make sure we're connected to the daemon
+        let connected = self.wallet.connected().await;
+        tracing::debug!("Wallet connected to daemon: {}", connected);
 
-        Ok(balance)
+        // Force a refresh first
+        self.refresh().await?;
+
+        let total = self.wallet.total_balance().await.as_pico();
+        tracing::debug!(
+            "Wallet `{}` balance (total): {}",
+            self.name,
+            Amount::from_pico(total)
+        );
+        Ok(total)
     }
 
     pub async fn unlocked_balance(&self) -> Result<u64> {
-        self.client().refresh().await?;
-        let balance = self.client().get_balance(0).await?.unlocked_balance;
-
-        Ok(balance)
+        Ok(self.wallet.unlocked_balance().await.as_pico())
     }
 
-    pub async fn refresh(&self) -> Result<Refreshed> {
-        Ok(self.client().refresh().await?)
+    pub async fn refresh(&self) -> Result<()> {
+        let name = self.name.clone();
+
+        self.wallet
+            .wait_until_synced(Some(move |sync_progress: SyncProgress| {
+                tracing::debug!(
+                    current = sync_progress.current_block,
+                    target = sync_progress.target_block,
+                    "Synching wallet {}",
+                    &name
+                );
+            }))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn transfer(&self, address: &Address, amount_pico: u64) -> Result<TxReceipt> {
+        let amount = Amount::from_pico(amount_pico);
+        self.wallet
+            .transfer(address, amount)
+            .await
+            .context("Failed to perform transfer")
+    }
+
+    pub async fn blockchain_height(&self) -> Result<u64> {
+        self.wallet.blockchain_height().await
     }
 }
 

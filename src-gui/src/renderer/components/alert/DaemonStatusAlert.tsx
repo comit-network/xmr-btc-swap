@@ -125,17 +125,6 @@ function PartialInitStatus({
           <>Opening Bitcoin wallet</>
         </LoadingSpinnerAlert>
       );
-    case "DownloadingMoneroWalletRpc": {
-      const moneroRpcTitle = `Downloading and verifying the Monero wallet RPC (${bytesToMb(status.progress.content.size).toFixed(2)} MB)`;
-      return (
-        <AlertWithLinearProgress
-          title={<>{moneroRpcTitle}</>}
-          progress={status.progress.content.progress}
-          icon={<MoneroIcon />}
-          count={totalOfType}
-        />
-      );
-    }
     case "OpeningMoneroWallet":
       return (
         <LoadingSpinnerAlert severity="info">

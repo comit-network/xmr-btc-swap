@@ -1,17 +1,20 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
+use crate::common::retry;
 use crate::env::Config;
+use crate::monero::wallet::no_listener;
+use crate::monero::TransferProof;
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, monero};
 use ::bitcoin::consensus::encode::serialize_hex;
 use anyhow::{bail, Context, Result};
 use tokio::select;
-use tokio::sync::Mutex;
 use tokio::time::timeout;
 use uuid::Uuid;
 
@@ -58,7 +61,7 @@ async fn next_state<LR>(
     state: AliceState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
-    monero_wallet: Arc<Mutex<monero::Wallet>>,
+    monero_wallet: Arc<monero::Wallets>,
     env_config: &Config,
     mut rate_service: LR,
 ) -> Result<AliceState>
@@ -128,42 +131,68 @@ where
                 .with_max_interval(Duration::from_secs(30))
                 .build();
 
-            let transfer_proof = backoff::future::retry_notify(backoff, || async {
-                // We check the status of the Bitcoin lock transaction
-                // If the swap is cancelled, there is no need to lock the Monero funds anymore
-                // because there is no way for the swap to succeed.
-                if !matches!(
-                    state3.expired_timelocks(bitcoin_wallet).await.context("Failed to check for expired timelocks before locking Monero").map_err(backoff::Error::transient)?,
-                    ExpiredTimelocks::None { .. }
-                ) {
-                    return Ok(None);
-                }
+            let transfer_proof = backoff::future::retry_notify(
+                backoff,
+                || async {
+                    // We check the status of the Bitcoin lock transaction
+                    // If the swap is cancelled, there is no need to lock the Monero funds anymore
+                    // because there is no way for the swap to succeed.
+                    if !matches!(
+                        state3
+                            .expired_timelocks(bitcoin_wallet)
+                            .await
+                            .context("Failed to check for expired timelocks before locking Monero")
+                            .map_err(backoff::Error::transient)?,
+                        ExpiredTimelocks::None { .. }
+                    ) {
+                        return Ok(None);
+                    }
 
-                // Record the current monero wallet block height so we don't have to scan from
-                // block 0 for scenarios where we create a refund wallet.
-                let monero_wallet_restore_blockheight = monero_wallet
-                    .lock().await
-                    .block_height()
-                    .await
-                    .context("Failed to get Monero wallet block height")
-                    .map_err(backoff::Error::transient)?;
+                    // Record the current monero wallet block height so we don't have to scan from
+                    // block 0 for scenarios where we create a refund wallet.
+                    let monero_wallet_restore_blockheight = monero_wallet
+                        .blockchain_height()
+                        .await
+                        .context("Failed to get Monero wallet block height")
+                        .map_err(backoff::Error::transient)?;
 
-                // Lock the Monero
-                monero_wallet
-                    .lock().await
-                    .transfer(state3.lock_xmr_transfer_request())
-                    .await
-                    .map(|proof| Some((monero_wallet_restore_blockheight, proof)))
-                    .context("Failed to transfer Monero. Make sure your monero-wallet-rpc is connected to a synced daemon and enough funds are available.")
-                    .map_err(backoff::Error::transient)
-            }, |e, wait_time: Duration| {
-                tracing::warn!(
-                    swap_id = %swap_id,
-                    error = ?e,
-                    "Failed to lock Monero. We will retry in {} seconds",
-                    wait_time.as_secs()
-                )
-            })
+                    let (address, amount) = state3
+                        .lock_xmr_transfer_request()
+                        .address_and_amount(env_config.monero_network);
+
+                    // Lock the Monero
+                    let receipt = monero_wallet
+                        .main_wallet()
+                        .await
+                        .transfer(&address, amount)
+                        .await
+                        .map_err(|e| tracing::error!(err=%e, "Failed to lock Monero"))
+                        .ok();
+
+                    let Some(receipt) = receipt else {
+                        return Err(backoff::Error::transient(anyhow::anyhow!(
+                            "Failed to lock Monero"
+                        )));
+                    };
+
+                    Ok(Some((
+                        monero_wallet_restore_blockheight,
+                        TransferProof::new(
+                            monero::TxHash(receipt.txid),
+                            monero::PrivateKey::from_str(&receipt.tx_key)
+                                .expect("tx key to be valid private key"),
+                        ),
+                    )))
+                },
+                |e, wait_time: Duration| {
+                    tracing::warn!(
+                        swap_id = %swap_id,
+                        error = ?e,
+                        "Failed to lock Monero. We will retry in {} seconds",
+                        wait_time.as_secs()
+                    )
+                },
+            )
             .await;
 
             match transfer_proof {
@@ -272,17 +301,18 @@ where
             state3,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None { .. } => {
-                monero::wallet::watch_for_transfer(
-                    monero_wallet.clone(),
-                    state3.lock_xmr_watch_request(transfer_proof.clone(), 1),
-                )
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to watch for transfer of XMR in transaction {}",
-                        transfer_proof.tx_hash()
+                monero_wallet
+                    .wait_until_confirmed(
+                        state3.lock_xmr_watch_request(transfer_proof.clone(), 1),
+                        no_listener(), // TODO: Add a listener with status updates
                     )
-                })?;
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to watch for transfer of XMR in transaction {}",
+                            transfer_proof.tx_hash()
+                        )
+                    })?;
 
                 AliceState::XmrLocked {
                     monero_wallet_restore_blockheight,
@@ -437,7 +467,7 @@ where
                 // We successfully published the redeem transaction
                 // We wait until we see the transaction in the mempool before transitioning to the next state
                 Some((txid, subscription)) => match subscription.wait_until_seen().await {
-                    Ok(_) => AliceState::BtcRedeemTransactionPublished { state3 },
+                    Ok(_) => AliceState::BtcRedeemTransactionPublished { state3, transfer_proof },
                     Err(e) => {
                         // We extract the txid and the hex representation of the transaction
                         // this'll allow the user to manually re-publish the transaction
@@ -459,7 +489,7 @@ where
                 }
             }
         }
-        AliceState::BtcRedeemTransactionPublished { state3 } => {
+        AliceState::BtcRedeemTransactionPublished { state3, .. } => {
             let subscription = bitcoin_wallet.subscribe_to(state3.tx_redeem()).await;
 
             match subscription.wait_until_final().await {
@@ -528,39 +558,26 @@ where
             }
         }
         AliceState::BtcRefunded {
-            monero_wallet_restore_blockheight,
             transfer_proof,
             spend_key,
             state3,
+            ..
         } => {
-            // We retry indefinitely to refund the Monero funds, until the refund transaction is confirmed
-            let backoff = backoff::ExponentialBackoffBuilder::new()
-                .with_max_elapsed_time(None)
-                .with_max_interval(Duration::from_secs(60))
-                .build();
-
-            backoff::future::retry_notify(
-                backoff,
+            retry(
+                "Refund Monero",
                 || async {
                     state3
                         .refund_xmr(
                             monero_wallet.clone(),
-                            monero_wallet_restore_blockheight,
-                            swap_id.to_string(),
+                            swap_id,
                             spend_key,
                             transfer_proof.clone(),
                         )
                         .await
                         .map_err(backoff::Error::transient)
                 },
-                |e, wait_time: Duration| {
-                    tracing::warn!(
-                        swap_id = %swap_id,
-                        error = ?e,
-                        "Failed to refund Monero. We will retry in {} seconds",
-                        wait_time.as_secs()
-                    )
-                },
+                None,
+                Duration::from_secs(60),
             )
             .await
             .expect("We should never run out of retries while refunding Monero");
@@ -577,7 +594,10 @@ where
             let punish = state3.punish_btc(bitcoin_wallet).await;
 
             match punish {
-                Ok(_) => AliceState::BtcPunished { state3 },
+                Ok(_) => AliceState::BtcPunished {
+                    state3,
+                    transfer_proof,
+                },
                 Err(error) => {
                     tracing::warn!("Failed to publish punish transaction: {:#}", error);
 
@@ -609,7 +629,13 @@ where
         }
         AliceState::XmrRefunded => AliceState::XmrRefunded,
         AliceState::BtcRedeemed => AliceState::BtcRedeemed,
-        AliceState::BtcPunished { state3 } => AliceState::BtcPunished { state3 },
+        AliceState::BtcPunished {
+            state3,
+            transfer_proof,
+        } => AliceState::BtcPunished {
+            state3,
+            transfer_proof,
+        },
         AliceState::BtcEarlyRefunded(state3) => AliceState::BtcEarlyRefunded(state3),
         AliceState::SafelyAborted => AliceState::SafelyAborted,
     })

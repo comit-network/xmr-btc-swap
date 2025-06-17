@@ -65,9 +65,9 @@ pub fn init(
         "libp2p_gossipsub",
         "libp2p_rendezvous",
         "libp2p_dcutr",
+        "monero_cpp",
     ];
-
-    let OUR_CRATES: Vec<&str> = vec!["swap", "asb", "unstoppableswap-gui-rs"];
+    let OUR_CRATES: Vec<&str> = vec!["swap", "asb", "monero_sys", "unstoppableswap-gui-rs"];
 
     // General log file for non-verbose logs
     let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
@@ -113,10 +113,10 @@ pub fn init(
     // Level: Passed in
     let is_terminal = atty::is(atty::Stream::Stderr);
     let terminal_layer = fmt::layer()
-        .with_writer(std::io::stdout)
+        .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
         .with_timer(UtcTime::rfc_3339())
-        .with_target(false);
+        .with_target(true);
 
     // Layer for writing to the Tauri guest. This will be displayed in the GUI.
     // Crates: All crates with libp2p at INFO+ level
@@ -145,6 +145,7 @@ pub fn init(
         )?,
         false => env_filter(level_filter, OUR_CRATES.clone())?,
     };
+
     let final_terminal_layer = match format {
         Format::Json => terminal_layer
             .json()

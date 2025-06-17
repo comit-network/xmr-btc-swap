@@ -17,17 +17,33 @@ monero_sys:
 	just update_submodules
 	cd monero-sys && cargo build
 
+# Test the FFI bindings using various sanitizers, that can detect memory safety issues.
+test-ffi: test-ffi-address
+
+# Tests the FFI bindings using AddressSanitizer (https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html#addresssanitizer). Can detect memory safety issues like use-after-free, double-free, leaks, etc.
+test-ffi-address:
+	cd monero-sys && RUSTFLAGS=-Zsanitizer=address cargo +nightly nextest run -Zbuild-std --target=`rustc --version --verbose | grep "host:" | cut -d' ' -f2`
+
 # Start the Tauri app
 tauri:
 	cd src-tauri && cargo tauri dev --no-watch -- -- --testnet
+
+tauri-mainnet:
+	cd src-tauri && cargo tauri dev --no-watch
 
 # Install the GUI dependencies
 gui_install:
 	cd src-gui && yarn install
 
 # Start the GUI Dev Server
-gui:
+web:
 	cd src-gui && yarn dev
+
+gui:
+	just web & just tauri
+
+gui-mainnet:
+	just web & just tauri-mainnet
 
 # Build the GUI
 gui_build:
@@ -45,6 +61,10 @@ test_monero_sys:
 swap:
 	cd swap && cargo build --bin asb --bin=swap
 
+# Run the asb on testnet
+asb-testnet:
+	cd swap && cargo run --bin asb -- --trace --testnet start
+
 # Updates our submodules (currently only Monero C++ codebase)
 update_submodules:
 	cd monero-sys && git submodule update --init --recursive --force
@@ -53,17 +73,9 @@ update_submodules:
 clippy:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-# Check the bindings for the Tauri API
-check_bindings:
-	cd src-gui && yarn run check-bindings
-
 # Generate the bindings for the Tauri API
 bindings:
 	cd src-gui && yarn run gen-bindings
-
-# Kill all instances of monero-wallet-rpc running in the background
-kill_monero_wallet_rpc:
-	killall monero-wallet-rpc && pkill -f monero-wallet-rpc
 
 # Format the code
 fmt:
@@ -85,3 +97,7 @@ check_gui:
 # Sometimes you have to prune the docker network to get the integration tests to work
 docker-prune-network:
 	docker network prune -f
+
+# Install dependencies required for building monero-sys
+prepare_mac_os_brew_dependencies:
+	cd dev_scripts && chmod +x ./brew_dependencies_install.sh && ./brew_dependencies_install.sh

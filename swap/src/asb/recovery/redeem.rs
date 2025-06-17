@@ -33,6 +33,7 @@ pub async fn redeem(
         AliceState::EncSigLearned {
             state3,
             encrypted_signature,
+            transfer_proof,
             ..
         } => {
             tracing::info!(%swap_id, "Trying to redeem swap");
@@ -42,7 +43,10 @@ pub async fn redeem(
 
             subscription.wait_until_seen().await?;
 
-            let state = AliceState::BtcRedeemTransactionPublished { state3 };
+            let state = AliceState::BtcRedeemTransactionPublished {
+                state3,
+                transfer_proof,
+            };
             db.insert_latest_state(swap_id, state.into()).await?;
 
             if let Finality::Await = finality {
@@ -55,7 +59,7 @@ pub async fn redeem(
 
             Ok((txid, state))
         }
-        AliceState::BtcRedeemTransactionPublished { state3 } => {
+        AliceState::BtcRedeemTransactionPublished { state3, .. } => {
             let subscription = bitcoin_wallet.subscribe_to(state3.tx_redeem()).await;
 
             if let Finality::Await = finality {

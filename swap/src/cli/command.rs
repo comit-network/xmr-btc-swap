@@ -13,6 +13,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::{clap, StructOpt};
+use url::Url;
 use uuid::Uuid;
 
 use super::api::request::GetLogsArgs;
@@ -455,10 +456,10 @@ enum CliCommand {
 #[derive(structopt::StructOpt, Debug)]
 pub struct Monero {
     #[structopt(
-        long = "monero-daemon-address",
-        help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
+        long = "monero-node-address",
+        help = "Specify to connect to a monero node of your choice: <host>:<port>"
     )]
-    pub monero_daemon_address: Option<String>,
+    pub monero_node_address: Option<Url>,
 }
 
 #[derive(structopt::StructOpt, Debug)]

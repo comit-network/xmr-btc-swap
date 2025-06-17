@@ -1,0 +1,42 @@
+name: 'Set Monero Environment Variables'
+description: 'Sets common environment variables for Monero dependencies across workflows'
+runs:
+  using: "composite"
+  steps:
+    - name: Set environment variables
+      shell: bash
+      run: |
+        
+        # GUI-specific Ubuntu dependencies
+        echo "DEPS_GUI_UBUNTU_SPECIFIC=libgtk-3-dev libappindicator3-dev librsvg2-dev libwebkit2gtk-4.1-0=2.44.0-2 libwebkit2gtk-4.1-dev=2.44.0-2 libjavascriptcoregtk-4.1-0=2.44.0-2 libjavascriptcoregtk-4.1-dev=2.44.0-2 gir1.2-javascriptcoregtk-4.1=2.44.0-2 gir1.2-webkit2-4.1=2.44.0-2" >> $GITHUB_ENV
+        
+        # Tauri Linux dependencies
+        echo "DEPS_TAURI_LINUX=libwebkit2gtk-4.1-dev curl wget file libxdo-dev libayatana-appindicator3-dev librsvg2-dev" >> $GITHUB_ENV
+        
+        # Linux dependencies
+        echo "DEPS_MONERO_LINUX=libabsl-dev libnghttp2-dev libevent-dev libexpat1-dev build-essential cmake libboost-all-dev miniupnpc libunbound-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libzmq3-dev libsodium-dev libusb-1.0-0-dev libprotobuf-dev protobuf-compiler git" >> $GITHUB_ENV
+        
+        # macOS dependencies
+        echo "DEPS_MONERO_MACOS=cmake boost openssl zmq libpgm miniupnpc expat libunwind-headers protobuf" >> $GITHUB_ENV
+        
+        # Windows MSYS2 dependencies
+        echo 'DEPS_MONERO_WINDOWS_MSYS2=mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake  mingw-w64-x86_64-boost mingw-w64-x86_64-openssl mingw-w64-x86_64-zeromq mingw-w64-x86_64-libsodium mingw-w64-x86_64-protobuf-c mingw-w64-x86_64-libusb mingw-w64-x86_64-unbound git' >> $GITHUB_ENV
+        
+        # APT configuration for better reliability
+        echo 'APT_SET_CONF_COMMAND<<EOF
+        sudo tee -a /etc/apt/apt.conf.d/80-custom << APTEOF
+        Acquire::Retries "3";
+        Acquire::http::Timeout "120";
+        Acquire::ftp::Timeout "120";
+        APTEOF
+        EOF' >> $GITHUB_ENV
+        
+    - name: Set platform identifiers
+      shell: bash
+      run: |
+        # Platform identifiers used in various workflows
+        echo "UBUNTU=ubuntu-24.04" >> $GITHUB_ENV
+        echo "UBUNTU_PLATFORM_ID=ubuntu-24.04" >> $GITHUB_ENV
+        echo "MACOS_INTEL=macos-13" >> $GITHUB_ENV
+        echo "WINDOWS=windows-latest" >> $GITHUB_ENV
+        echo "WINDOWS_PLATFORM_ID=windows-latest" >> $GITHUB_ENV

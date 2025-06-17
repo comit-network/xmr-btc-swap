@@ -1,4 +1,5 @@
 use crate::bitcoin::{self};
+use crate::common::retry;
 use crate::monero;
 use crate::protocol::alice::AliceState;
 use crate::protocol::Database;
@@ -6,7 +7,7 @@ use anyhow::{bail, Result};
 use libp2p::PeerId;
 use std::convert::TryInto;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
@@ -27,29 +28,29 @@ pub enum Error {
 pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<Mutex<monero::Wallet>>,
+    monero_wallet: Arc<monero::Wallets>,
     db: Arc<dyn Database>,
 ) -> Result<AliceState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
-    let (monero_wallet_restore_blockheight, transfer_proof, state3) = match state {
+    let (transfer_proof, state3) = match state {
         // In case no XMR has been locked, move to Safely Aborted
         AliceState::Started { .. }
         | AliceState::BtcLockTransactionSeen { .. }
         | AliceState::BtcLocked { .. } => bail!(Error::NoXmrLocked(state)),
 
         // Refund potentially possible (no knowledge of cancel transaction)
-        AliceState::XmrLockTransactionSent { monero_wallet_restore_blockheight, transfer_proof, state3, }
-        | AliceState::XmrLocked { monero_wallet_restore_blockheight, transfer_proof, state3 }
-        | AliceState::XmrLockTransferProofSent { monero_wallet_restore_blockheight, transfer_proof, state3 }
-        | AliceState::EncSigLearned { monero_wallet_restore_blockheight, transfer_proof, state3, .. }
-        | AliceState::CancelTimelockExpired { monero_wallet_restore_blockheight, transfer_proof, state3 }
+        AliceState::XmrLockTransactionSent { transfer_proof, state3, .. }
+        | AliceState::XmrLocked { transfer_proof, state3, .. }
+        | AliceState::XmrLockTransferProofSent { transfer_proof, state3, .. }
+        | AliceState::EncSigLearned { transfer_proof, state3, .. }
+        | AliceState::CancelTimelockExpired { transfer_proof, state3, .. }
 
         // Refund possible due to cancel transaction already being published
-        | AliceState::BtcCancelled { monero_wallet_restore_blockheight, transfer_proof, state3 }
-        | AliceState::BtcRefunded { monero_wallet_restore_blockheight, transfer_proof, state3, .. }
-        | AliceState::BtcPunishable { monero_wallet_restore_blockheight, transfer_proof, state3, .. } => {
-            (monero_wallet_restore_blockheight, transfer_proof, state3)
+        | AliceState::BtcCancelled { transfer_proof, state3, .. }
+        | AliceState::BtcRefunded { transfer_proof, state3, .. }
+        | AliceState::BtcPunishable { transfer_proof, state3, .. } => {
+            (transfer_proof, state3)
         }
 
         // Alice already in final state
@@ -74,15 +75,23 @@ pub async fn refund(
         bail!(Error::RefundTransactionNotPublishedYet(bob_peer_id),);
     };
 
-    state3
-        .refund_xmr(
-            monero_wallet.clone(),
-            monero_wallet_restore_blockheight,
-            swap_id.to_string(),
-            spend_key,
-            transfer_proof,
-        )
-        .await?;
+    retry(
+        "Refund Monero",
+        || async {
+            state3
+                .refund_xmr(
+                    monero_wallet.clone(),
+                    swap_id,
+                    spend_key,
+                    transfer_proof.clone(),
+                )
+                .await
+                .map_err(backoff::Error::transient)
+        },
+        None,
+        Duration::from_secs(60),
+    )
+    .await?;
 
     let state = AliceState::XmrRefunded;
     db.insert_latest_state(swap_id, state.clone().into())

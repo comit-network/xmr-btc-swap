@@ -93,6 +93,14 @@ where
             env_config: env_config(testnet),
             cmd: Command::ExportBitcoinWallet,
         },
+        RawCommand::ExportMoneroWallet => Arguments {
+            testnet,
+            json,
+            trace,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
+            cmd: Command::ExportMoneroWallet,
+        },
         RawCommand::ManualRecovery(ManualRecovery::Redeem {
             redeem_params: RecoverCommandParams { swap_id },
             do_not_await_finality,
@@ -226,6 +234,7 @@ pub enum Command {
         swap_id: Uuid,
     },
     ExportBitcoinWallet,
+    ExportMoneroWallet,
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -320,6 +329,8 @@ pub enum RawCommand {
     Balance,
     #[structopt(about = "Print the internal bitcoin wallet descriptor.")]
     ExportBitcoinWallet,
+    #[structopt(about = "Print the Monero wallet seed and creation height.")]
+    ExportMoneroWallet,
     #[structopt(about = "Contains sub-commands for recovering a swap manually.")]
     ManualRecovery(ManualRecovery),
 }
@@ -628,6 +639,25 @@ mod tests {
             cmd: Command::Balance,
         };
         let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_export_monero_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
+
+        let raw_ars = vec![BINARY_NAME, "--testnet", "export-monero-wallet"];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            trace: false,
+            config_path: default_testnet_conf_path,
+            env_config: testnet_env_config,
+            cmd: Command::ExportMoneroWallet,
+        };
+        let args = parse_args(raw_ars).unwrap();
+
         assert_eq!(expected_args, args);
     }
 

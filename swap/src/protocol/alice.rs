@@ -4,7 +4,6 @@ use crate::env::Config;
 use crate::protocol::Database;
 use crate::{asb, bitcoin, monero};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 pub use self::state::*;
@@ -17,7 +16,7 @@ pub struct Swap {
     pub state: AliceState,
     pub event_loop_handle: asb::EventLoopHandle,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<Mutex<monero::Wallet>>,
+    pub monero_wallet: Arc<monero::Wallets>,
     pub env_config: Config,
     pub swap_id: Uuid,
     pub db: Arc<dyn Database + Send + Sync>,

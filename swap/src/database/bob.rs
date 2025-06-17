@@ -1,7 +1,7 @@
+use crate::monero::BlockHeight;
 use crate::monero::TransferProof;
 use crate::protocol::bob;
 use crate::protocol::bob::BobState;
-use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

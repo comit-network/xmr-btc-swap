@@ -34,7 +34,6 @@ pub async fn cancel(
         BobState::BtcLocked {
             state3,
             monero_wallet_restore_blockheight,
-            ..
         } => state3.cancel(monero_wallet_restore_blockheight),
         BobState::XmrLockProofReceived {
             state,

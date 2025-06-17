@@ -16,6 +16,10 @@ jobs:
         with:
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 10G
+
       - name: Create release branch
         run: git checkout -b release/${{ github.event.inputs.version }}
 

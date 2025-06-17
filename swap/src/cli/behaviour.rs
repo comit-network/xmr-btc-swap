@@ -1,4 +1,4 @@
-use crate::monero::Scalar;
+use crate::monero::{Scalar, TransferProof};
 use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemRejectReason;
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
@@ -36,6 +36,7 @@ pub enum OutEvent {
         id: OutboundRequestId,
         s_a: Scalar,
         swap_id: uuid::Uuid,
+        lock_transfer_proof: TransferProof,
     },
     CooperativeXmrRedeemRejected {
         id: OutboundRequestId,

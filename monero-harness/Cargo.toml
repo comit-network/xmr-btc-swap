@@ -8,8 +8,11 @@ publish = false
 [dependencies]
 anyhow = "1"
 futures = "0.3"
+monero = "0.12"
 monero-rpc = { path = "../monero-rpc" }
+monero-sys = { path = "../monero-sys" }
 rand = "0.7"
+reqwest = "0.12.15"
 testcontainers = "0.15"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "time", "macros"] }
 tracing = "0.1"

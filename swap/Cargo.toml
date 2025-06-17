@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "2.0.3"
+version = "2.1.0-beta.2"
 authors = ["The COMIT guys <hello@comit.network>"]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -44,6 +44,7 @@ libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", branc
 moka = { version = "0.12", features = ["sync", "future"] }
 monero = { version = "0.12", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }
+monero-sys = { path = "../monero-sys" }
 once_cell = "1.19"
 pem = "3.0"
 proptest = "1"

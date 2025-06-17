@@ -13,6 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.7
 
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
+
       - name: Extract version from branch name
         id: extract-version
         shell: python

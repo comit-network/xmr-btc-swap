@@ -13,7 +13,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
-use monero_rpc::wallet::BlockHeight;
+use monero::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -455,12 +455,16 @@ impl State3 {
             public_spend_key: S,
             public_view_key: self.v.public(),
             transfer_proof,
-            conf_target: self.min_monero_confirmations,
-            expected: self.xmr,
+            confirmation_target: self.min_monero_confirmations,
+            expected_amount: self.xmr.into(),
         }
     }
 
-    pub fn xmr_locked(self, monero_wallet_restore_blockheight: BlockHeight) -> State4 {
+    pub fn xmr_locked(
+        self,
+        monero_wallet_restore_blockheight: BlockHeight,
+        lock_transfer_proof: TransferProof,
+    ) -> State4 {
         State4 {
             A: self.A,
             b: self.b,
@@ -475,6 +479,7 @@ impl State3 {
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
             monero_wallet_restore_blockheight,
+            lock_transfer_proof,
             tx_redeem_fee: self.tx_redeem_fee,
             tx_refund_fee: self.tx_refund_fee,
             tx_cancel_fee: self.tx_cancel_fee,
@@ -530,6 +535,7 @@ impl State3 {
         &self,
         s_a: monero::PrivateKey,
         monero_wallet_restore_blockheight: BlockHeight,
+        lock_transfer_proof: TransferProof,
     ) -> State5 {
         State5 {
             s_a,
@@ -537,6 +543,7 @@ impl State3 {
             v: self.v,
             tx_lock: self.tx_lock.clone(),
             monero_wallet_restore_blockheight,
+            lock_transfer_proof,
         }
     }
 
@@ -575,6 +582,7 @@ pub struct State4 {
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     monero_wallet_restore_blockheight: BlockHeight,
+    lock_transfer_proof: TransferProof,
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::amount::serde::as_sat")]
@@ -606,6 +614,7 @@ impl State4 {
                 v: self.v,
                 tx_lock: self.tx_lock.clone(),
                 monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
+                lock_transfer_proof: self.lock_transfer_proof.clone(),
             }))
         } else {
             Ok(None)
@@ -689,6 +698,7 @@ pub struct State5 {
     v: monero::PrivateViewKey,
     tx_lock: bitcoin::TxLock,
     pub monero_wallet_restore_blockheight: BlockHeight,
+    pub lock_transfer_proof: TransferProof,
 }
 
 impl State5 {
@@ -705,24 +715,45 @@ impl State5 {
 
     pub async fn redeem_xmr(
         &self,
-        monero_wallet: &monero::Wallet,
-        wallet_file_name: std::string::String,
+        monero_wallet: &monero::Wallets,
+        swap_id: Uuid,
         monero_receive_address: monero::Address,
     ) -> Result<Vec<TxHash>> {
         let (spend_key, view_key) = self.xmr_keys();
 
-        tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+        tracing::info!(%swap_id, "Redeeming Monero from extracted keys");
 
-        let tx_hashes = monero_wallet
-            .create_from_keys_and_sweep_to(
-                wallet_file_name.clone(),
+        tracing::debug!(%swap_id, "Opening temporary Monero wallet");
+
+        let wallet = monero_wallet
+            .swap_wallet(
+                swap_id,
                 spend_key,
                 view_key,
-                self.monero_wallet_restore_blockheight,
-                monero_receive_address,
+                self.lock_transfer_proof.tx_hash(),
             )
             .await
-            .context("Failed to redeem Monero")?;
+            .context("Failed to open Monero wallet")?;
+
+        // Update blockheight to ensure that the wallet knows the funds are unlocked
+        tracing::debug!(%swap_id, "Updating temporary Monero wallet's blockheight");
+        let _ = wallet
+            .blockchain_height()
+            .await
+            .context("Couldn't get Monero blockheight")?;
+
+        tracing::debug!(%swap_id, receive_address=%monero_receive_address, "Sweeping Monero to receive address");
+
+        let tx_hashes = wallet
+            .clone()
+            .sweep(&monero_receive_address.clone())
+            .await
+            .context("Failed to redeem Monero")?
+            .into_iter()
+            .map(TxHash)
+            .collect();
+
+        tracing::info!(%swap_id, txids=?tx_hashes, "Monero sweep completed");
 
         Ok(tx_hashes)
     }
@@ -852,14 +883,18 @@ impl State6 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
-
-    pub fn attempt_cooperative_redeem(&self, s_a: monero::PrivateKey) -> State5 {
+    pub fn attempt_cooperative_redeem(
+        &self,
+        s_a: monero::PrivateKey,
+        lock_transfer_proof: TransferProof,
+    ) -> State5 {
         State5 {
             s_a,
             s_b: self.s_b,
             v: self.v,
             tx_lock: self.tx_lock.clone(),
             monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
+            lock_transfer_proof,
         }
     }
 

@@ -1,5 +1,4 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
-use crate::monero::Amount;
 use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemRejectReason;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
 use crate::network::quote::BidQuote;
@@ -17,13 +16,14 @@ use libp2p::request_response::{OutboundFailure, OutboundRequestId, ResponseChann
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use moka::future::Cache;
+use monero::Amount;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use uuid::Uuid;
 
@@ -45,7 +45,7 @@ where
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<Mutex<monero::Wallet>>,
+    monero_wallet: Arc<monero::Wallets>,
     db: Arc<dyn Database + Send + Sync>,
     latest_rate: LR,
     min_buy: bitcoin::Amount,
@@ -132,7 +132,7 @@ where
         swarm: Swarm<Behaviour<LR>>,
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<Mutex<monero::Wallet>>,
+        monero_wallet: Arc<monero::Wallets>,
         db: Arc<dyn Database + Send + Sync>,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
@@ -232,7 +232,7 @@ where
                                 }
                             };
 
-                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &*self.monero_wallet.lock().await, &self.external_redeem_address, btc).await {
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, &self.external_redeem_address, btc).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,
                                 Err(error) => {
                                     tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error);
@@ -391,19 +391,19 @@ where
                             // If we are in either of these states, the punish timelock has expired
                             // Bob cannot refund the Bitcoin anymore. We can publish tx_punish to redeem the Bitcoin.
                             // Therefore it is safe to reveal s_a to let him redeem the Monero
-                            let State::Alice (AliceState::BtcPunished { state3 } | AliceState::BtcPunishable { state3, .. }) = swap_state else {
+                            let State::Alice (AliceState::BtcPunished { state3, transfer_proof, .. } | AliceState::BtcPunishable { state3, transfer_proof, .. }) = swap_state else {
                                 tracing::warn!(
                                     swap_id = %swap_id,
                                     reason = "swap is in invalid state",
-                                    "Rejecting cooperative XMR redeem request"
+                                    "Rejecting cooperative Monero redeem request"
                                 );
                                 if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Rejected { swap_id, reason: CooperativeXmrRedeemRejectReason::SwapInvalidState }).is_err() {
-                                    tracing::error!(swap_id = %swap_id, "Failed to reject cooperative XMR redeem request");
+                                    tracing::error!(swap_id = %swap_id, "Failed to send rejection for cooperative Monero redeem request");
                                 }
                                 continue;
                             };
 
-                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Fullfilled { swap_id, s_a: state3.s_a }).is_err() {
+                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Fullfilled { swap_id, s_a: state3.s_a, lock_transfer_proof: transfer_proof }).is_err() {
                                 tracing::error!(peer = %peer, "Failed to respond to cooperative XMR redeem request");
                                 continue;
                             }
@@ -420,7 +420,7 @@ where
                             tracing::error!(
                                 %peer,
                                 %request_id,
-                                %error,
+                                ?error,
                                 %protocol,
                                 "Failed to send request-response request to peer");
 
@@ -432,14 +432,14 @@ where
                             tracing::error!(
                                 %peer,
                                 %request_id,
-                                %error,
+                                ?error,
                                 %protocol,
                                 "Failed to receive request-response request from peer");
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(
                                 %peer,
-                                "Communication error: {:#}", error);
+                                "Communication error: {:?}", error);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::trace!(%peer, address = %endpoint.get_remote_address(), "New connection established");
@@ -452,22 +452,23 @@ where
                                     // We have an established connection to the peer, so we can add the transfer proof to the queue
                                     // This is then polled in the next iteration of the event loop, and attempted to be sent to the peer
                                     if let Err(e) = self.outgoing_transfer_proofs_sender.send((peer, transfer_proof, responder)) {
-                                        tracing::error!(%peer, error = %e, "Failed to forward buffered transfer proof to event loop channel");
+                                        tracing::error!(%peer, error = ?e, "Failed to forward buffered transfer proof to event loop channel");
                                     }
                                 }
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
-                            tracing::trace!(%address, "Failed to set up connection with peer: {:#}", error);
+                            tracing::trace!(%address, "Failed to set up connection with peer: {:?}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error), connection_id } => {
-                            tracing::trace!(%peer, address = %endpoint.get_remote_address(), %connection_id, "Lost connection to peer: {:#}", error);
+                            tracing::trace!(%peer, address = %endpoint.get_remote_address(), %connection_id, "Lost connection to peer: {:?}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None, connection_id } => {
                             tracing::trace!(%peer, address = %endpoint.get_remote_address(), %connection_id,  "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr{address, ..} => {
-                            tracing::info!(%address, "New listen address reported");
+                            let multiaddr = format!("{address}/p2p/{}", self.swarm.local_peer_id());
+                            tracing::info!(%address, %multiaddr, "New listen address reported");
                         }
                         _ => {}
                     }
@@ -528,8 +529,10 @@ where
             Ok(alice_states)
         };
 
-        let get_unlocked_balance =
-            || async { unlocked_monero_balance_with_timeout(self.monero_wallet.clone()).await };
+        let monero_wallet = self.monero_wallet.clone();
+        let get_unlocked_balance = || async {
+            unlocked_monero_balance_with_timeout(monero_wallet.main_wallet().await).await
+        };
 
         let result = make_quote(
             min_buy,
@@ -578,7 +581,7 @@ where
         match self.db.insert_peer_id(swap_id, bob_peer_id).await {
             Ok(_) => {
                 if let Err(error) = self.swap_sender.send(swap).await {
-                    tracing::warn!(%swap_id, "Failed to start swap: {}", error);
+                    tracing::warn!(%swap_id, "Failed to start swap: {:?}", error);
                 }
             }
             Err(error) => {
@@ -886,19 +889,16 @@ pub fn unreserved_monero_balance(
 
 /// Returns the unlocked Monero balance from the wallet
 async fn unlocked_monero_balance_with_timeout(
-    wallet: Arc<Mutex<monero::Wallet>>,
+    wallet: Arc<monero::Wallet>,
 ) -> Result<Amount, anyhow::Error> {
-    /// This is how long we maximally wait to get access to the wallet
-    const MONERO_WALLET_MUTEX_LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+    /// This is how long we maximally wait for the wallet operation
+    const MONERO_WALLET_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
 
-    let balance = timeout(MONERO_WALLET_MUTEX_LOCK_TIMEOUT, wallet.lock())
+    let balance = timeout(MONERO_WALLET_OPERATION_TIMEOUT, wallet.unlocked_balance())
         .await
-        .context("Timeout while waiting for lock on Monero wallet")?
-        .get_balance()
-        .await
-        .context("Failed to get Monero balance")?;
+        .context("Timeout while getting unlocked balance from Monero wallet")?;
 
-    Ok(Amount::from_piconero(balance.unlocked_balance))
+    Ok(balance.into())
 }
 
 #[allow(missing_debug_implementations)]

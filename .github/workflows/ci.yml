@@ -12,30 +12,54 @@ concurrency:
 
 jobs:
   static_analysis:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
-
-      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.82"
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
+
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
+
+      - name: Restore Rust/Cargo cache from S3
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      - name: Install Rust toolchain (no internal cache)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           components: clippy,rustfmt
+          rustflags: ""
+          cache-directories: ""
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - name: Configure apt for retries
+        run: ${{ env.APT_SET_CONF_COMMAND }}
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
+      - name: Install dependencies (ubuntu-latest-m)
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }} git
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Check formatting
         uses: dprint/check@v2.2
@@ -48,27 +72,50 @@ jobs:
       - name: Run clippy with all features enabled
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+      - name: Save Rust/Cargo cache to S3
+        if: ${{ always() }}
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
   bdk_test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
+      - name: Configure apt for retries
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }}
 
+      - name: Clone submodules
+        run: git submodule update --init --recursive
+        
       - name: Build swap
         run: cargo build --bin swap
 
@@ -76,25 +123,31 @@ jobs:
         run: ./swap/tests/bdk.sh
 
   sqlx_test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
+      - name: Configure apt for retries
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }}
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Install sqlx-cli
         run: cargo install --locked --version 0.6.3 sqlx-cli
@@ -106,43 +159,84 @@ jobs:
 
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-latest-m
           - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
+            os: ubuntu-latest-m
           - target: x86_64-apple-darwin
             os: macos-13
           - target: aarch64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
-            os: windows-latest
+            os: windows-latest-l
     runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
-
-      - uses: Swatinem/rust-cache@v2.7.3
-
-      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.82"
-          targets: armv7-unknown-linux-gnueabihf
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
-        if: matrix.os == 'ubuntu-latest' # This must match the platform value defined above.
+      - uses: actionhippie/swap-space@v1
+        if: matrix.os == 'ubuntu-latest-m'
+        with:
+          size: 15G
+
+      - name: Restore Rust/Cargo cache from S3
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      - name: Install Rust toolchain (no internal cache)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ""
+          cache-directories: ""
+      
+      - name: Configure apt for retries
+        if: matrix.os == 'ubuntu-latest-m'
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
+        if: matrix.os == 'ubuntu-latest-m' # This must match the platform value defined above.
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }} git
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
+
+      - name: Install Monero build dependencies (macOS)
+        if: startsWith(matrix.os, 'macos-')
+        run: |
+          brew update
+          brew install ${{ env.DEPS_MONERO_MACOS }}
+          brew reinstall --build-from-source unbound expat 
+          brew install protobuf@21
+
+      - name: Install Monero build dependencies (Windows)
+        if: matrix.os == 'windows-latest-l'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: ${{ env.DEPS_MONERO_WINDOWS_MSYS2 }}
 
       - name: Build binary
         if: matrix.target != 'armv7-unknown-linux-gnueabihf'
@@ -168,14 +262,33 @@ jobs:
           name: asb-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/asb
 
+      - name: Save Rust/Cargo cache to S3
+        if: ${{ always() }}
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
   test:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest-m, macos-latest]
     runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: (Free disk space on Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest-m'
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
         with:
           # removing all of these takes ~10 mins, so just do as needed
@@ -187,106 +300,228 @@ jobs:
           swap-storage: false
           tool-cache: false
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
-        if: matrix.os == 'ubuntu-latest' # This must match the platform value defined above.
-        run: |
-          sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: actionhippie/swap-space@v1
+        if: matrix.os == 'ubuntu-latest-m'
+        with:
+          size: 15G
+
+      - name: Restore Rust/Cargo cache from S3
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      - name: Install Rust toolchain (no internal cache)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ""
+          cache-directories: ""
+
+      - name: Configure apt for retries
+        if: matrix.os == 'ubuntu-latest-m'
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
+        if: matrix.os == 'ubuntu-latest-m'
+        run: |
+          sudo apt update
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }}
+
+      - name: Install Monero build dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install ${{ env.DEPS_MONERO_MACOS }}
+          brew reinstall --build-from-source unbound expat
+          brew install protobuf@21
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
 
       - name: Run monero-harness tests
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest-m'
         run: cargo test --package monero-harness --all-features
 
       - name: Run library tests for swap
         run: cargo test --package swap --lib
 
+      - name: Save Rust/Cargo cache to S3
+        if: ${{ always() }}
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
   docker_tests:
     strategy:
+      fail-fast: false
       matrix:
-        test_name:
-          [
-            happy_path,
-            happy_path_restart_bob_after_xmr_locked,
-            happy_path_restart_bob_before_xmr_locked,
-            happy_path_restart_alice_after_xmr_locked,
-            alice_and_bob_refund_using_cancel_and_refund_command,
-            alice_and_bob_refund_using_cancel_then_refund_command,
-            alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired,
-            alice_manually_punishes_after_bob_dead_and_bob_cancels,
-            punish,
-            alice_punishes_after_restart_bob_dead,
-            alice_manually_punishes_after_bob_dead,
-            alice_refunds_after_restart_bob_refunded,
-            ensure_same_swap_id,
-            concurrent_bobs_before_xmr_lock_proof_sent,
-            concurrent_bobs_after_xmr_lock_proof_sent,
-            alice_manually_redeems_after_enc_sig_learned,
-            happy_path_bob_offline_while_alice_redeems_btc,
-            alice_empty_balance_after_started_btc_early_refund,
-            alice_broken_wallet_rpc_after_started_btc_early_refund
-          ]
-    runs-on: ubuntu-latest
+        include:
+          - package: swap
+            test_name: happy_path
+          - package: swap
+            test_name: happy_path_restart_bob_after_xmr_locked
+          - package: swap
+            test_name: happy_path_restart_bob_before_xmr_locked
+          - package: swap
+            test_name: happy_path_restart_alice_after_xmr_locked
+          - package: swap
+            test_name: alice_and_bob_refund_using_cancel_and_refund_command
+          - package: swap
+            test_name: alice_and_bob_refund_using_cancel_then_refund_command
+          - package: swap
+            test_name: alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired
+          - package: swap
+            test_name: alice_manually_punishes_after_bob_dead_and_bob_cancels
+          - package: swap
+            test_name: punish
+          - package: swap
+            test_name: alice_punishes_after_restart_bob_dead
+          - package: swap
+            test_name: alice_manually_punishes_after_bob_dead
+          - package: swap
+            test_name: alice_refunds_after_restart_bob_refunded
+          - package: swap
+            test_name: ensure_same_swap_id
+          - package: swap
+            test_name: concurrent_bobs_before_xmr_lock_proof_sent
+          - package: swap
+            test_name: concurrent_bobs_after_xmr_lock_proof_sent
+          - package: swap
+            test_name: alice_manually_redeems_after_enc_sig_learned
+          - package: swap
+            test_name: happy_path_bob_offline_while_alice_redeems_btc
+          - package: swap
+            test_name: alice_empty_balance_after_started_btc_early_refund
+          - package: swap
+            test_name: alice_broken_wallet_rpc_after_started_btc_early_refund
+          - package: monero-sys
+            test_name: harness_test
+    runs-on: ubuntu-latest-m
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
+      - name: Configure apt for retries
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }}
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Run test ${{ matrix.test_name }}
-        run: cargo test --package swap --test ${{ matrix.test_name }} -- --nocapture
-
+        run: cargo test --package ${{ matrix.package }} --test ${{ matrix.test_name }} -- --nocapture
 
   check_stable:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
+        with:
+          submodules: recursive
+        
+      - name: Set up environment variables
+        uses: ./.github/actions/set-monero-env
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - name: Restore Rust/Cargo cache from S3
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
 
-      - name: Install dependencies required by Tauri v2 (ubuntu only)
+      - name: Install Rust toolchain (no internal cache)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ""
+          cache-directories: ""
+
+      - name: Configure apt for retries
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu-latest-m)
         run: |
           sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          sudo apt install -y ${{ env.DEPS_TAURI_LINUX }} ${{ env.DEPS_MONERO_LINUX }}
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Run cargo check on stable rust
         run: cargo check --all-targets
+
+      - name: Save Rust/Cargo cache to S3
+        if: ${{ always() }}
+        uses: whywaita/actions-cache-s3@v2
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          aws-s3-bucket: ${{ secrets.S3_BUCKET_NAME }}
+          aws-region: eu-central-1
+          aws-endpoint: ${{ secrets.S3_ENDPOINT_URL }}
+          aws-s3-force-path-style: true
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}

@@ -913,8 +913,8 @@ mod tests {
         #[test]
         fn extract_semver_with_prerelease() {
             assert_eq!(
-                extract_semver_from_agent_str("asb/2.1.0-beta.1 (xmr-btc-swap-testnet)"),
-                Some(Version::parse("2.1.0-beta.1").unwrap())
+                extract_semver_from_agent_str("asb/2.1.0-beta.2.1 (xmr-btc-swap-testnet)"),
+                Some(Version::parse("2.1.0-beta.2.1").unwrap())
             );
         }
 

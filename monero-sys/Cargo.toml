@@ -1,0 +1,24 @@
+[package]
+name = "monero-sys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.98"
+cxx = "1.0.137"
+monero = { version = "0.12", features = ["serde_support"] }
+tokio = { version = "1.44.2", features = ["sync", "time", "rt"] }
+tracing = "0.1.41"
+
+[build-dependencies]
+cmake = "0.1.54"
+cxx-build = "1.0.137"
+
+[dev-dependencies]
+anyhow = "1.0.98"
+futures = "0.3.31"
+tempfile = "3.19.1"
+testcontainers = "0.15"
+tokio = { version = "1.44.2", features = ["full"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+uuid = { version = "1.16.0", features = ["v4"] }

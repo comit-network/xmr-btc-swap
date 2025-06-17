@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["monero-rpc", "monero-wallet", "src-tauri", "swap"]
+members = ["monero-rpc", "monero-sys", "src-tauri", "swap"]
+
+[profile.release]
+opt-level = 0
 
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51

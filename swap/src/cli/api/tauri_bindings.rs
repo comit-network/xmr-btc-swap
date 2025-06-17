@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use strum::Display;
 use tokio::sync::{oneshot, Mutex as TokioMutex};
 use typeshare::typeshare;
+use url::Url;
 use uuid::Uuid;
 
 #[typeshare]
@@ -539,7 +540,6 @@ pub struct BackgroundRefundProgress {
 #[serde(tag = "componentName", content = "progress")]
 pub enum TauriBackgroundProgress {
     OpeningBitcoinWallet(PendingCompleted<()>),
-    DownloadingMoneroWalletRpc(PendingCompleted<DownloadProgress>),
     OpeningMoneroWallet(PendingCompleted<()>),
     OpeningDatabase(PendingCompleted<()>),
     EstablishingTorCircuits(PendingCompleted<TorBootstrapStatus>),
@@ -702,7 +702,8 @@ pub enum BackgroundRefundState {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TauriSettings {
     /// The URL of the Monero node e.g `http://xmr.node:18081`
-    pub monero_node_url: Option<String>,
+    #[typeshare(serialized_as = "Option<string>")]
+    pub monero_node_url: Option<Url>,
     /// The URLs of the Electrum RPC servers e.g `["ssl://bitcoin.com:50001", "ssl://backup.com:50001"]`
     pub electrum_rpc_urls: Vec<String>,
     /// Whether to initialize and use a tor client.

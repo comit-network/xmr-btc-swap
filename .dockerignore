@@ -1,0 +1,38 @@
+# Rust build artifacts
+target/
+
+# IDE files
+.vscode/
+.DS_Store
+
+# Cache directories
+.cargo/registry/
+.cargo/git/
+
+# Documentation build
+docs/_build/
+
+# Node modules if any
+node_modules/
+
+# Development scripts
+dev_scripts/
+dev-docs/
+
+# Tauri development files
+src-tauri/target/
+
+# GUI development files  
+src-gui/node_modules/
+src-gui/dist/
+src-gui/.next/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+Thumbs.db 

@@ -1,4 +1,4 @@
-use crate::monero::Scalar;
+use crate::monero::{Scalar, TransferProof};
 use crate::{asb, cli};
 use libp2p::request_response::ProtocolSupport;
 use libp2p::{request_response, PeerId, StreamProtocol};
@@ -41,6 +41,7 @@ pub enum Response {
     Fullfilled {
         swap_id: Uuid,
         s_a: Scalar,
+        lock_transfer_proof: TransferProof,
     },
     Rejected {
         swap_id: Uuid,
@@ -93,10 +94,15 @@ impl From<(PeerId, Message)> for cli::OutEvent {
                 response,
                 request_id,
             } => match response {
-                Response::Fullfilled { swap_id, s_a } => Self::CooperativeXmrRedeemFulfilled {
+                Response::Fullfilled {
+                    swap_id,
+                    s_a,
+                    lock_transfer_proof,
+                } => Self::CooperativeXmrRedeemFulfilled {
                     id: request_id,
                     swap_id,
                     s_a,
+                    lock_transfer_proof,
                 },
                 Response::Rejected {
                     swap_id,

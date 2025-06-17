@@ -6,7 +6,7 @@ Makers run an automated swap backend (`asb`), which users can connect to and swa
 The `asb` accepts Bitcoin and sells Monero, for a fee.
 
 The `asb` needs to communicate with the Bitcoin and Monero blockchains.
-For this, it uses `monero-wallet-rpc` for Monero and `electrs` for Bitcoin.
+For this, it uses direct FFI wallet access via `monero-sys` for Monero and `electrs` for Bitcoin.
 
 It's also strongly recommended to run your own Monero and Bitcoin nodes.
 
@@ -14,8 +14,7 @@ It's also strongly recommended to run your own Monero and Bitcoin nodes.
 
 We maintain a Docker Compose configuration ([link](https://github.com/UnstoppableSwap/asb-docker-compose)) that automatically starts and manages these services:
 
-- `asb` (the maker service, connecting to `monero-wallet-rpc` and `electrs`)
-- `monero-wallet-rpc` (an RPC server, managing the Monero wallet and connecting to `monerod`)
+- `asb` (the maker service, with built-in wallet functionality connecting directly to `monerod` and `electrs`)
 - `electrs` (a Bitcoin blockchain indexer, connecting to `bitcoind`)
 - `monerod` (a Monero node, connecting to the Monero blockchain)
 - `bitcoind` (a Bitcoin node, connecting to the Bitcoin blockchain)
@@ -160,13 +159,14 @@ network = "Mainnet"
 ### Monero Section
 
 The `monero` section specifies a few details about the asb's interaction with the Monero blockchain.
+The asb uses direct FFI wallet access via `monero-sys`, eliminating the need for `monero-wallet-rpc`.
 We do not recommend changing these settings, however we document them for completeness sake.
 
 ```toml filename="config_mainnet.toml"
 # ...
 
 [monero]
-wallet_rpc_url = "http://mainnet_monero-wallet-rpc:18083/json_rpc"
+daemon_url = "http://your.monero-daemon.org:18081"
 network = "Mainnet"
 
 # ...
@@ -174,8 +174,8 @@ network = "Mainnet"
 
 | Option | Description |
 | --- | --- |
-| `wallet_rpc_url` | The URL of the _monero-wallet-rpc_ server the asb will connect to. The _monero-wallet-rpc_ server is is used to interact with the Monero blockchain. The default URL points to the docker-hosted _monero-wallet-rpc_ server. |
-| `network` | The Monero network the asb will connect to. |
+| `daemon_url` | The URL of the Monero daemon (monerod) that the asb will connect to directly. The asb manages wallets internally using FFI bindings. Optional: if not specified, the asb will connect to a known public Monero node at random. |
+| `network` | The Monero network the asb will connect to. Either "Mainnet" or "Stagenet". |
 
 ### Tor Section
 
@@ -260,7 +260,7 @@ use_mempool_space_fee_estimation = true
 network = "Mainnet"
 
 [monero]
-wallet_rpc_url = "http://mainnet_monero-wallet-rpc:18083/json_rpc"
+daemon_url = "http://mainnet_monerod:18081"
 network = "Mainnet"
 
 [tor]

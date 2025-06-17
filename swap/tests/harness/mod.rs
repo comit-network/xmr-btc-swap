@@ -1,7 +1,7 @@
 mod bitcoind;
 mod electrs;
 
-use ::monero::Address;
+
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -10,9 +10,11 @@ use get_port::get_port;
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
 use monero_harness::{image, Monero};
+use monero_sys::Daemon;
 use std::cmp::Ordering;
 use std::fmt;
 use std::path::PathBuf;
+
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,6 +24,8 @@ use swap::cli::api;
 use swap::database::{AccessMode, SqliteDatabase};
 use swap::env::{Config, GetConfig};
 use swap::fs::ensure_directory_exists;
+use swap::monero::wallet::no_listener;
+use swap::monero::Wallets;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
@@ -29,15 +33,13 @@ use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob, Database};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 use testcontainers::clients::Cli;
 use testcontainers::{Container, RunnableImage};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout};
-use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -49,10 +51,10 @@ where
 {
     let cli = Cli::default();
 
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
+    tracing_subscriber::fmt()
+        .with_env_filter("info,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info,monero_cpp=info,monero_sys=debug") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
         .with_test_writer()
-        .set_default();
+        .init();
 
     let env_config = C::get_config();
 
@@ -68,10 +70,14 @@ where
     let electrs_rpc_port = containers.electrs.get_host_port_ipv4(electrs::RPC_PORT);
 
     let alice_seed = Seed::random().unwrap();
+    let alice_db_path = NamedTempFile::new().unwrap().path().to_path_buf();
+    let alice_monero_dir = TempDir::new().unwrap().path().join("alice-monero-wallets");
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_ALICE,
         containers.bitcoind_url.clone(),
         &monero,
+        &containers._monerod_container,
+        alice_monero_dir,
         alice_starting_balances.clone(),
         electrs_rpc_port,
         &alice_seed,
@@ -84,7 +90,6 @@ where
         .parse()
         .expect("failed to parse Alice's address");
 
-    let alice_db_path = NamedTempFile::new().unwrap().path().to_path_buf();
     let (alice_handle, alice_swap_handle) = start_alice(
         &alice_seed,
         alice_db_path.clone(),
@@ -97,11 +102,13 @@ where
 
     let bob_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
-
+    let bob_monero_dir = TempDir::new().unwrap().path().join("bob-monero-wallets");
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_BOB,
         containers.bitcoind_url,
         &monero,
+        &containers._monerod_container,
+        bob_monero_dir,
         bob_starting_balances.clone(),
         electrs_rpc_port,
         &bob_seed,
@@ -137,6 +144,7 @@ where
         bob_starting_balances,
         bob_bitcoin_wallet,
         bob_monero_wallet,
+        monerod_container_id: containers._monerod_container.id().to_string(),
     };
 
     testfn(test).await.unwrap()
@@ -225,7 +233,7 @@ async fn start_alice(
     listen_address: Multiaddr,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<Mutex<monero::Wallet>>,
+    monero_wallet: Arc<monero::Wallets>,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     if let Some(parent_dir) = db_path.parent() {
         ensure_directory_exists(parent_dir).unwrap();
@@ -284,14 +292,42 @@ async fn init_test_wallets(
     name: &str,
     bitcoind_url: Url,
     monero: &Monero,
+    monerod_container: &Container<'_, image::Monerod>,
+    monero_wallet_dir: PathBuf,
     starting_balances: StartingBalances,
     electrum_rpc_port: u16,
     seed: &Seed,
     env_config: Config,
-) -> (Arc<bitcoin::Wallet>, Arc<Mutex<monero::Wallet>>) {
+) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallets>) {
+    let monerod_port = monerod_container
+        .ports()
+        .map_to_host_port_ipv4(image::RPC_PORT)
+        .expect("rpc port should be mapped to some external port");
+    let monero_daemon = Daemon {
+        address: format!("http://127.0.0.1:{}", monerod_port),
+        ssl: false,
+    };
+
+    let wallets = Wallets::new(
+        monero_wallet_dir,
+        "main".to_string(),
+        monero_daemon,
+        monero::Network::Mainnet,
+        true,
+    )
+    .await
+    .unwrap();
+
+    let xmr_wallet = wallets.main_wallet().await;
+    tracing::info!(
+        address = %xmr_wallet.main_address().await,
+        "Initialized monero wallet"
+    );
+
     monero
-        .init_wallet(
+        .init_external_wallet(
             name,
+            &xmr_wallet,
             starting_balances
                 .xmr_outputs
                 .into_iter()
@@ -301,13 +337,11 @@ async fn init_test_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = swap::monero::Wallet::connect(
-        monero.wallet(name).unwrap().client().clone(),
-        name.to_string(),
-        env_config,
-    )
-    .await
-    .unwrap();
+    // On regtests we need to allow a mismatched daemon version.
+    // Regtests use the Mainnet network.
+    if env_config.monero_network == monero::Network::Mainnet {
+        xmr_wallet.unsafe_prepare_for_regtest().await;
+    }
 
     let electrum_rpc_url = {
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);
@@ -356,7 +390,12 @@ async fn init_test_wallets(
         }
     }
 
-    (Arc::new(btc_wallet), Arc::new(Mutex::new(xmr_wallet)))
+    tracing::info!("Waiting for monero wallet to sync");
+    xmr_wallet.wait_until_synced(no_listener()).await.unwrap();
+
+    tracing::info!("Monero wallet synced");
+
+    (Arc::new(btc_wallet), Arc::new(wallets))
 }
 
 const MONERO_WALLET_NAME_BOB: &str = "bob";
@@ -413,7 +452,7 @@ pub struct BobParams {
     seed: Seed,
     db_path: PathBuf,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<Mutex<monero::Wallet>>,
+    monero_wallet: Arc<monero::Wallets>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
     env_config: Config,
@@ -431,7 +470,7 @@ impl BobParams {
     pub async fn get_change_receive_addresses(&self) -> (bitcoin::Address, monero::Address) {
         (
             self.bitcoin_wallet.new_address().await.unwrap(),
-            self.monero_wallet.lock().await.get_main_address(),
+            self.monero_wallet.main_wallet().await.main_address().await,
         )
     }
 
@@ -453,7 +492,7 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.env_config,
             handle,
-            self.monero_wallet.lock().await.get_main_address(),
+            self.monero_wallet.main_wallet().await.main_address().await,
         )
         .await?;
 
@@ -485,7 +524,7 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.env_config,
             handle,
-            self.monero_wallet.lock().await.get_main_address(),
+            self.monero_wallet.main_wallet().await.main_address().await,
             self.bitcoin_wallet.new_address().await?,
             btc_amount,
             bitcoin::Amount::from_sat(1000), // Fixed fee of 1000 satoshis for now
@@ -545,14 +584,17 @@ pub struct TestContext {
 
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
-    alice_monero_wallet: Arc<Mutex<monero::Wallet>>,
+    alice_monero_wallet: Arc<monero::Wallets>,
     alice_swap_handle: mpsc::Receiver<Swap>,
     alice_handle: AliceApplicationHandle,
 
     pub bob_params: BobParams,
     bob_starting_balances: StartingBalances,
     bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
-    bob_monero_wallet: Arc<Mutex<monero::Wallet>>,
+    bob_monero_wallet: Arc<monero::Wallets>,
+
+    // Store the container ID as String instead of reference
+    monerod_container_id: String,
 }
 
 impl TestContext {
@@ -628,7 +670,7 @@ impl TestContext {
         .unwrap();
 
         assert_eventual_balance(
-            &*self.alice_monero_wallet.lock().await,
+            &*self.alice_monero_wallet.main_wallet().await,
             Ordering::Less,
             self.alice_redeemed_xmr_balance(),
         )
@@ -649,7 +691,7 @@ impl TestContext {
 
         // Alice pays fees - comparison does not take exact lock fee into account
         assert_eventual_balance(
-            &*self.alice_monero_wallet.lock().await,
+            &*self.alice_monero_wallet.main_wallet().await,
             Ordering::Greater,
             self.alice_refunded_xmr_balance(),
         )
@@ -659,7 +701,7 @@ impl TestContext {
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
         let (cancel_fee, punish_fee) = match state {
-            AliceState::BtcPunished { state3 } => (state3.tx_cancel_fee, state3.tx_punish_fee),
+            AliceState::BtcPunished { state3, .. } => (state3.tx_cancel_fee, state3.tx_punish_fee),
             _ => panic!("Alice is not in btc punished state: {:?}", state),
         };
 
@@ -673,7 +715,7 @@ impl TestContext {
         .unwrap();
 
         assert_eventual_balance(
-            &*self.alice_monero_wallet.lock().await,
+            &*self.alice_monero_wallet.main_wallet().await,
             Ordering::Less,
             self.alice_punished_xmr_balance(),
         )
@@ -690,11 +732,8 @@ impl TestContext {
         .await
         .unwrap();
 
-        // unload the generated wallet by opening the original wallet
-        self.bob_monero_wallet.lock().await.re_open().await.unwrap();
-
         assert_eventual_balance(
-            &*self.bob_monero_wallet.lock().await,
+            &*self.bob_monero_wallet.main_wallet().await,
             Ordering::Greater,
             self.bob_redeemed_xmr_balance(),
         )
@@ -727,7 +766,7 @@ impl TestContext {
         assert!(bob_cancelled_and_refunded);
 
         assert_eventual_balance(
-            &*self.bob_monero_wallet.lock().await,
+            &*self.bob_monero_wallet.main_wallet().await,
             Ordering::Equal,
             self.bob_refunded_xmr_balance(),
         )
@@ -745,7 +784,7 @@ impl TestContext {
         .unwrap();
 
         assert_eventual_balance(
-            &*self.bob_monero_wallet.lock().await,
+            &*self.bob_monero_wallet.main_wallet().await,
             Ordering::Equal,
             self.bob_punished_xmr_balance(),
         )
@@ -837,41 +876,37 @@ impl TestContext {
     }
 
     pub async fn stop_alice_monero_wallet_rpc(&self) {
-        self.alice_monero_wallet.lock().await.stop().await.unwrap();
-
-        // Wait until the monero-wallet-rpc is fully stopped
-        // stop_wallet() internally sets a flag in the monero-wallet-rpc (`m_stop`) which
-        // is only checked every once in a while
-        loop {
-            if !self
-                .alice_monero_wallet
-                .lock()
-                .await
-                .is_alive()
-                .await
-                .unwrap()
-            {
-                tracing::info!("Alice Monero Wallet RPC stopped");
-                break;
-            }
-
-            tokio::time::sleep(Duration::from_secs(1)).await;
+        tracing::info!("Killing monerod container");
+        
+        // Use Docker CLI to forcefully kill the container
+        let output = tokio::process::Command::new("docker")
+            .args(&["kill", &self.monerod_container_id])
+            .output()
+            .await
+            .expect("Failed to execute docker kill command");
+            
+        if output.status.success() {
+            tracing::info!("Successfully killed monerod container: {}", &self.monerod_container_id);
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            tracing::error!("Failed to kill monerod container {}: {}", &self.monerod_container_id, stderr);
         }
     }
 
     pub async fn empty_alice_monero_wallet(&self) {
-        self.alice_monero_wallet
-            .lock()
+        let burn_address = monero::Address::from_str("49LEH26DJGuCyr8xzRAzWPUryzp7bpccC7Hie1DiwyfJEyUKvMFAethRLybDYrFdU1eHaMkKQpUPebY4WT3cSjEvThmpjPa").unwrap();
+        let wallet = self.alice_monero_wallet.main_wallet().await;
+        
+        wallet
+            .sweep(&burn_address)
             .await
-            .re_open()
-            .await
-            .unwrap();
-        self.alice_monero_wallet.lock().await.sweep_all(Address::from_str("49LEH26DJGuCyr8xzRAzWPUryzp7bpccC7Hie1DiwyfJEyUKvMFAethRLybDYrFdU1eHaMkKQpUPebY4WT3cSjEvThmpjPa").unwrap()).await.unwrap();
+            .expect("Failed to empty alice monero wallet to burn address");
     }
 
     pub async fn assert_alice_monero_wallet_empty(&self) {
+        let wallet = self.alice_monero_wallet.main_wallet().await;
         assert_eventual_balance(
-            &*self.alice_monero_wallet.lock().await,
+            &*wallet,
             Ordering::Equal,
             monero::Amount::ZERO,
         )
@@ -932,28 +967,22 @@ async fn assert_eventual_balance<A: fmt::Display + PartialOrd>(
 trait Wallet {
     type Amount;
 
-    async fn refresh(&self) -> Result<()>;
-    async fn get_balance(&self) -> Result<Self::Amount>;
+    fn refresh(&self) -> impl Future<Output = Result<()>>;
+    fn get_balance(&self) -> impl Future<Output = Result<Self::Amount>>;
 }
 
-#[async_trait]
 impl Wallet for monero::Wallet {
     type Amount = monero::Amount;
 
     async fn refresh(&self) -> Result<()> {
-        self.refresh(1).await?;
-
-        Ok(())
+        self.wait_until_synced(no_listener()).await
     }
 
     async fn get_balance(&self) -> Result<Self::Amount> {
-        let total = self.get_balance().await?;
-        let balance = Self::Amount::from_piconero(total.balance);
-        Ok(balance)
+        Ok(self.total_balance().await.into())
     }
 }
 
-#[async_trait]
 impl Wallet for bitcoin::Wallet {
     type Amount = bitcoin::Amount;
 

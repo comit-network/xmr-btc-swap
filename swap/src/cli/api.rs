@@ -7,18 +7,19 @@ use crate::common::tracing_util::Format;
 use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
+use crate::monero::wallet_rpc;
+use crate::monero::Wallets;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
 use crate::seed::Seed;
 use crate::{bitcoin, common, monero};
-use anyhow::anyhow;
 use anyhow::{bail, Context as AnyContext, Error, Result};
 use arti_client::TorClient;
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex as SyncMutex, Once};
+use std::sync::{Arc, Once};
 use tauri_bindings::{TauriBackgroundProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
@@ -185,8 +186,7 @@ pub struct Context {
     pub tasks: Arc<PendingTaskList>,
     tauri_handle: Option<TauriHandle>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
-    monero_wallet: Option<Arc<TokioMutex<monero::Wallet>>>,
-    monero_rpc_process: Option<Arc<SyncMutex<monero::WalletRpcProcess>>>,
+    monero_manager: Option<Arc<monero::Wallets>>,
     tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
 }
 
@@ -372,9 +372,9 @@ impl ContextBuilder {
                             (),
                         );
 
-                    let (wlt, prc) = init_monero_wallet(
+                    let wallets = init_monero_wallet(
                         data_dir.as_path(),
-                        monero.monero_daemon_address,
+                        monero.monero_node_address.map(|url| url.to_string()),
                         env_config,
                         tauri_handle.clone(),
                     )
@@ -382,12 +382,9 @@ impl ContextBuilder {
 
                     monero_progress_handle.finish();
 
-                    Ok((
-                        Some(Arc::new(TokioMutex::new(wlt))),
-                        Some(Arc::new(SyncMutex::new(prc))),
-                    ))
+                    Ok(Some(wallets))
                 }
-                None => Ok((None, None)),
+                None => Ok(None),
             }
         };
 
@@ -408,7 +405,7 @@ impl ContextBuilder {
             Ok(maybe_tor_client)
         };
 
-        let (bitcoin_wallet, (monero_wallet, monero_rpc_process), tor) = tokio::try_join!(
+        let (bitcoin_wallet, monero_manager, tor) = tokio::try_join!(
             initialize_bitcoin_wallet,
             initialize_monero_wallet,
             initialize_tor_client,
@@ -432,8 +429,7 @@ impl ContextBuilder {
         let context = Context {
             db,
             bitcoin_wallet,
-            monero_wallet,
-            monero_rpc_process,
+            monero_manager,
             config: Config {
                 namespace: XmrBtcNamespace::from_is_testnet(self.is_testnet),
                 env_config,
@@ -465,18 +461,17 @@ impl Context {
         env_config: EnvConfig,
         db_path: PathBuf,
         bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
-        bob_monero_wallet: Arc<TokioMutex<monero::Wallet>>,
+        bob_monero_wallet: Arc<monero::Wallets>,
     ) -> Self {
         let config = Config::for_harness(seed, env_config);
 
         Self {
-            bitcoin_wallet: bob_bitcoin_wallet.into(),
-            monero_wallet: bob_monero_wallet.into(),
+            bitcoin_wallet: Some(bob_bitcoin_wallet),
+            monero_manager: Some(bob_monero_wallet),
             config,
             db: open_db(db_path, AccessMode::ReadWrite, None)
                 .await
                 .expect("Could not open sqlite database"),
-            monero_rpc_process: None,
             swap_lock: SwapLock::new().into(),
             tasks: PendingTaskList::default().into(),
             tauri_handle: None,
@@ -485,14 +480,7 @@ impl Context {
     }
 
     pub fn cleanup(&self) -> Result<()> {
-        if let Some(ref monero_rpc_process) = self.monero_rpc_process {
-            let mut process = monero_rpc_process
-                .lock()
-                .map_err(|_| anyhow!("Failed to lock monero_rpc_process for cleanup"))?;
-
-            process.kill()?;
-            println!("Killed monero-wallet-rpc process");
-        }
+        // TODO: close all monero wallets
 
         Ok(())
     }
@@ -545,37 +533,37 @@ async fn init_bitcoin_wallet(
 
 async fn init_monero_wallet(
     data_dir: &Path,
-    monero_daemon_address: impl Into<Option<String>> + Clone,
+    monero_daemon_address: impl Into<Option<String>>,
     env_config: EnvConfig,
-    tauri_handle: Option<TauriHandle>,
-) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
+    _tauri_handle: Option<TauriHandle>,
+) -> Result<Arc<Wallets>> {
     let network = env_config.monero_network;
 
-    // Start the monero-wallet-rpc after the wallet is removed
-    let monero_wallet_rpc_working_dir = data_dir.join("monero");
+    // Use the ./monero/monero-data directory for backwards compatibility
+    let wallet_dir = data_dir.join("monero").join("monero-data");
 
-    let monero_wallet_rpc =
-        monero::WalletRpc::new(monero_wallet_rpc_working_dir.clone(), tauri_handle).await?;
+    let daemon = if let Some(addr) = monero_daemon_address.into() {
+        monero_sys::Daemon {
+            address: addr,
+            ssl: false,
+        }
+    } else {
+        let node = wallet_rpc::choose_monero_node(env_config.monero_network).await?;
+        tracing::debug!(%node, "Automatically selected monero node");
+        monero_sys::Daemon {
+            address: node.to_string(),
+            ssl: false,
+        }
+    };
 
-    tracing::debug!(
-        override_monero_daemon_address = monero_daemon_address.clone().into(),
-        "Attempting to start monero-wallet-rpc process"
-    );
-
-    let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(network, monero_daemon_address.into())
-        .await
-        .context("Failed to start monero-wallet-rpc process")?;
-
-    let monero_wallet_rpc_dir = monero_wallet_rpc_working_dir.join("monero-data");
+    // This is the name of a wallet we only use for blockchain monitoring
+    const DEFAULT_WALLET: &str = "swap-tool-blockchain-monitoring-wallet";
 
     // Remove the monitoring wallet if it exists
     // It doesn't contain any coins
     // Deleting it ensures we never have issues at startup
     // And we reset the restore height
-    const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
-
-    let wallet_path = monero_wallet_rpc_dir.join(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME);
+    let wallet_path = wallet_dir.join(DEFAULT_WALLET);
     if wallet_path.exists() {
         tracing::debug!(
             wallet_path = %wallet_path.display(),
@@ -592,16 +580,17 @@ async fn init_monero_wallet(
         let _ = tokio::fs::remove_file(keys_path).await;
     }
 
-    // Now open the wallet
-    let monero_wallet = monero::Wallet::open_or_create(
-        monero_wallet_rpc_process.endpoint(),
-        MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
-        env_config,
+    let wallets = monero::Wallets::new(
+        wallet_dir,
+        DEFAULT_WALLET.to_string(),
+        daemon,
+        network,
+        false,
     )
     .await
-    .context("Failed to open or create Monero wallet")?;
+    .context("Failed to initialize Monero wallets")?;
 
-    Ok((monero_wallet, monero_wallet_rpc_process))
+    Ok(Arc::new(wallets))
 }
 
 pub mod data {

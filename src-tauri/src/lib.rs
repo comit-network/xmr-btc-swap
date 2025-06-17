@@ -378,7 +378,7 @@ async fn initialize_context(
             bitcoin_target_block: None,
         })
         .with_monero(Monero {
-            monero_daemon_address: settings.monero_node_url.clone(),
+            monero_node_address: settings.monero_node_url.clone(),
         })
         .with_json(false)
         .with_debug(true)

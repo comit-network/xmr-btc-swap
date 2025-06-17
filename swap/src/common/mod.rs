@@ -2,7 +2,7 @@ pub mod tor;
 pub mod tracing_util;
 
 use anyhow::anyhow;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, future::Future, path::PathBuf, time::Duration};
 use tokio::{
     fs::{read_dir, File},
     io::{AsyncBufReadExt, BufReader},
@@ -31,6 +31,57 @@ pub async fn warn_if_outdated(current_version: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Convenience function for retrying an operation with exponential backoff.
+/// Optionally specify the maximum elapsed time and the maximum interval.
+/// If not specified, the operation may run indefinitely, the default max_interval is 15 seconds.
+///
+/// # Example
+///
+/// See this example of a retry operation that runs indefinitely, with a max
+/// interval of 60 seconds.
+///
+/// ```ignore rust
+/// use swap::common::retry;
+///
+/// let result = retry("Reality check", || async {
+///     if 1 == 1 {
+///         Ok(())
+///     } else {
+///         anyhow::anyhow!("Math is not mathing").map_err(backoff::Error::transient)
+///     }
+/// }, None, std::time::Duration::from_secs(60));
+/// ```
+pub async fn retry<T, F, Fut, E>(
+    description: &str,
+    function: F,
+    max_elapsed_time: impl Into<Option<Duration>>,
+    max_interval: impl Into<Option<Duration>>,
+) -> Result<T, anyhow::Error>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, backoff::Error<E>>>,
+    E: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static,
+{
+    let max_interval = max_interval.into().unwrap_or(Duration::from_secs(15));
+
+    let config = backoff::ExponentialBackoffBuilder::new()
+        .with_max_elapsed_time(max_elapsed_time.into())
+        .with_max_interval(max_interval)
+        .build();
+
+    let result = backoff::future::retry_notify(config, function, |err, wait_time: Duration| {
+        tracing::warn!(
+            error = ?err,
+            "Failed operation `{}`, retrying in {} seconds",
+            description,
+            wait_time.as_secs()
+        );
+    })
+    .await;
+
+    result.map_err(|e| anyhow!("{}", e))
 }
 
 /// helper macro for [`redact`]... eldrich sorcery

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- We now call Monero function directly (via FFI bindings) instead of using `monero-wallet-rpc`.
+- ASB: Since we don't communicate with `monero-wallet-rpc` anymore, the Monero wallet's will no longer be accessible by connecting to it. If you are using the asb-docker-compose setup, run this command to migrate the wallet files from the volume of the monero-wallet-rpc container to the volume of the asb container:
+  ```bash
+  # On testnet
+  cp /var/lib/docker/volumes/testnet_stagenet_monero-wallet-rpc-data/_data/* /var/lib/docker/volumes/testnet_testnet_asb-data/_data/monero/wallets
+  # On mainnet
+  cp /var/lib/docker/volumes/mainnet_mainnet_monero-wallet-rpc-data/_data/* /var/lib/docker/volumes/mainnet_mainnet_asb-data/_data/monero/wallets
+  ```
+- ASB: The `wallet_url` option has been removed and replaced with the optional `daemon_url`, that specifies which Monero node the asb will connect to. If not specified, the asb will connect to a known public Monero node at random.
+- ASB: Add a `export-monero-wallet` command which gives the Monero wallet's seed and restore height. Export this seed into a wallet software of your own choosing to manage your Monero funds.
+  The seed is a 25 word mnemonic. Example:
+  ```bash
+  $ asb export-monero-wallet > wallet.txt
+  $ cat wallet.txt
+  Seed          : novelty deodorant aloof serving fuel vipers awful segments siblings bite exquisite quick snout rising hobby trash amply recipe cinema ritual problems pram getting playful novelty
+  Restore height: 3403755
+  $
+  ```
+
+- Logs are now written to `stderr` (instead of `stdout`). Makers relying on piping the logs need to make sure to include the `stderr` output:
+
+  | Before                     | After                            |
+  | -------------------------- | -------------------------------- |
+  | `asb logs \| my-script.sh` | `asb logs  2>&1 \| my-script.sh` |
+  | `asb logs > output.txt`    | `asb logs > output.txt 2>&1`     |
 - GUI: Improved peer discovery: We can now connect to multiple rendezvous points at once. We also cache peers we have previously connected to locally and will attempt to connect to them again in the future, even if they aren't registered with a rendezvous point anymore.
 - ASB: We now retry for 6 hours to broadcast the early refund transaction. After that, we give up and Bob will have to wait for the timelock to expire then refund himself. If we detect that Bob has cancelled the swap, we will abort the swap on our side and let Bob refund himself.
 

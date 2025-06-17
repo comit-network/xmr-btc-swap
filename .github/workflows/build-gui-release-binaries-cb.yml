@@ -12,6 +12,28 @@ env:
   MACOS_INTEL: "macos-13"
   WINDOWS: "windows-latest"
   CN_APPLICATION: "unstoppableswap/unstoppableswap-gui-rs"
+  DEPS_MONERO_LINUX: 'build-essential cmake libboost-all-dev miniupnpc libunbound-dev graphviz doxygen libunwind8-dev pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev libprotobuf-dev protobuf-compiler git'
+  DEPS_GUI_UBUNTU_SPECIFIC: 'libgtk-3-dev libappindicator3-dev librsvg2-dev libwebkit2gtk-4.1-0=2.44.0-2 libwebkit2gtk-4.1-dev=2.44.0-2 libjavascriptcoregtk-4.1-0=2.44.0-2 libjavascriptcoregtk-4.1-dev=2.44.0-2 gir1.2-javascriptcoregtk-4.1=2.44.0-2 gir1.2-webkit2-4.1=2.44.0-2'
+  DEPS_MONERO_MACOS: 'cmake boost hidapi openssl zmq libpgm miniupnpc expat libunwind-headers protobuf'
+  DEPS_MONERO_WINDOWS_MSYS2: >-
+    mingw-w64-x86_64-toolchain
+    make
+    mingw-w64-x86_64-cmake
+    mingw-w64-x86_64-boost
+    mingw-w64-x86_64-openssl
+    mingw-w64-x86_64-zeromq
+    mingw-w64-x86_64-libsodium
+    mingw-w64-x86_64-hidapi
+    mingw-w64-x86_64-protobuf-c
+    mingw-w64-x86_64-libusb
+    mingw-w64-x86_64-unbound
+    git
+  APT_SET_CONF_COMMAND: |
+    sudo tee -a /etc/apt/apt.conf.d/80-custom << EOF
+    Acquire::Retries "3";
+    Acquire::http::Timeout "120";
+    Acquire::ftp::Timeout "120";
+    EOF
 
 jobs:
   draft-cb-release:
@@ -20,6 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Create Draft Release
         uses: crabnebula-dev/cloud-release@v0
         with:
@@ -43,40 +66,46 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
 
-      - uses: Swatinem/rust-cache@v2.7.3
-
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@1.80
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-24.04' # This must match the platform value defined above.
+      - name: Configure apt for retries (ubuntu only)
+        if: matrix.platform == env.UBUNTU
+        run: ${{ env.APT_SET_CONF_COMMAND }}
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == env.UBUNTU # This must match the platform value defined above.
         run: |
           sudo apt update;
-          sudo apt install -y \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libappindicator3-dev \
-            librsvg2-dev;
+          sudo apt install -y ${{ env.DEPS_MONERO_LINUX }} ${{ env.DEPS_GUI_UBUNTU_SPECIFIC }} git
 
-          sudo apt install -y \
-            libwebkit2gtk-4.1-0=2.44.0-2 \
-            libwebkit2gtk-4.1-dev=2.44.0-2 \
-            libjavascriptcoregtk-4.1-0=2.44.0-2 \
-            libjavascriptcoregtk-4.1-dev=2.44.0-2 \
-            gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
-            gir1.2-webkit2-4.1=2.44.0-2;
+      - name: Install Monero build dependencies (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          brew update
+          brew install ${{ env.DEPS_MONERO_MACOS }} git
+          brew reinstall --build-from-source unbound expat 
+          brew install protobuf@21
+
+      - name: Install Monero build dependencies (Windows)
+        if: matrix.platform == env.WINDOWS
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: ${{ env.DEPS_MONERO_WINDOWS_MSYS2 }} git
+
+      - name: Clone submodules
+        run: git submodule update --init --recursive
 
       - name: Work around spurious network errors in curl 8.0
         shell: bash
@@ -128,6 +157,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actionhippie/swap-space@v1
+        with:
+          size: 15G
+
       - name: Publish Release
         uses: crabnebula-dev/cloud-release@v0
         with:
