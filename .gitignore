@@ -3,3 +3,8 @@ target/
 .claude/settings.local.json
 .DS_Store
 build/
+release-build.sh
+cn_macos
+target-check
+monero-rpc-pool/temp_db.sqlite
+monero-rpc-pool/temp.db

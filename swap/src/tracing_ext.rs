@@ -18,6 +18,8 @@ pub fn capture_logs(min_level: LevelFilter) -> MakeCapturingWriter {
         tracing_subscriber::fmt()
             .with_ansi(false)
             .without_time()
+            .with_file(true)
+            .with_line_number(true)
             .with_writer(make_writer.clone())
             .with_env_filter(format!("{}", min_level))
             .finish(),

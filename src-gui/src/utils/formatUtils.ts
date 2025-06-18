@@ -83,3 +83,24 @@ export function currencySymbol(currency: FiatCurrency): string | null {
       return null;
   }
 }
+
+/**
+ * Formats confirmation count, displaying "?" when the transaction state is unknown
+ * @param confirmations - The number of confirmations, or undefined if unknown
+ * @param maxConfirmations - Optional maximum confirmations to show as "X/Y" format
+ * @returns Formatted string showing confirmations or "?" if unknown
+ */
+export function formatConfirmations(
+  confirmations: number | undefined | null,
+  maxConfirmations?: number,
+): string {
+  if (confirmations === undefined || confirmations === null) {
+    return maxConfirmations !== undefined ? `?/${maxConfirmations}` : "?";
+  }
+
+  if (maxConfirmations !== undefined) {
+    return `${confirmations}/${maxConfirmations}`;
+  }
+
+  return confirmations.toString();
+}

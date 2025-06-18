@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE monero_nodes \n            SET network = ?, updated_at = ?\n            WHERE full_url = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5736de2aac47eb69d7f6835d266aa28732b02a5e8e055ffaebcb452ed1b5044c"
+}

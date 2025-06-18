@@ -1,4 +1,5 @@
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
+import { formatConfirmations } from "utils/formatUtils";
 import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
 import SwapStatusAlert from "renderer/components/alert/SwapStatusAlert/SwapStatusAlert";
 import { useActiveSwapInfo } from "store/hooks";
@@ -15,10 +16,11 @@ export default function BitcoinLockTxInMempoolPage({
 
   return (
     <Box>
-      {btc_lock_confirmations < BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD && (
+      {(btc_lock_confirmations === undefined ||
+        btc_lock_confirmations < BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD) && (
         <DialogContentText>
           Your Bitcoin has been locked.{" "}
-          {btc_lock_confirmations > 0
+          {btc_lock_confirmations !== undefined && btc_lock_confirmations > 0
             ? "We are waiting for the other party to lock their Monero."
             : "We are waiting for the blockchain to confirm the transaction. Once confirmed, the other party will lock their Monero."}
         </DialogContentText>
@@ -30,9 +32,10 @@ export default function BitcoinLockTxInMempoolPage({
           gap: "1rem",
         }}
       >
-        {btc_lock_confirmations >= BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD && (
-          <SwapStatusAlert swap={swapInfo} isRunning={true} />
-        )}
+        {btc_lock_confirmations !== undefined &&
+          btc_lock_confirmations >= BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD && (
+            <SwapStatusAlert swap={swapInfo} isRunning={true} />
+          )}
         <BitcoinTransactionInfoBox
           title="Bitcoin Lock Transaction"
           txId={btc_lock_txid}
@@ -43,7 +46,7 @@ export default function BitcoinLockTxInMempoolPage({
               After they lock their funds and the Monero transaction receives
               one confirmation, the swap will proceed to the next step.
               <br />
-              Confirmations: {btc_lock_confirmations}
+              Confirmations: {formatConfirmations(btc_lock_confirmations)}
             </>
           }
         />

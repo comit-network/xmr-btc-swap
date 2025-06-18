@@ -8,6 +8,7 @@ import {
   approvalEventReceived,
   backgroundProgressEventReceived,
 } from "store/features/rpcSlice";
+import { poolStatusReceived } from "store/features/poolSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
 import {
@@ -125,6 +126,10 @@ export async function setupBackgroundTasks(): Promise<void> {
 
       case "BackgroundProgress":
         store.dispatch(backgroundProgressEventReceived(eventData));
+        break;
+
+      case "PoolStatusUpdate":
+        store.dispatch(poolStatusReceived(eventData));
         break;
 
       default:

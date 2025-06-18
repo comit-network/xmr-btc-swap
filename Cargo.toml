@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["monero-rpc", "monero-sys", "src-tauri", "swap"]
+members = ["monero-rpc", "monero-rpc-pool", "monero-sys", "src-tauri", "swap"]
 
 [profile.release]
 opt-level = 0
