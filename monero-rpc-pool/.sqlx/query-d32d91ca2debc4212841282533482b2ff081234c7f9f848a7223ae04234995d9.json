@@ -1,0 +1,23 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT \n                CAST(SUM(CASE WHEN hc.was_successful THEN 1 ELSE 0 END) AS INTEGER) as \"successful!: i64\",\n                CAST(SUM(CASE WHEN NOT hc.was_successful THEN 1 ELSE 0 END) AS INTEGER) as \"unsuccessful!: i64\"\n            FROM (\n                SELECT hc.was_successful\n                FROM health_checks hc\n                JOIN monero_nodes n ON hc.node_id = n.id\n                WHERE n.network = ?\n                ORDER BY hc.timestamp DESC\n                LIMIT 100\n            ) hc\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "successful!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "unsuccessful!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [true, true]
+  },
+  "hash": "d32d91ca2debc4212841282533482b2ff081234c7f9f848a7223ae04234995d9"
+}

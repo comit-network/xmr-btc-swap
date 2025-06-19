@@ -37,12 +37,12 @@ pub struct AppState {
 }
 
 /// Manages background tasks for the RPC pool
-pub struct TaskManager {
+pub struct PoolHandle {
     pub status_update_handle: JoinHandle<()>,
     pub discovery_handle: JoinHandle<()>,
 }
 
-impl Drop for TaskManager {
+impl Drop for PoolHandle {
     fn drop(&mut self) {
         self.status_update_handle.abort();
         self.discovery_handle.abort();
@@ -62,7 +62,7 @@ async fn create_app_with_receiver(
 ) -> Result<(
     Router,
     tokio::sync::broadcast::Receiver<PoolStatus>,
-    TaskManager,
+    PoolHandle,
 )> {
     // Initialize database
     let db = Database::new_with_data_dir(config.data_dir.clone()).await?;
@@ -75,17 +75,27 @@ async fn create_app_with_receiver(
     // Initialize discovery service
     let discovery = NodeDiscovery::new(db.clone())?;
 
+    // Publish initial status immediately to ensure first event is sent
+    {
+        let pool_guard = node_pool.read().await;
+        if let Err(e) = pool_guard.publish_status_update().await {
+            error!("Failed to publish initial status update: {}", e);
+        }
+    }
+
     // Start background tasks
     let node_pool_for_health_check = node_pool.clone();
     let status_update_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+
         loop {
-            // Publish status update after health check
+            interval.tick().await;
+
+            // Publish status update
             let pool_guard = node_pool_for_health_check.read().await;
             if let Err(e) = pool_guard.publish_status_update().await {
-                error!("Failed to publish status update after health check: {}", e);
+                error!("Failed to publish status update: {}", e);
             }
-
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     });
 
@@ -102,7 +112,7 @@ async fn create_app_with_receiver(
         }
     });
 
-    let task_manager = TaskManager {
+    let pool_handle = PoolHandle {
         status_update_handle,
         discovery_handle,
     };
@@ -116,12 +126,12 @@ async fn create_app_with_receiver(
         .layer(CorsLayer::permissive())
         .with_state(app_state);
 
-    Ok((app, status_receiver, task_manager))
+    Ok((app, status_receiver, pool_handle))
 }
 
 pub async fn create_app(config: Config, network: Network) -> Result<Router> {
-    let (app, _, _task_manager) = create_app_with_receiver(config, network).await?;
-    // Note: task_manager is dropped here, so tasks will be aborted when this function returns
+    let (app, _, _pool_handle) = create_app_with_receiver(config, network).await?;
+    // Note: pool_handle is dropped here, so tasks will be aborted when this function returns
     // This is intentional for the simple create_app use case
     Ok(app)
 }
@@ -160,14 +170,14 @@ pub async fn run_server_with_data_dir(
 }
 
 /// Start a server with a random port for library usage
-/// Returns the server info with the actual port used, a receiver for pool status updates, and task manager
+/// Returns the server info with the actual port used, a receiver for pool status updates, and pool handle
 pub async fn start_server_with_random_port(
     config: Config,
     network: Network,
 ) -> Result<(
     ServerInfo,
     tokio::sync::broadcast::Receiver<PoolStatus>,
-    TaskManager,
+    PoolHandle,
 )> {
     // Clone the host before moving config
     let host = config.host.clone();
@@ -175,7 +185,7 @@ pub async fn start_server_with_random_port(
     // If port is 0, the system will assign a random available port
     let config_with_random_port = Config::new_random_port(config.host, config.data_dir);
 
-    let (app, status_receiver, task_manager) =
+    let (app, status_receiver, pool_handle) =
         create_app_with_receiver(config_with_random_port, network).await?;
 
     // Bind to port 0 to get a random available port
@@ -199,11 +209,11 @@ pub async fn start_server_with_random_port(
         }
     });
 
-    Ok((server_info, status_receiver, task_manager))
+    Ok((server_info, status_receiver, pool_handle))
 }
 
 /// Start a server with a random port and custom data directory for library usage
-/// Returns the server info with the actual port used, a receiver for pool status updates, and task manager
+/// Returns the server info with the actual port used, a receiver for pool status updates, and pool handle
 pub async fn start_server_with_random_port_and_data_dir(
     config: Config,
     network: Network,
@@ -211,7 +221,7 @@ pub async fn start_server_with_random_port_and_data_dir(
 ) -> Result<(
     ServerInfo,
     tokio::sync::broadcast::Receiver<PoolStatus>,
-    TaskManager,
+    PoolHandle,
 )> {
     let config_with_data_dir = Config::new_random_port(config.host, data_dir);
     start_server_with_random_port(config_with_data_dir, network).await

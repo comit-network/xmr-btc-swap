@@ -17,7 +17,7 @@ use swap::cli::{
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
     },
-    command::{Bitcoin, Monero},
+    command::Bitcoin,
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -367,48 +367,6 @@ async fn initialize_context(
         .context("Context is already being initialized")
         .to_string_result()?;
 
-    // Determine which Monero node to use:
-    // - If using RPC pool, start and use the local RPC pool
-    // - Otherwise, use the provided node URL directly (even if empty)
-    let monero_node_url = if settings.use_monero_rpc_pool {
-        // Start RPC pool and use it
-        let data_dir = data::data_dir_from(None, testnet).to_string_result()?;
-        match monero_rpc_pool::start_server_with_random_port(
-            monero_rpc_pool::config::Config::new_random_port(
-                "127.0.0.1".to_string(),
-                data_dir.join("monero-rpc-pool"),
-            ),
-            match testnet {
-                true => swap::monero::Network::Stagenet,
-                false => swap::monero::Network::Mainnet,
-            },
-        )
-        .await
-        {
-            Ok((server_info, mut status_receiver, _task_manager)) => {
-                let rpc_url = format!("http://{}:{}", server_info.host, server_info.port);
-                tracing::info!("Monero RPC Pool started on {}", rpc_url);
-
-                // Start listening for pool status updates and forward them to frontend
-                let pool_tauri_handle = TauriHandle::new(app_handle.clone());
-                tauri::async_runtime::spawn(async move {
-                    while let Ok(status) = status_receiver.recv().await {
-                        pool_tauri_handle.emit_pool_status_update(status);
-                    }
-                });
-
-                rpc_url.parse().ok()
-            }
-            Err(e) => {
-                tracing::error!("Failed to start Monero RPC Pool: {}", e);
-                None
-            }
-        }
-    } else {
-        // Use the provided node URL directly without checking availability
-        settings.monero_node_url.clone()
-    };
-
     // Get app handle and create a Tauri handle
     let tauri_handle = TauriHandle::new(app_handle.clone());
 
@@ -420,9 +378,7 @@ async fn initialize_context(
             bitcoin_electrum_rpc_urls: settings.electrum_rpc_urls.clone(),
             bitcoin_target_block: None,
         })
-        .with_monero(Monero {
-            monero_node_address: monero_node_url,
-        })
+        .with_monero(settings.monero_node_config)
         .with_json(false)
         .with_debug(true)
         .with_tor(settings.use_tor)

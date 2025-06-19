@@ -223,21 +223,30 @@ export async function initializeContext() {
   const bitcoinNodes =
     store.getState().settings.nodes[network][Blockchain.Bitcoin];
 
-  // For Monero nodes, get the configured node URL and pool setting
+  // For Monero nodes, determine whether to use pool or custom node
   const useMoneroRpcPool = store.getState().settings.useMoneroRpcPool;
-  const moneroNodes =
-    store.getState().settings.nodes[network][Blockchain.Monero];
 
-  // Always pass the first configured monero node URL directly without checking availability
-  // The backend will handle whether to use the pool or the custom node
-  const moneroNode = moneroNodes.length > 0 ? moneroNodes[0] : null;
+  const moneroNodeUrl =
+    store.getState().settings.nodes[network][Blockchain.Monero][0] ?? null;
+
+  // Check the state of the Monero node
+  const isMoneroNodeOnline = await getMoneroNodeStatus(moneroNodeUrl, network);
+
+  const moneroNodeConfig =
+    useMoneroRpcPool || moneroNodeUrl == null || !isMoneroNodeOnline
+      ? { type: "Pool" as const }
+      : {
+          type: "SingleNode" as const,
+          content: {
+            url: moneroNodeUrl,
+          },
+        };
 
   // Initialize Tauri settings
   const tauriSettings: TauriSettings = {
     electrum_rpc_urls: bitcoinNodes,
-    monero_node_url: moneroNode,
+    monero_node_config: moneroNodeConfig,
     use_tor: useTor,
-    use_monero_rpc_pool: useMoneroRpcPool,
   };
 
   logger.info("Initializing context with settings", tauriSettings);

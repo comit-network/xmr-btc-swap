@@ -481,9 +481,14 @@ impl Database {
             SELECT 
                 CAST(SUM(CASE WHEN hc.was_successful THEN 1 ELSE 0 END) AS INTEGER) as "successful!: i64",
                 CAST(SUM(CASE WHEN NOT hc.was_successful THEN 1 ELSE 0 END) AS INTEGER) as "unsuccessful!: i64"
-            FROM health_checks hc
-            JOIN monero_nodes n ON hc.node_id = n.id
-            WHERE n.network = ?
+            FROM (
+                SELECT hc.was_successful
+                FROM health_checks hc
+                JOIN monero_nodes n ON hc.node_id = n.id
+                WHERE n.network = ?
+                ORDER BY hc.timestamp DESC
+                LIMIT 100
+            ) hc
             "#,
             network
         )

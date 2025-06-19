@@ -64,7 +64,7 @@ export default function MoneroPoolHealthBox() {
           size="small"
         />
         <Chip
-          label={`${(100 - overallSuccessRate).toFixed(1)}% Retry Rate`}
+          label={`${(100 - overallSuccessRate).toFixed(1)}% Retry Rate (last 200 operations)`}
           color={
             overallSuccessRate > 80
               ? "success"
@@ -182,25 +182,6 @@ export default function MoneroPoolHealthBox() {
       additionalContent={
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {poolStatus && renderHealthSummary()}
-
-          {poolStatus && (
-            <Box>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: "medium" }}>
-                Health Check Statistics
-              </Typography>
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                <Typography variant="caption" color="text.secondary">
-                  Successful:{" "}
-                  {poolStatus.successful_health_checks.toLocaleString()}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Failed:{" "}
-                  {poolStatus.unsuccessful_health_checks.toLocaleString()}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
           <Box>{renderTopNodes()}</Box>
         </Box>
       }

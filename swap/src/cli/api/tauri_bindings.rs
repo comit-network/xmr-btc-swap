@@ -13,7 +13,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use strum::Display;
 use tokio::sync::{oneshot, Mutex as TokioMutex};
 use typeshare::typeshare;
-use url::Url;
 use uuid::Uuid;
 
 #[typeshare]
@@ -703,19 +702,24 @@ pub enum BackgroundRefundState {
     Completed,
 }
 
+#[typeshare]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", content = "content")]
+pub enum MoneroNodeConfig {
+    Pool,
+    SingleNode { url: String },
+}
+
 /// This struct contains the settings for the Context
 #[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TauriSettings {
-    /// The URL of the Monero node e.g `http://xmr.node:18081`
-    #[typeshare(serialized_as = "Option<string>")]
-    pub monero_node_url: Option<Url>,
+    /// Configuration for Monero node connection
+    pub monero_node_config: MoneroNodeConfig,
     /// The URLs of the Electrum RPC servers e.g `["ssl://bitcoin.com:50001", "ssl://backup.com:50001"]`
     pub electrum_rpc_urls: Vec<String>,
     /// Whether to initialize and use a tor client.
     pub use_tor: bool,
-    /// Whether to use the Monero RPC pool instead of custom nodes.
-    pub use_monero_rpc_pool: bool,
 }
 
 #[typeshare]
