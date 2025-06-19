@@ -352,34 +352,48 @@ function MoneroRpcPoolSetting() {
 function MoneroNodeUrlSetting() {
   const network = getNetwork();
   const useMoneroRpcPool = useSettings((s) => s.useMoneroRpcPool);
-  const moneroNodeUrl = useSettings((s) => s.nodes[network][Blockchain.Monero][0] || "");
+  const moneroNodeUrl = useSettings(
+    (s) => s.nodes[network][Blockchain.Monero][0] || "",
+  );
   const nodeStatuses = useNodes((s) => s.nodes);
   const dispatch = useAppDispatch();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const currentNodes = useSettings((s) => s.nodes[network][Blockchain.Monero]);
-  
+
   const handleNodeUrlChange = (newUrl: string) => {
     // Remove existing nodes and add the new one
-    currentNodes.forEach(node => {
+    currentNodes.forEach((node) => {
       dispatch(removeNode({ network, type: Blockchain.Monero, node }));
     });
-    
+
     if (newUrl.trim()) {
-      dispatch(addNode({ network, type: Blockchain.Monero, node: newUrl.trim() }));
+      dispatch(
+        addNode({ network, type: Blockchain.Monero, node: newUrl.trim() }),
+      );
     }
   };
 
   const handleRefreshStatus = async () => {
     // Don't refresh if pool is enabled or no node URL is configured
     if (!moneroNodeUrl || useMoneroRpcPool) return;
-    
+
     setIsRefreshing(true);
     try {
-      const status = await getNodeStatus(moneroNodeUrl, Blockchain.Monero, network);
-      
+      const status = await getNodeStatus(
+        moneroNodeUrl,
+        Blockchain.Monero,
+        network,
+      );
+
       // Update the status in the store
-      dispatch(setStatus({ node: moneroNodeUrl, status, blockchain: Blockchain.Monero }));
+      dispatch(
+        setStatus({
+          node: moneroNodeUrl,
+          status,
+          blockchain: Blockchain.Monero,
+        }),
+      );
     } catch (error) {
       console.error("Failed to refresh node status:", error);
     } finally {
@@ -388,7 +402,9 @@ function MoneroNodeUrlSetting() {
   };
 
   const isValid = (url: string) => url === "" || isValidUrl(url, ["http"]);
-  const nodeStatus = moneroNodeUrl ? nodeStatuses[Blockchain.Monero][moneroNodeUrl] : null;
+  const nodeStatus = moneroNodeUrl
+    ? nodeStatuses[Blockchain.Monero][moneroNodeUrl]
+    : null;
 
   return (
     <TableRow>
@@ -416,26 +432,36 @@ function MoneroNodeUrlSetting() {
             noErrorWhenEmpty
           />
           <>
-            <Tooltip title={
-              useMoneroRpcPool 
-                ? "Node status checking is disabled when using the pool" 
-                : !moneroNodeUrl 
-                  ? "Enter a node URL to check status"
-                  : "Node status"
-            }>
+            <Tooltip
+              title={
+                useMoneroRpcPool
+                  ? "Node status checking is disabled when using the pool"
+                  : !moneroNodeUrl
+                    ? "Enter a node URL to check status"
+                    : "Node status"
+              }
+            >
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <Circle
-                  color={useMoneroRpcPool || !moneroNodeUrl ? "gray" : (nodeStatus ? "green" : "red")}
+                  color={
+                    useMoneroRpcPool || !moneroNodeUrl
+                      ? "gray"
+                      : nodeStatus
+                        ? "green"
+                        : "red"
+                  }
                 />
               </Box>
             </Tooltip>
-            <Tooltip title={
-              useMoneroRpcPool 
-                ? "Node status refresh is disabled when using the pool" 
-                : !moneroNodeUrl 
-                  ? "Enter a node URL to refresh status"
-                  : "Refresh node status"
-            }>
+            <Tooltip
+              title={
+                useMoneroRpcPool
+                  ? "Node status refresh is disabled when using the pool"
+                  : !moneroNodeUrl
+                    ? "Enter a node URL to refresh status"
+                    : "Refresh node status"
+              }
+            >
               <IconButton
                 onClick={handleRefreshStatus}
                 disabled={isRefreshing || useMoneroRpcPool || !moneroNodeUrl}

@@ -225,8 +225,9 @@ export async function initializeContext() {
 
   // For Monero nodes, get the configured node URL and pool setting
   const useMoneroRpcPool = store.getState().settings.useMoneroRpcPool;
-  const moneroNodes = store.getState().settings.nodes[network][Blockchain.Monero];
-  
+  const moneroNodes =
+    store.getState().settings.nodes[network][Blockchain.Monero];
+
   // Always pass the first configured monero node URL directly without checking availability
   // The backend will handle whether to use the pool or the custom node
   const moneroNode = moneroNodes.length > 0 ? moneroNodes[0] : null;

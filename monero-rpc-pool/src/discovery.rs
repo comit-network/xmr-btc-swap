@@ -332,12 +332,12 @@ impl NodeDiscovery {
         for node_url in nodes.iter() {
             if let Ok(url) = url::Url::parse(node_url) {
                 let scheme = url.scheme();
-                
+
                 // Validate scheme - must be http or https
                 if !matches!(scheme, "http" | "https") {
                     continue;
                 }
-                
+
                 // Validate host - must be non-empty
                 let Some(host) = url.host_str() else {
                     continue;
@@ -345,7 +345,7 @@ impl NodeDiscovery {
                 if host.is_empty() {
                     continue;
                 }
-                
+
                 // Validate port - must be present
                 let Some(port) = url.port() else {
                     continue;
