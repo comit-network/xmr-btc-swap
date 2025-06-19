@@ -5932,6 +5932,8 @@ dependencies = [
  "chrono",
  "clap 4.5.38",
  "dirs 5.0.1",
+ "futures",
+ "monero",
  "monero-rpc",
  "rand 0.8.5",
  "regex",
@@ -5945,6 +5947,7 @@ dependencies = [
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+ "typeshare",
  "url",
  "uuid",
 ]
@@ -9593,7 +9596,7 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "swap"
-version = ""
+version = "2.3.0-beta"
 dependencies = [
  "anyhow",
  "arti-client",
@@ -9631,6 +9634,7 @@ dependencies = [
  "monero",
  "monero-harness",
  "monero-rpc",
+ "monero-rpc-pool",
  "monero-sys",
  "once_cell",
  "pem",
@@ -12137,9 +12141,10 @@ dependencies = [
 
 [[package]]
 name = "unstoppableswap-gui-rs"
-version = ""
+version = "2.3.0-beta"
 dependencies = [
  "anyhow",
+ "monero-rpc-pool",
  "rustls 0.23.27",
  "serde",
  "serde_json",
