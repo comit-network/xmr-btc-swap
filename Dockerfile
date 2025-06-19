@@ -43,7 +43,6 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 COPY . .
 
 # Check that submodules are present (they should be initialized before building)
-# Run: git submodule update --init --recursive before building this Docker image
 RUN if [ ! -f "monero-sys/monero/CMakeLists.txt" ]; then \
         echo "ERROR: Submodules not initialized. Run 'git submodule update --init --recursive' before building Docker image."; \
         exit 1; \
