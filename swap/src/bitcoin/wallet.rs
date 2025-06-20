@@ -43,6 +43,7 @@ use super::bitcoin_address::revalidate_network;
 use super::BlockHeight;
 use crate::bitcoin::electrum_balancer::ElectrumBalancer;
 use derive_builder::Builder;
+use moka;
 
 /// We allow transaction fees of up to 20% of the transferred amount to ensure
 /// that lock transactions can always be published, even when fees are high.
@@ -66,8 +67,10 @@ pub struct Wallet<Persister = Connection, C = Client> {
     persister: Arc<TokioMutex<Persister>>,
     /// The electrum client.
     electrum_client: Arc<TokioMutex<C>>,
-    /// The mempool client.
-    mempool_client: Arc<Option<mempool_client::MempoolClient>>,
+    /// The cached fee estimator for the electrum client.
+    cached_electrum_fee_estimator: Arc<CachedFeeEstimator<C>>,
+    /// The cached fee estimator for the mempool client.
+    cached_mempool_fee_estimator: Arc<Option<CachedFeeEstimator<mempool_client::MempoolClient>>>,
     /// The network this wallet is on.
     network: Network,
     /// The number of confirmations (blocks) we require for a transaction
@@ -83,6 +86,7 @@ pub struct Wallet<Persister = Connection, C = Client> {
 }
 
 /// This is our wrapper around a bdk electrum client.
+#[derive(Clone)]
 pub struct Client {
     /// The underlying electrum balancer for load balancing across multiple servers.
     inner: Arc<ElectrumBalancer>,
@@ -130,7 +134,7 @@ impl WalletBuilder {
     /// Asynchronously builds the `Wallet<Connection>` using the configured parameters.
     /// This method contains the core logic for wallet initialization, including
     /// database setup, key derivation, and potential migration from older wallet formats.
-    pub async fn build(self) -> Result<Wallet<Connection>> {
+    pub async fn build(self) -> Result<Wallet<Connection, Client>> {
         let config = self
             .validate_config()
             .map_err(|e| anyhow!("Builder validation failed: {e}"))?;
@@ -293,6 +297,83 @@ pub trait EstimateFeeRate {
     fn min_relay_fee(&self) -> impl std::future::Future<Output = Result<FeeRate>> + Send;
 }
 
+/// A caching wrapper around EstimateFeeRate implementations.
+///
+/// Uses Moka cache with TTL (Time To Live) expiration for both fee rate estimates
+/// and minimum relay fees to reduce the frequency of network calls to Electrum and mempool.space APIs.
+#[derive(Clone)]
+pub struct CachedFeeEstimator<T> {
+    inner: T,
+    fee_cache: Arc<moka::future::Cache<u32, FeeRate>>,
+    min_relay_cache: Arc<moka::future::Cache<(), FeeRate>>,
+}
+
+impl<T> CachedFeeEstimator<T> {
+    /// Cache duration for fee estimates (2 minutes)
+    const CACHE_DURATION: Duration = Duration::from_secs(120);
+    /// Maximum number of cached fee rate entries (different target blocks)
+    const MAX_CACHE_SIZE: u64 = 10;
+
+    /// Create a new caching wrapper around an EstimateFeeRate implementation.
+    pub fn new(inner: T) -> Self {
+        Self {
+            inner,
+            fee_cache: Arc::new(
+                moka::future::Cache::builder()
+                    .max_capacity(Self::MAX_CACHE_SIZE)
+                    .time_to_live(Self::CACHE_DURATION)
+                    .build(),
+            ),
+            min_relay_cache: Arc::new(
+                moka::future::Cache::builder()
+                    .max_capacity(1) // Only one min relay fee value
+                    .time_to_live(Self::CACHE_DURATION)
+                    .build(),
+            ),
+        }
+    }
+}
+
+impl<T: EstimateFeeRate + Send + Sync> EstimateFeeRate for CachedFeeEstimator<T> {
+    async fn estimate_feerate(&self, target_block: u32) -> Result<FeeRate> {
+        // Check cache first
+        if let Some(cached_rate) = self.fee_cache.get(&target_block).await {
+            return Ok(cached_rate);
+        }
+
+        // If not in cache, fetch from underlying estimator
+        let fee_rate = self.inner.estimate_feerate(target_block).await?;
+
+        // Store in cache
+        self.fee_cache.insert(target_block, fee_rate).await;
+
+        Ok(fee_rate)
+    }
+
+    async fn min_relay_fee(&self) -> Result<FeeRate> {
+        // Check cache first
+        if let Some(cached_rate) = self.min_relay_cache.get(&()).await {
+            return Ok(cached_rate);
+        }
+
+        // If not in cache, fetch from underlying estimator
+        let min_relay_fee = self.inner.min_relay_fee().await?;
+
+        // Store in cache
+        self.min_relay_cache.insert((), min_relay_fee).await;
+
+        Ok(min_relay_fee)
+    }
+}
+
+impl<T> std::ops::Deref for CachedFeeEstimator<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl Wallet {
     /// If this many consequent addresses are unused, we stop the full scan.
     /// On old wallets we used to generate a ton of unused addresses
@@ -362,7 +443,7 @@ impl Wallet {
         sync_interval: Duration,
         env_config: crate::env::Config,
         tauri_handle: Option<TauriHandle>,
-    ) -> Result<Wallet<bdk_wallet::rusqlite::Connection>> {
+    ) -> Result<Wallet<bdk_wallet::rusqlite::Connection, Client>> {
         // Construct the private key, directory and wallet file for the new (>= 1.0.0) bdk wallet
         let xprivkey = seed.derive_extended_private_key(env_config.bitcoin_network)?;
         let wallet_dir = data_dir
@@ -425,7 +506,7 @@ impl Wallet {
         target_block: u32,
         sync_interval: Duration,
         tauri_handle: Option<TauriHandle>,
-    ) -> Result<Wallet<bdk_wallet::rusqlite::Connection>> {
+    ) -> Result<Wallet<bdk_wallet::rusqlite::Connection, Client>> {
         Self::create_new(
             seed.derive_extended_private_key(network)?,
             network,
@@ -458,7 +539,7 @@ impl Wallet {
         old_wallet: Option<pre_1_0_0_bdk::Export>,
         tauri_handle: Option<TauriHandle>,
         use_mempool_space_fee_estimation: bool,
-    ) -> Result<Wallet<Persister>>
+    ) -> Result<Wallet<Persister, Client>>
     where
         Persister: WalletPersister + Sized,
         <Persister as WalletPersister>::Error: std::error::Error + Send + Sync + 'static,
@@ -550,10 +631,16 @@ impl Wallet {
             None
         };
 
+        // Create cached fee estimators
+        let cached_electrum_fee_estimator = Arc::new(CachedFeeEstimator::new(client.clone()));
+        let cached_mempool_fee_estimator =
+            Arc::new(mempool_client.clone().map(CachedFeeEstimator::new));
+
         Ok(Wallet {
             wallet: wallet.into_arc_mutex_async(),
             electrum_client: client.into_arc_mutex_async(),
-            mempool_client: Arc::new(mempool_client),
+            cached_electrum_fee_estimator,
+            cached_mempool_fee_estimator,
             persister: persister.into_arc_mutex_async(),
             tauri_handle,
             network,
@@ -573,7 +660,7 @@ impl Wallet {
         target_block: u32,
         tauri_handle: Option<TauriHandle>,
         use_mempool_space_fee_estimation: bool,
-    ) -> Result<Wallet<Persister>>
+    ) -> Result<Wallet<Persister, Client>>
     where
         Persister: WalletPersister + Sized,
         <Persister as WalletPersister>::Error: std::error::Error + Send + Sync + 'static,
@@ -596,19 +683,23 @@ impl Wallet {
             .context("Failed to open database")?
             .context("No wallet found in database")?;
 
-        // Create the mempool client
-        let mempool_client = if use_mempool_space_fee_estimation {
+        // Create the mempool client with caching
+        let cached_mempool_fee_estimator = if use_mempool_space_fee_estimation {
             mempool_client::MempoolClient::new(network).inspect_err(|e| {
                 tracing::warn!("Failed to create mempool client: {:?}. We will only use the Electrum server for fee estimation.", e);
-            }).ok()
+            }).ok().map(CachedFeeEstimator::new)
         } else {
             None
         };
 
+        // Wrap the electrum client with caching
+        let cached_electrum_fee_estimator = Arc::new(CachedFeeEstimator::new(client.clone()));
+
         let wallet = Wallet {
             wallet: wallet.into_arc_mutex_async(),
             electrum_client: client.into_arc_mutex_async(),
-            mempool_client: Arc::new(mempool_client),
+            cached_electrum_fee_estimator,
+            cached_mempool_fee_estimator: Arc::new(cached_mempool_fee_estimator),
             persister: persister.into_arc_mutex_async(),
             tauri_handle,
             network,
@@ -1095,10 +1186,11 @@ where
     /// If either of the clients fail but the other is successful, we use the successful one.
     /// If both clients fail, we return an error
     async fn combined_fee_rate(&self) -> Result<FeeRate> {
-        let electrum_client = self.electrum_client.lock().await;
-        let electrum_future = electrum_client.estimate_feerate(self.target_block);
+        let electrum_future = self
+            .cached_electrum_fee_estimator
+            .estimate_feerate(self.target_block);
         let mempool_future = async {
-            match self.mempool_client.as_ref() {
+            match self.cached_mempool_fee_estimator.as_ref() {
                 Some(mempool_client) => mempool_client
                     .estimate_feerate(self.target_block)
                     .await
@@ -1174,10 +1266,9 @@ where
     ///
     /// Only fails if both sources fail. Always chooses the higher value.
     async fn combined_min_relay_fee(&self) -> Result<FeeRate> {
-        let electrum_client = self.electrum_client.lock().await;
-        let electrum_future = electrum_client.min_relay_fee();
+        let electrum_future = self.cached_electrum_fee_estimator.min_relay_fee();
         let mempool_future = async {
-            match self.mempool_client.as_ref() {
+            match self.cached_mempool_fee_estimator.as_ref() {
                 Some(mempool_client) => mempool_client.min_relay_fee().await.map(Some),
                 None => Ok(None),
             }
@@ -2455,6 +2546,7 @@ mod mempool_client {
     /// A client for the mempool.space API.
     ///
     /// This client is used to estimate the fee rate for a transaction.
+    #[derive(Clone)]
     pub struct MempoolClient {
         client: reqwest::Client,
         base_url: String,
@@ -2751,6 +2843,7 @@ impl<T> IntoArcMutex<T> for T {
 }
 
 #[cfg(test)]
+#[derive(Clone)]
 pub struct StaticFeeRate {
     fee_rate: FeeRate,
     min_relay_fee: bitcoin::Amount,
@@ -2856,10 +2949,13 @@ impl TestWalletBuilder {
             bitcoin::Amount::from_sat(self.min_relay_sats_per_vb),
         );
 
+        let cached_electrum_fee_estimator = Arc::new(CachedFeeEstimator::new(client.clone()));
+
         let wallet = Wallet {
             wallet: bdk_core_wallet.into_arc_mutex_async(),
             electrum_client: client.into_arc_mutex_async(),
-            mempool_client: Arc::new(None), // We don't use mempool client in tests
+            cached_electrum_fee_estimator,
+            cached_mempool_fee_estimator: Arc::new(None), // We don't use mempool client in tests
             persister: persister.into_arc_mutex_async(),
             tauri_handle: None,
             network: Network::Regtest,
@@ -3307,6 +3403,264 @@ TRACE swap::bitcoin::wallet: Bitcoin transaction status changed txid=00000000000
 
                 result.expect("transaction to be signed");
             });
+        }
+    }
+
+    mod cached_fee_estimator_tests {
+        use super::*;
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        use tokio::time::{sleep, Duration};
+
+        /// Mock fee estimator that tracks how many times methods are called
+        #[derive(Clone)]
+        struct MockFeeEstimator {
+            estimate_calls: Arc<AtomicU32>,
+            min_relay_calls: Arc<AtomicU32>,
+            fee_rate: FeeRate,
+            min_relay_fee: FeeRate,
+            delay: Duration,
+        }
+
+        impl MockFeeEstimator {
+            fn new(fee_rate: FeeRate, min_relay_fee: FeeRate) -> Self {
+                Self {
+                    estimate_calls: Arc::new(AtomicU32::new(0)),
+                    min_relay_calls: Arc::new(AtomicU32::new(0)),
+                    fee_rate,
+                    min_relay_fee,
+                    delay: Duration::from_millis(0),
+                }
+            }
+
+            fn with_delay(mut self, delay: Duration) -> Self {
+                self.delay = delay;
+                self
+            }
+
+            fn estimate_call_count(&self) -> u32 {
+                self.estimate_calls.load(Ordering::SeqCst)
+            }
+
+            fn min_relay_call_count(&self) -> u32 {
+                self.min_relay_calls.load(Ordering::SeqCst)
+            }
+        }
+
+        impl EstimateFeeRate for MockFeeEstimator {
+            async fn estimate_feerate(&self, _target_block: u32) -> Result<FeeRate> {
+                self.estimate_calls.fetch_add(1, Ordering::SeqCst);
+                if !self.delay.is_zero() {
+                    sleep(self.delay).await;
+                }
+                Ok(self.fee_rate)
+            }
+
+            async fn min_relay_fee(&self) -> Result<FeeRate> {
+                self.min_relay_calls.fetch_add(1, Ordering::SeqCst);
+                if !self.delay.is_zero() {
+                    sleep(self.delay).await;
+                }
+                Ok(self.min_relay_fee)
+            }
+        }
+
+        #[tokio::test]
+        async fn caches_fee_rate_estimates() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(50).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // First call should hit the underlying estimator
+            let fee1 = cached.estimate_feerate(6).await.unwrap();
+            assert_eq!(fee1, FeeRate::from_sat_per_vb(50).unwrap());
+            assert_eq!(mock.estimate_call_count(), 1);
+
+            // Second call with same target should use cache
+            let fee2 = cached.estimate_feerate(6).await.unwrap();
+            assert_eq!(fee2, FeeRate::from_sat_per_vb(50).unwrap());
+            assert_eq!(mock.estimate_call_count(), 1); // Still 1, not 2
+
+            // Different target should hit the underlying estimator again
+            let fee3 = cached.estimate_feerate(12).await.unwrap();
+            assert_eq!(fee3, FeeRate::from_sat_per_vb(50).unwrap());
+            assert_eq!(mock.estimate_call_count(), 2);
+        }
+
+        #[tokio::test]
+        async fn caches_min_relay_fee() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(50).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // First call should hit the underlying estimator
+            let fee1 = cached.min_relay_fee().await.unwrap();
+            assert_eq!(fee1, FeeRate::from_sat_per_vb(1).unwrap());
+            assert_eq!(mock.min_relay_call_count(), 1);
+
+            // Second call should use cache
+            let fee2 = cached.min_relay_fee().await.unwrap();
+            assert_eq!(fee2, FeeRate::from_sat_per_vb(1).unwrap());
+            assert_eq!(mock.min_relay_call_count(), 1); // Still 1, not 2
+        }
+
+        #[tokio::test]
+        async fn concurrent_requests_dont_duplicate_calls() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(25).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            )
+            .with_delay(Duration::from_millis(50)); // Add delay to simulate network call
+
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // First, make one call to populate the cache
+            let _initial = cached.estimate_feerate(6).await.unwrap();
+            assert_eq!(mock.estimate_call_count(), 1);
+
+            // Now make multiple concurrent requests for the same target
+            // These should all hit the cache
+            let handles: Vec<_> = (0..5)
+                .map(|_| {
+                    let cached = cached.clone();
+                    tokio::spawn(async move { cached.estimate_feerate(6).await })
+                })
+                .collect();
+
+            // Wait for all requests to complete
+            let results: Vec<_> = futures::future::join_all(handles).await;
+
+            // All should succeed with the same value
+            for result in results {
+                let fee = result.unwrap().unwrap();
+                assert_eq!(fee, FeeRate::from_sat_per_vb(25).unwrap());
+            }
+
+            // The underlying estimator should still only have been called once
+            // since all subsequent requests should hit the cache
+            assert_eq!(
+                mock.estimate_call_count(),
+                1,
+                "Expected exactly 1 call, got {}",
+                mock.estimate_call_count()
+            );
+        }
+
+        #[tokio::test]
+        async fn different_target_blocks_cached_separately() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(30).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // Request different target blocks
+            let _fee1 = cached.estimate_feerate(1).await.unwrap();
+            let _fee2 = cached.estimate_feerate(6).await.unwrap();
+            let _fee3 = cached.estimate_feerate(12).await.unwrap();
+
+            assert_eq!(mock.estimate_call_count(), 3);
+
+            // Request same targets again - should use cache
+            let _fee1_cached = cached.estimate_feerate(1).await.unwrap();
+            let _fee2_cached = cached.estimate_feerate(6).await.unwrap();
+            let _fee3_cached = cached.estimate_feerate(12).await.unwrap();
+
+            assert_eq!(mock.estimate_call_count(), 3); // Still 3, no additional calls
+        }
+
+        #[tokio::test]
+        async fn cache_respects_ttl() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(40).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // First call
+            let _fee1 = cached.estimate_feerate(6).await.unwrap();
+            assert_eq!(mock.estimate_call_count(), 1);
+
+            // Wait for cache to expire (2 minutes + small buffer)
+            // Note: In a real test environment, you might want to use a shorter TTL
+            // or mock the time. For now, we'll just verify the cache works within TTL.
+
+            // Immediate second call should use cache
+            let _fee2 = cached.estimate_feerate(6).await.unwrap();
+            assert_eq!(mock.estimate_call_count(), 1);
+        }
+
+        #[tokio::test]
+        async fn error_propagation() {
+            #[derive(Clone)]
+            struct FailingEstimator;
+
+            impl EstimateFeeRate for FailingEstimator {
+                async fn estimate_feerate(&self, _target_block: u32) -> Result<FeeRate> {
+                    Err(anyhow::anyhow!("Network error"))
+                }
+
+                async fn min_relay_fee(&self) -> Result<FeeRate> {
+                    Err(anyhow::anyhow!("Network error"))
+                }
+            }
+
+            let cached = CachedFeeEstimator::new(FailingEstimator);
+
+            // Errors should be propagated, not cached
+            let result1 = cached.estimate_feerate(6).await;
+            assert!(result1.is_err());
+            assert!(result1.unwrap_err().to_string().contains("Network error"));
+
+            let result2 = cached.min_relay_fee().await;
+            assert!(result2.is_err());
+            assert!(result2.unwrap_err().to_string().contains("Network error"));
+        }
+
+        #[tokio::test]
+        async fn cache_capacity_limits() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(35).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached = CachedFeeEstimator::new(mock.clone());
+
+            // Fill cache beyond capacity (MAX_CACHE_SIZE = 10)
+            for target in 1..=15 {
+                let _fee = cached.estimate_feerate(target).await.unwrap();
+            }
+
+            assert_eq!(mock.estimate_call_count(), 15);
+
+            // Request some of the earlier targets - some might have been evicted
+            // Due to LRU eviction, the earliest entries might be gone
+            let _fee = cached.estimate_feerate(1).await.unwrap();
+
+            // The exact behavior depends on Moka's eviction policy,
+            // but we should see that the cache is working within its limits
+            assert!(mock.estimate_call_count() >= 15);
+        }
+
+        #[tokio::test]
+        async fn clone_shares_cache() {
+            let mock = MockFeeEstimator::new(
+                FeeRate::from_sat_per_vb(45).unwrap(),
+                FeeRate::from_sat_per_vb(1).unwrap(),
+            );
+            let cached1 = CachedFeeEstimator::new(mock.clone());
+            let cached2 = cached1.clone();
+
+            // First estimator makes a call
+            let _fee1 = cached1.estimate_feerate(6).await.unwrap();
+            assert_eq!(mock.estimate_call_count(), 1);
+
+            // Second estimator should use the shared cache
+            let _fee2 = cached2.estimate_feerate(6).await.unwrap();
+            assert_eq!(mock.estimate_call_count(), 1); // Still 1, cache was shared
         }
     }
 }

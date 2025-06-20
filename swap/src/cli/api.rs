@@ -556,7 +556,7 @@ async fn init_bitcoin_wallet(
     env_config: EnvConfig,
     bitcoin_target_block: u16,
     tauri_handle_option: Option<TauriHandle>,
-) -> Result<bitcoin::Wallet> {
+) -> Result<bitcoin::Wallet<bdk_wallet::rusqlite::Connection, bitcoin::wallet::Client>> {
     let mut builder = bitcoin::wallet::WalletBuilder::default()
         .seed(seed.clone())
         .network(env_config.bitcoin_network)

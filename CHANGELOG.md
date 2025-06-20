@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB + GUI + CLI: We now cache fee estimates for the Bitcoin wallet for up to 2 minutes. This improves the speed of fee estimation and reduces the number of requests to the Electrum servers.
+
 ## [2.3.0-beta.1] - 2025-06-19
 
 - ASB + CLI + GUI: Introduce a load-balancing proxy for Monero RPC nodes that automatically discovers healthy nodes and routes requests to improve connection reliability.
