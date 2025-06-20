@@ -36,8 +36,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Rust 1.82
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.82.0
+# Install Rust 1.85
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.85.0
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY . .

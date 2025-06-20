@@ -57,7 +57,7 @@ jobs:
         id: make-commit
         env:
           DPRINT_VERSION: "0.50.0"
-          RUST_TOOLCHAIN: "1.82"
+          RUST_TOOLCHAIN: "1.85"
         run: |
           rustup component add rustfmt --toolchain "$RUST_TOOLCHAIN-x86_64-unknown-linux-gnu"
           curl -fsSL https://dprint.dev/install.sh | sh -s $DPRINT_VERSION
