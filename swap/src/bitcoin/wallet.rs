@@ -41,7 +41,7 @@ use tracing::{debug_span, Instrument};
 
 use super::bitcoin_address::revalidate_network;
 use super::BlockHeight;
-use crate::bitcoin::electrum_balancer::ElectrumBalancer;
+use electrum_pool::ElectrumBalancer;
 use derive_builder::Builder;
 use moka;
 
@@ -754,7 +754,7 @@ impl Wallet {
                 kind, txid, total_count
             );
 
-            let multi_error = crate::bitcoin::electrum_balancer::MultiError::new(errors, context);
+            let multi_error = electrum_pool::MultiError::new(errors, context);
             return Err(anyhow::Error::from(multi_error));
         }
 

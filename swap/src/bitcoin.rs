@@ -1,4 +1,3 @@
-pub mod electrum_balancer;
 pub mod wallet;
 
 mod cancel;
@@ -458,7 +457,7 @@ impl From<RpcErrorCode> for i64 {
 
 pub fn parse_rpc_error_code(error: &anyhow::Error) -> anyhow::Result<i64> {
     // First try to extract an Electrum error from a MultiError if present
-    if let Some(multi_error) = error.downcast_ref::<crate::bitcoin::electrum_balancer::MultiError>()
+    if let Some(multi_error) = error.downcast_ref::<electrum_pool::MultiError>()
     {
         // Try to find the first Electrum error in the MultiError
         for single_error in multi_error.iter() {
