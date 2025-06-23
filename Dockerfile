@@ -50,6 +50,9 @@ RUN if [ ! -f "monero-sys/monero/CMakeLists.txt" ]; then \
 
 WORKDIR /build/swap
 
+# Act as if we are in a GitHub Actions environment
+ENV DOCKER_BUILD=true
+
 RUN cargo build -vv --bin=asb
 
 FROM ubuntu:24.04
