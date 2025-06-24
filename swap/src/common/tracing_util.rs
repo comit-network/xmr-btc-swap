@@ -190,20 +190,6 @@ pub fn init(
     Ok(())
 }
 
-/// This function controls which crate's logs actually get logged and from which level.
-fn env_filter(level_filter: LevelFilter, crates: Vec<&str>) -> Result<EnvFilter> {
-    let mut filter = EnvFilter::from_default_env();
-
-    // Add directives for each crate in the provided list
-    for crate_name in crates {
-        filter = filter.add_directive(Directive::from_str(&format!(
-            "{}={}",
-            crate_name, &level_filter
-        ))?);
-    }
-
-    Ok(filter)
-}
 
 /// This function controls which crate's logs actually get logged and from which level, with info-level crates at INFO level or higher.
 fn env_filter_with_info_crates(
@@ -223,37 +209,6 @@ fn env_filter_with_info_crates(
 
     for crate_name in info_level_crates {
         filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
-    }
-
-    Ok(filter)
-}
-
-/// This function controls which crate's logs actually get logged and from which level, with libp2p crates at INFO level or higher.
-fn env_filter_with_libp2p_info(
-    level_filter: LevelFilter,
-    our_crates: Vec<&str>,
-    libp2p_crates: Vec<&str>,
-    tor_crates: Vec<&str>,
-) -> Result<EnvFilter> {
-    let mut filter = EnvFilter::from_default_env();
-
-    // Add directives for each crate in the provided list
-    for crate_name in our_crates {
-        filter = filter.add_directive(Directive::from_str(&format!(
-            "{}={}",
-            crate_name, &level_filter
-        ))?);
-    }
-
-    for crate_name in libp2p_crates {
-        filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
-    }
-
-    for crate_name in tor_crates {
-        filter = filter.add_directive(Directive::from_str(&format!(
-            "{}={}",
-            crate_name, &level_filter
-        ))?);
     }
 
     Ok(filter)
