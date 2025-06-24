@@ -15,6 +15,11 @@ Join our [Matrix room](https://matrix.to/#/#unstoppableswap-core:matrix.org) to 
 
 ![Screenshot 2024-11-21 at 6 19 03 PM](https://github.com/user-attachments/assets/a9fe110e-90b4-4af8-8980-d4207a5e2a71)
 
+## Contributing
+
+We have a `justfile` containing a lot of useful commands. 
+Run `just help` to see all the available commands.
+
 ## Running tests
 
 This repository uses [cargo-nextest](https://nexte.st/docs/running/) to run the
