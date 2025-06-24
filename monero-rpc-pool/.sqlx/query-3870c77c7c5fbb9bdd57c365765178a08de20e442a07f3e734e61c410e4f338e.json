@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO monero_nodes (scheme, host, port, network, first_seen_at, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?)\n            ON CONFLICT(scheme, host, port) DO UPDATE SET\n                network = excluded.network,\n                updated_at = excluded.updated_at\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3870c77c7c5fbb9bdd57c365765178a08de20e442a07f3e734e61c410e4f338e"
+}

@@ -100,15 +100,15 @@ impl NodePool {
         score
     }
 
-    pub async fn record_success(&self, url: &str, latency_ms: f64) -> Result<()> {
+    pub async fn record_success(&self, scheme: &str, host: &str, port: i64, latency_ms: f64) -> Result<()> {
         self.db
-            .record_health_check(url, true, Some(latency_ms))
+            .record_health_check(scheme, host, port, true, Some(latency_ms))
             .await?;
         Ok(())
     }
 
-    pub async fn record_failure(&self, url: &str) -> Result<()> {
-        self.db.record_health_check(url, false, None).await?;
+    pub async fn record_failure(&self, scheme: &str, host: &str, port: i64) -> Result<()> {
+        self.db.record_health_check(scheme, host, port, false, None).await?;
         Ok(())
     }
 

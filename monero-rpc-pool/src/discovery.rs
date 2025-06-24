@@ -116,7 +116,7 @@ impl NodeDiscovery {
     }
 
     /// Enhanced health check that detects network and validates node identity
-    pub async fn check_node_health(&self, url: &str) -> Result<HealthCheckOutcome> {
+    pub async fn check_node_health(&self, scheme: &str, host: &str, port: i64) -> Result<HealthCheckOutcome> {
         let start_time = Instant::now();
 
         let rpc_request = serde_json::json!({
@@ -125,8 +125,8 @@ impl NodeDiscovery {
             "method": "get_info"
         });
 
-        let full_url = format!("{}/json_rpc", url);
-        let response = self.client.post(&full_url).json(&rpc_request).send().await;
+        let node_url = format!("{}://{}:{}/json_rpc", scheme, host, port);
+        let response = self.client.post(&node_url).json(&rpc_request).send().await;
 
         let latency = start_time.elapsed();
 
@@ -214,7 +214,6 @@ impl NodeDiscovery {
                 scheme,
                 host,
                 port,
-                full_url,
                 network as "network!: String",
                 first_seen_at
             FROM monero_nodes 
@@ -229,12 +228,14 @@ impl NodeDiscovery {
         let mut corrected_count = 0;
 
         for node in all_nodes {
-            match self.check_node_health(&node.full_url).await {
+            match self.check_node_health(&node.scheme, &node.host, node.port).await {
                 Ok(outcome) => {
                     // Always record the health check
                     self.db
                         .record_health_check(
-                            &node.full_url,
+                            &node.scheme,
+                            &node.host,
+                            node.port,
                             outcome.was_successful,
                             if outcome.was_successful {
                                 Some(outcome.latency.as_millis() as f64)
@@ -251,10 +252,11 @@ impl NodeDiscovery {
                         if let Some(discovered_network) = outcome.discovered_network {
                             let discovered_network_str = network_to_string(&discovered_network);
                             if node.network != discovered_network_str {
+                                let node_url = format!("{}://{}:{}", node.scheme, node.host, node.port);
                                 warn!("Network mismatch detected for node {}: stored={}, discovered={}. Correcting...", 
-                                      node.full_url, node.network, discovered_network_str);
+                                      node_url, node.network, discovered_network_str);
                                 self.db
-                                    .update_node_network(&node.full_url, &discovered_network_str)
+                                    .update_node_network(&node.scheme, &node.host, node.port, &discovered_network_str)
                                     .await?;
                                 corrected_count += 1;
                             }
@@ -264,7 +266,7 @@ impl NodeDiscovery {
                 }
                 Err(_e) => {
                     self.db
-                        .record_health_check(&node.full_url, false, None)
+                        .record_health_check(&node.scheme, &node.host, node.port, false, None)
                         .await?;
                 }
             }

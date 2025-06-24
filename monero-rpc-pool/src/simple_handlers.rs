@@ -60,7 +60,7 @@ fn extract_jsonrpc_method(body: &[u8]) -> Option<String> {
 }
 
 async fn raw_http_request(
-    node_url: &str,
+    node_url: (String, String, i64),
     path: &str,
     method: &str,
     headers: &HeaderMap,
@@ -71,7 +71,8 @@ async fn raw_http_request(
         .build()
         .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
-    let url = format!("{}{}", node_url, path);
+    let (scheme, host, port) = &node_url;
+    let url = format!("{}://{}:{}{}", scheme, host, port, path);
 
     // Use generic request method to support any HTTP verb
     let http_method = method
@@ -148,31 +149,33 @@ async fn raw_http_request(
     Ok(axum_response)
 }
 
-async fn record_success(state: &AppState, node_url: &str, latency_ms: f64) {
+async fn record_success(state: &AppState, scheme: &str, host: &str, port: i64, latency_ms: f64) {
     let node_pool_guard = state.node_pool.read().await;
-    if let Err(e) = node_pool_guard.record_success(node_url, latency_ms).await {
-        error!("Failed to record success for {}: {}", node_url, e);
+    if let Err(e) = node_pool_guard.record_success(scheme, host, port, latency_ms).await {
+        error!("Failed to record success for {}://{}:{}: {}", scheme, host, port, e);
     }
 }
 
-async fn record_failure(state: &AppState, node_url: &str) {
+async fn record_failure(state: &AppState, scheme: &str, host: &str, port: i64) {
     let node_pool_guard = state.node_pool.read().await;
-    if let Err(e) = node_pool_guard.record_failure(node_url).await {
-        error!("Failed to record failure for {}: {}", node_url, e);
+    if let Err(e) = node_pool_guard.record_failure(scheme, host, port).await {
+        error!("Failed to record failure for {}://{}:{}: {}", scheme, host, port, e);
     }
 }
 
 async fn single_raw_request(
     state: &AppState,
-    node_url: String,
+    node_url: (String, String, i64),
     path: &str,
     method: &str,
     headers: &HeaderMap,
     body: Option<&[u8]>,
-) -> Result<(Response, String, f64), HandlerError> {
+) -> Result<(Response, (String, String, i64), f64), HandlerError> {
+    let (scheme, host, port) = &node_url;
+
     let start_time = Instant::now();
 
-    match raw_http_request(&node_url, path, method, headers, body).await {
+    match raw_http_request(node_url.clone(), path, method, headers, body).await {
         Ok(response) => {
             let elapsed = start_time.elapsed();
             let latency_ms = elapsed.as_millis() as f64;
@@ -187,22 +190,22 @@ async fn single_raw_request(
                         .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
                     if is_jsonrpc_error(&body_bytes) {
-                        record_failure(state, &node_url).await;
+                        record_failure(state, scheme, host, *port).await;
                         return Err(HandlerError::RequestError("JSON-RPC error".to_string()));
                     }
 
                     // Reconstruct response with the body we consumed
                     let response = Response::from_parts(parts, Body::from(body_bytes));
-                    record_success(state, &node_url, latency_ms).await;
+                    record_success(state, scheme, host, *port, latency_ms).await;
                     Ok((response, node_url, latency_ms))
                 } else {
                     // For non-JSON-RPC endpoints, HTTP success is enough
-                    record_success(state, &node_url, latency_ms).await;
+                    record_success(state, scheme, host, *port, latency_ms).await;
                     Ok((response, node_url, latency_ms))
                 }
             } else {
                 // Non-200 status codes are failures
-                record_failure(state, &node_url).await;
+                record_failure(state, scheme, host, *port).await;
                 Err(HandlerError::RequestError(format!(
                     "HTTP {}",
                     response.status()
@@ -210,7 +213,7 @@ async fn single_raw_request(
             }
         }
         Err(e) => {
-            record_failure(state, &node_url).await;
+            record_failure(state, scheme, host, *port).await;
             Err(e)
         }
     }
@@ -246,9 +249,9 @@ async fn race_requests(
             .await
             .map_err(|e| HandlerError::PoolError(e.to_string()))?;
 
-        let pool: Vec<String> = reliable_nodes
+        let pool: Vec<(String, String, i64)> = reliable_nodes
             .into_iter()
-            .map(|node| node.full_url())
+            .map(|node| (node.scheme, node.host, node.port))
             .collect();
 
         pool
@@ -286,7 +289,7 @@ async fn race_requests(
         }
 
         // Store node URLs for error tracking before consuming them
-        let current_nodes: Vec<String> = [&node1_option, &node2_option]
+        let current_nodes: Vec<(String, String, i64)> = [&node1_option, &node2_option]
             .iter()
             .filter_map(|opt| opt.as_ref())
             .cloned()
@@ -362,6 +365,9 @@ async fn race_requests(
 
         match result {
             Ok((response, winning_node, latency_ms)) => {
+                let (scheme, host, port) = &winning_node;
+                let winning_node = format!("{}://{}:{}", scheme, host, port);
+                
                 match &jsonrpc_method {
                     Some(rpc_method) => {
                         debug!(
@@ -377,14 +383,15 @@ async fn race_requests(
                         tried_nodes.len()
                     ),
                 }
-                record_success(state, &winning_node, latency_ms).await;
+                record_success(state, scheme, host, *port, latency_ms).await;
                 return Ok(response);
             }
             Err(e) => {
                 // Since we don't know which specific node failed in the race,
                 // record the error for all nodes in this batch
-                for node_url in &current_nodes {
-                    collected_errors.push((node_url.clone(), e.to_string()));
+                for (scheme, host, port) in &current_nodes {
+                    let node_display = format!("{}://{}:{}", scheme, host, port);
+                    collected_errors.push((node_display, e.to_string()));
                 }
                 debug!(
                     "Request failed: {} - retrying with different nodes from pool...",

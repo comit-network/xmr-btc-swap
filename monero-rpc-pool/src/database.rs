@@ -149,14 +149,13 @@ impl Database {
         port: i64,
         network: &str,
     ) -> Result<i64> {
-        let full_url = format!("{}://{}:{}", scheme, host, port);
         let now = chrono::Utc::now().to_rfc3339();
 
         let result = sqlx::query!(
             r#"
-            INSERT INTO monero_nodes (scheme, host, port, full_url, network, first_seen_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(full_url) DO UPDATE SET
+            INSERT INTO monero_nodes (scheme, host, port, network, first_seen_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(scheme, host, port) DO UPDATE SET
                 network = excluded.network,
                 updated_at = excluded.updated_at
             RETURNING id
@@ -164,7 +163,6 @@ impl Database {
             scheme,
             host,
             port,
-            full_url,
             network,
             now,
             now
@@ -176,26 +174,28 @@ impl Database {
     }
 
     /// Update a node's network after it has been identified
-    pub async fn update_node_network(&self, url: &str, network: &str) -> Result<()> {
+    pub async fn update_node_network(&self, scheme: &str, host: &str, port: i64, network: &str) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
 
         let result = sqlx::query!(
             r#"
             UPDATE monero_nodes 
             SET network = ?, updated_at = ?
-            WHERE full_url = ?
+            WHERE scheme = ? AND host = ? AND port = ?
             "#,
             network,
             now,
-            url
+            scheme,
+            host,
+            port
         )
         .execute(&self.pool)
         .await?;
 
         if result.rows_affected() > 0 {
-            debug!("Updated network for node {} to {}", url, network);
+            debug!("Updated network for node {}://{}:{} to {}", scheme, host, port, network);
         } else {
-            warn!("Failed to update network for node {}: not found", url);
+            warn!("Failed to update network for node {}://{}:{}: not found", scheme, host, port);
         }
 
         Ok(())
@@ -204,21 +204,23 @@ impl Database {
     /// Record a health check event
     pub async fn record_health_check(
         &self,
-        url: &str,
+        scheme: &str,
+        host: &str,
+        port: i64,
         was_successful: bool,
         latency_ms: Option<f64>,
     ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
 
         // First get the node_id
-        let node_row = sqlx::query!("SELECT id FROM monero_nodes WHERE full_url = ?", url)
+        let node_row = sqlx::query!("SELECT id FROM monero_nodes WHERE scheme = ? AND host = ? AND port = ?", scheme, host, port)
             .fetch_optional(&self.pool)
             .await?;
 
         let node_id = match node_row {
             Some(row) => row.id,
             None => {
-                warn!("Cannot record health check for unknown node: {}", url);
+                warn!("Cannot record health check for unknown node: {}://{}:{}", scheme, host, port);
                 return Ok(());
             }
         };
@@ -248,7 +250,6 @@ impl Database {
                 n.scheme,
                 n.host,
                 n.port,
-                n.full_url,
                 n.network,
                 n.first_seen_at,
                 CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
@@ -353,7 +354,6 @@ impl Database {
                 n.scheme,
                 n.host,
                 n.port,
-                n.full_url,
                 n.network,
                 n.first_seen_at,
                 CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
@@ -516,7 +516,6 @@ impl Database {
                 n.scheme,
                 n.host,
                 n.port,
-                n.full_url,
                 n.network,
                 n.first_seen_at,
                 CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
@@ -623,7 +622,6 @@ impl Database {
                 n.scheme,
                 n.host,
                 n.port,
-                n.full_url,
                 n.network,
                 n.first_seen_at,
                 CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
@@ -734,7 +732,6 @@ impl Database {
                     n.scheme,
                     n.host,
                     n.port,
-                    n.full_url,
                     n.network,
                     n.first_seen_at,
                     CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
@@ -835,7 +832,6 @@ impl Database {
                 n.scheme,
                 n.host,
                 n.port,
-                n.full_url,
                 n.network,
                 n.first_seen_at,
                 CAST(COALESCE(stats.success_count, 0) AS INTEGER) as "success_count!: i64",
