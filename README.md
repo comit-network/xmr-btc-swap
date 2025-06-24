@@ -17,7 +17,7 @@ Join our [Matrix room](https://matrix.to/#/#unstoppableswap-core:matrix.org) to 
 
 ## Contributing
 
-We have a `justfile` containing a lot of useful commands. 
+We have a `justfile` containing a lot of useful commands.
 Run `just help` to see all the available commands.
 
 ## Running tests

@@ -116,7 +116,12 @@ impl NodeDiscovery {
     }
 
     /// Enhanced health check that detects network and validates node identity
-    pub async fn check_node_health(&self, scheme: &str, host: &str, port: i64) -> Result<HealthCheckOutcome> {
+    pub async fn check_node_health(
+        &self,
+        scheme: &str,
+        host: &str,
+        port: i64,
+    ) -> Result<HealthCheckOutcome> {
         let start_time = Instant::now();
 
         let rpc_request = serde_json::json!({
@@ -228,7 +233,10 @@ impl NodeDiscovery {
         let mut corrected_count = 0;
 
         for node in all_nodes {
-            match self.check_node_health(&node.scheme, &node.host, node.port).await {
+            match self
+                .check_node_health(&node.scheme, &node.host, node.port)
+                .await
+            {
                 Ok(outcome) => {
                     // Always record the health check
                     self.db
@@ -252,11 +260,17 @@ impl NodeDiscovery {
                         if let Some(discovered_network) = outcome.discovered_network {
                             let discovered_network_str = network_to_string(&discovered_network);
                             if node.network != discovered_network_str {
-                                let node_url = format!("{}://{}:{}", node.scheme, node.host, node.port);
+                                let node_url =
+                                    format!("{}://{}:{}", node.scheme, node.host, node.port);
                                 warn!("Network mismatch detected for node {}: stored={}, discovered={}. Correcting...", 
                                       node_url, node.network, discovered_network_str);
                                 self.db
-                                    .update_node_network(&node.scheme, &node.host, node.port, &discovered_network_str)
+                                    .update_node_network(
+                                        &node.scheme,
+                                        &node.host,
+                                        node.port,
+                                        &discovered_network_str,
+                                    )
                                     .await?;
                                 corrected_count += 1;
                             }

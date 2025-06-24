@@ -67,16 +67,9 @@ pub fn init(
         "libp2p_dcutr",
         "monero_cpp",
     ];
-    let OUR_CRATES: Vec<&str> = vec![
-        "swap",
-        "asb",
-        "monero_sys",
-        "unstoppableswap-gui-rs",
-    ];
-    
-    let INFO_LEVEL_CRATES: Vec<&str> = vec![
-        "monero_rpc_pool",
-    ];
+    let OUR_CRATES: Vec<&str> = vec!["swap", "asb", "monero_sys", "unstoppableswap-gui-rs"];
+
+    let INFO_LEVEL_CRATES: Vec<&str> = vec!["monero_rpc_pool"];
 
     // General log file for non-verbose logs
     let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
@@ -101,7 +94,11 @@ pub fn init(
         .with_file(true)
         .with_line_number(true)
         .json()
-        .with_filter(env_filter_with_info_crates(level_filter, OUR_CRATES.clone(), INFO_LEVEL_CRATES.clone())?);
+        .with_filter(env_filter_with_info_crates(
+            level_filter,
+            OUR_CRATES.clone(),
+            INFO_LEVEL_CRATES.clone(),
+        )?);
 
     // Layer for writing to the verbose log file
     // Crates: All crates with different levels (libp2p at INFO+, others at TRACE)
@@ -163,7 +160,11 @@ pub fn init(
             TOR_CRATES.clone(),
             INFO_LEVEL_CRATES.clone(),
         )?,
-        false => env_filter_with_info_crates(level_filter, OUR_CRATES.clone(), INFO_LEVEL_CRATES.clone())?,
+        false => env_filter_with_info_crates(
+            level_filter,
+            OUR_CRATES.clone(),
+            INFO_LEVEL_CRATES.clone(),
+        )?,
     };
 
     let final_terminal_layer = match format {
@@ -189,7 +190,6 @@ pub fn init(
 
     Ok(())
 }
-
 
 /// This function controls which crate's logs actually get logged and from which level, with info-level crates at INFO level or higher.
 fn env_filter_with_info_crates(

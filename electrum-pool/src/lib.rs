@@ -193,11 +193,7 @@ where
     /// individual failures, allowing the caller to inspect and make decisions based
     /// on the specific types of errors encountered.
     #[instrument(level = "debug", skip(self, f), fields(operation = kind, total_clients = self.client_count()))]
-    pub async fn call_async_with_multi_error<F, T>(
-        &self,
-        kind: &str,
-        f: F,
-    ) -> Result<T, MultiError>
+    pub async fn call_async_with_multi_error<F, T>(&self, kind: &str, f: F) -> Result<T, MultiError>
     where
         F: Fn(&C) -> Result<T, Error> + Send + Sync + Clone + 'static,
         T: Send + 'static,

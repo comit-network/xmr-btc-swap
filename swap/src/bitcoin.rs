@@ -457,8 +457,7 @@ impl From<RpcErrorCode> for i64 {
 
 pub fn parse_rpc_error_code(error: &anyhow::Error) -> anyhow::Result<i64> {
     // First try to extract an Electrum error from a MultiError if present
-    if let Some(multi_error) = error.downcast_ref::<electrum_pool::MultiError>()
-    {
+    if let Some(multi_error) = error.downcast_ref::<electrum_pool::MultiError>() {
         // Try to find the first Electrum error in the MultiError
         for single_error in multi_error.iter() {
             if let bdk_electrum::electrum_client::Error::Protocol(serde_json::Value::String(

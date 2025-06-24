@@ -151,15 +151,24 @@ async fn raw_http_request(
 
 async fn record_success(state: &AppState, scheme: &str, host: &str, port: i64, latency_ms: f64) {
     let node_pool_guard = state.node_pool.read().await;
-    if let Err(e) = node_pool_guard.record_success(scheme, host, port, latency_ms).await {
-        error!("Failed to record success for {}://{}:{}: {}", scheme, host, port, e);
+    if let Err(e) = node_pool_guard
+        .record_success(scheme, host, port, latency_ms)
+        .await
+    {
+        error!(
+            "Failed to record success for {}://{}:{}: {}",
+            scheme, host, port, e
+        );
     }
 }
 
 async fn record_failure(state: &AppState, scheme: &str, host: &str, port: i64) {
     let node_pool_guard = state.node_pool.read().await;
     if let Err(e) = node_pool_guard.record_failure(scheme, host, port).await {
-        error!("Failed to record failure for {}://{}:{}: {}", scheme, host, port, e);
+        error!(
+            "Failed to record failure for {}://{}:{}: {}",
+            scheme, host, port, e
+        );
     }
 }
 
@@ -367,7 +376,7 @@ async fn race_requests(
             Ok((response, winning_node, latency_ms)) => {
                 let (scheme, host, port) = &winning_node;
                 let winning_node = format!("{}://{}:{}", scheme, host, port);
-                
+
                 match &jsonrpc_method {
                     Some(rpc_method) => {
                         debug!(

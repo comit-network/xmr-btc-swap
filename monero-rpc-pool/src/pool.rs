@@ -71,7 +71,8 @@ impl NodePool {
 
         debug!(
             "Selected node using P2C for network {}: {}",
-            self.network, selected.full_url()
+            self.network,
+            selected.full_url()
         );
 
         Ok(Some(selected.full_url()))
@@ -100,7 +101,13 @@ impl NodePool {
         score
     }
 
-    pub async fn record_success(&self, scheme: &str, host: &str, port: i64, latency_ms: f64) -> Result<()> {
+    pub async fn record_success(
+        &self,
+        scheme: &str,
+        host: &str,
+        port: i64,
+        latency_ms: f64,
+    ) -> Result<()> {
         self.db
             .record_health_check(scheme, host, port, true, Some(latency_ms))
             .await?;
@@ -108,7 +115,9 @@ impl NodePool {
     }
 
     pub async fn record_failure(&self, scheme: &str, host: &str, port: i64) -> Result<()> {
-        self.db.record_health_check(scheme, host, port, false, None).await?;
+        self.db
+            .record_health_check(scheme, host, port, false, None)
+            .await?;
         Ok(())
     }
 

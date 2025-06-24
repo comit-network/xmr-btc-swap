@@ -174,7 +174,13 @@ impl Database {
     }
 
     /// Update a node's network after it has been identified
-    pub async fn update_node_network(&self, scheme: &str, host: &str, port: i64, network: &str) -> Result<()> {
+    pub async fn update_node_network(
+        &self,
+        scheme: &str,
+        host: &str,
+        port: i64,
+        network: &str,
+    ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
 
         let result = sqlx::query!(
@@ -193,9 +199,15 @@ impl Database {
         .await?;
 
         if result.rows_affected() > 0 {
-            debug!("Updated network for node {}://{}:{} to {}", scheme, host, port, network);
+            debug!(
+                "Updated network for node {}://{}:{} to {}",
+                scheme, host, port, network
+            );
         } else {
-            warn!("Failed to update network for node {}://{}:{}: not found", scheme, host, port);
+            warn!(
+                "Failed to update network for node {}://{}:{}: not found",
+                scheme, host, port
+            );
         }
 
         Ok(())
@@ -213,14 +225,22 @@ impl Database {
         let now = chrono::Utc::now().to_rfc3339();
 
         // First get the node_id
-        let node_row = sqlx::query!("SELECT id FROM monero_nodes WHERE scheme = ? AND host = ? AND port = ?", scheme, host, port)
-            .fetch_optional(&self.pool)
-            .await?;
+        let node_row = sqlx::query!(
+            "SELECT id FROM monero_nodes WHERE scheme = ? AND host = ? AND port = ?",
+            scheme,
+            host,
+            port
+        )
+        .fetch_optional(&self.pool)
+        .await?;
 
         let node_id = match node_row {
             Some(row) => row.id,
             None => {
-                warn!("Cannot record health check for unknown node: {}://{}:{}", scheme, host, port);
+                warn!(
+                    "Cannot record health check for unknown node: {}://{}:{}",
+                    scheme, host, port
+                );
                 return Ok(());
             }
         };

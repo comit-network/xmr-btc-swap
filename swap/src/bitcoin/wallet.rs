@@ -41,8 +41,8 @@ use tracing::{debug_span, Instrument};
 
 use super::bitcoin_address::revalidate_network;
 use super::BlockHeight;
-use electrum_pool::ElectrumBalancer;
 use derive_builder::Builder;
+use electrum_pool::ElectrumBalancer;
 use moka;
 
 /// We allow transaction fees of up to 20% of the transferred amount to ensure
