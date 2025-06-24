@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 use serde_json::json;
-use std::{error::Error, time::Instant};
+use std::time::Instant;
 use tracing::{debug, error, info_span, Instrument};
 use uuid::Uuid;
 
@@ -69,7 +69,7 @@ async fn raw_http_request(
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
-        .map_err(|e| HandlerError::RequestError(e.to_string()))?;
+        .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
     let url = format!("{}{}", node_url, path);
 
@@ -119,19 +119,14 @@ async fn raw_http_request(
     let response = request_builder
         .send()
         .await
-        .map_err(|e| HandlerError::RequestError(e.to_string()))?;
+        .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
     // Convert to axum Response preserving everything
     let status = response.status();
     let response_headers = response.headers().clone();
 
     let body_bytes = response.bytes().await.map_err(|e| {
-        let mut error_msg = format!("Failed to read response body: {}", e);
-        if let Some(source) = e.source() {
-            error_msg.push_str(&format!(" (source: {})", source));
-        }
-
-        HandlerError::RequestError(error_msg)
+        HandlerError::RequestError(format!("Failed to read response body: {:#?}", e))
     })?;
 
     let mut axum_response = Response::new(Body::from(body_bytes));
@@ -189,7 +184,7 @@ async fn single_raw_request(
                     let (parts, body_stream) = response.into_parts();
                     let body_bytes = axum::body::to_bytes(body_stream, usize::MAX)
                         .await
-                        .map_err(|e| HandlerError::RequestError(e.to_string()))?;
+                        .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
                     if is_jsonrpc_error(&body_bytes) {
                         record_failure(state, &node_url).await;
@@ -253,7 +248,7 @@ async fn race_requests(
 
         let pool: Vec<String> = reliable_nodes
             .into_iter()
-            .map(|node| node.full_url)
+            .map(|node| node.full_url())
             .collect();
 
         pool

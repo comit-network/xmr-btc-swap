@@ -12,7 +12,6 @@ pub struct MoneroNode {
     pub scheme: String, // http or https
     pub host: String,
     pub port: i64,
-    pub full_url: String,
     pub network: String, // mainnet, stagenet, or testnet - always known at insertion time
     pub first_seen_at: String, // ISO 8601 timestamp when first discovered
     // Computed fields from health_checks (not stored in monero_nodes table)
@@ -49,14 +48,14 @@ pub struct HealthCheck {
 
 impl MoneroNode {
     pub fn new(scheme: String, host: String, port: i64, network: String) -> Self {
-        let full_url = format!("{}://{}:{}", scheme, host, port);
+        // TODO: Do this in the database
         let now = chrono::Utc::now().to_rfc3339();
+
         Self {
             id: None,
             scheme,
             host,
             port,
-            full_url,
             network,
             first_seen_at: now,
             // These are computed from health_checks
@@ -71,6 +70,10 @@ impl MoneroNode {
             max_latency_ms: None,
             last_latency_ms: None,
         }
+    }
+
+    pub fn full_url(&self) -> String {
+        format!("{}://{}:{}", self.scheme, self.host, self.port)
     }
 
     pub fn success_rate(&self) -> f64 {
@@ -318,7 +321,6 @@ impl Database {
                 scheme: row.scheme,
                 host: row.host,
                 port: row.port,
-                full_url: row.full_url,
                 network: row.network,
                 first_seen_at: row.first_seen_at,
                 success_count: row.success_count,
@@ -402,7 +404,6 @@ impl Database {
                 scheme: row.scheme,
                 host: row.host,
                 port: row.port,
-                full_url: row.full_url,
                 network: row.network,
                 first_seen_at: row.first_seen_at,
                 success_count: row.success_count,
@@ -592,7 +593,6 @@ impl Database {
                 scheme: row.scheme,
                 host: row.host,
                 port: row.port,
-                full_url: row.full_url,
                 network: row.network,
                 first_seen_at: row.first_seen_at,
                 success_count: row.success_count,
@@ -696,7 +696,6 @@ impl Database {
                 scheme: row.scheme,
                 host: row.host,
                 port: row.port,
-                full_url: row.full_url,
                 network: row.network,
                 first_seen_at: row.first_seen_at,
                 success_count: row.success_count,
@@ -810,7 +809,6 @@ impl Database {
                     scheme: row.scheme,
                     host: row.host,
                     port: row.port,
-                    full_url: row.full_url,
                     network: row.network,
                     first_seen_at: row.first_seen_at,
                     success_count: row.success_count,
@@ -917,7 +915,6 @@ impl Database {
                 scheme: row.scheme,
                 host: row.host,
                 port: row.port,
-                full_url: row.full_url,
                 network: row.network,
                 first_seen_at: row.first_seen_at,
                 success_count: row.success_count,

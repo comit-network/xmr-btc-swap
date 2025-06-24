@@ -54,7 +54,7 @@ impl NodePool {
         }
 
         if candidate_nodes.len() == 1 {
-            return Ok(Some(candidate_nodes[0].full_url.clone()));
+            return Ok(Some(candidate_nodes[0].full_url()));
         }
 
         // Power of Two Choices: pick 2 random nodes, select the better one
@@ -71,9 +71,10 @@ impl NodePool {
 
         debug!(
             "Selected node using P2C for network {}: {}",
-            self.network, selected.full_url
+            self.network, selected.full_url()
         );
-        Ok(Some(selected.full_url.clone()))
+
+        Ok(Some(selected.full_url()))
     }
 
     /// Calculate goodness score based on usage-based recency
@@ -127,7 +128,7 @@ impl NodePool {
             .into_iter()
             .take(5)
             .map(|node| ReliableNodeInfo {
-                url: node.full_url.clone(),
+                url: node.full_url(),
                 success_rate: node.success_rate(),
                 avg_latency_ms: node.avg_latency_ms,
             })
