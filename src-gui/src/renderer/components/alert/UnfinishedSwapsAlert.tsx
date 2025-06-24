@@ -24,8 +24,8 @@ export default function UnfinishedSwapsAlert() {
       >
         You have{" "}
         {resumableSwapsCount > 1
-          ? `${resumableSwapsCount} unfinished swaps`
-          : "one unfinished swap"}
+          ? `${resumableSwapsCount} pending swaps`
+          : "one pending swap"}
       </Alert>
     );
   }

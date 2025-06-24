@@ -1195,8 +1195,25 @@ pub async fn monero_recovery(
 #[tracing::instrument(fields(method = "get_current_swap"), skip(context))]
 pub async fn get_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
     Ok(json!({
-        "swap_id": context.swap_lock.get_current_swap_id().await
+        "swap_id": context.swap_lock.get_current_swap_id().await,
     }))
+}
+
+pub async fn resolve_approval_request(
+    resolve_approval: ResolveApprovalArgs,
+    ctx: Arc<Context>,
+) -> Result<ResolveApprovalResponse> {
+    let request_id = Uuid::parse_str(&resolve_approval.request_id).context("Invalid request ID")?;
+
+    if let Some(handle) = ctx.tauri_handle.clone() {
+        handle
+            .resolve_approval(request_id, resolve_approval.accept)
+            .await?;
+    } else {
+        bail!("Cannot resolve approval without a Tauri handle");
+    }
+
+    Ok(ResolveApprovalResponse { success: true })
 }
 
 fn qr_code(value: &impl ToString) -> Result<String> {
@@ -1353,6 +1370,9 @@ struct UnknownMoneroNetwork(String);
 
 impl CheckMoneroNodeArgs {
     pub async fn request(self) -> Result<CheckMoneroNodeResponse> {
+        let url = self.url.clone();
+        let network_str = self.network.clone();
+
         let network = match self.network.to_lowercase().as_str() {
             // When the GUI says testnet, it means monero stagenet
             "mainnet" => Network::Mainnet,
@@ -1373,11 +1393,20 @@ impl CheckMoneroNodeArgs {
             return Ok(CheckMoneroNodeResponse { available: false });
         };
 
-        let Ok(available) = monero_daemon.is_available(&CLIENT).await else {
-            return Ok(CheckMoneroNodeResponse { available: false });
-        };
+        match monero_daemon.is_available(&CLIENT).await {
+            Ok(available) => Ok(CheckMoneroNodeResponse { available }),
+            Err(e) => {
+                tracing::error!(
+                    url = %url,
+                    network = %network_str,
+                    error = ?e,
+                    error_chain = %format!("{:#}", e),
+                    "Failed to check monero node availability"
+                );
 
-        Ok(CheckMoneroNodeResponse { available })
+                Ok(CheckMoneroNodeResponse { available: false })
+            }
+        }
     }
 }
 
@@ -1410,14 +1439,14 @@ impl CheckElectrumNodeArgs {
 }
 
 #[typeshare]
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResolveApprovalArgs {
     pub request_id: String,
     pub accept: bool,
 }
 
 #[typeshare]
-#[derive(Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResolveApprovalResponse {
     pub success: bool,
 }
@@ -1426,14 +1455,6 @@ impl Request for ResolveApprovalArgs {
     type Response = ResolveApprovalResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        let request_id = Uuid::parse_str(&self.request_id).context("Invalid request ID")?;
-
-        if let Some(handle) = ctx.tauri_handle.clone() {
-            handle.resolve_approval(request_id, self.accept).await?;
-        } else {
-            bail!("Cannot resolve approval without a Tauri handle");
-        }
-
-        Ok(ResolveApprovalResponse { success: true })
+        resolve_approval_request(self, ctx).await
     }
 }

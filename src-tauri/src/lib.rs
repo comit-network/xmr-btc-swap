@@ -17,7 +17,7 @@ use swap::cli::{
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
     },
-    command::{Bitcoin, Monero},
+    command::Bitcoin,
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -141,7 +141,8 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // We need to set a value for the Tauri state right at the start
     // If we don't do this, Tauri commands will panic at runtime if no value is present
-    app_handle.manage::<RwLock<State>>(RwLock::new(State::new()));
+    let state = RwLock::new(State::new());
+    app_handle.manage::<RwLock<State>>(state);
 
     Ok(())
 }
@@ -192,7 +193,7 @@ pub fn run() {
             get_data_dir,
             resolve_approval_request,
             redact,
-            save_txt_files
+            save_txt_files,
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -377,9 +378,7 @@ async fn initialize_context(
             bitcoin_electrum_rpc_urls: settings.electrum_rpc_urls.clone(),
             bitcoin_target_block: None,
         })
-        .with_monero(Monero {
-            monero_node_address: settings.monero_node_url.clone(),
-        })
+        .with_monero(settings.monero_node_config)
         .with_json(false)
         .with_debug(true)
         .with_tor(settings.use_tor)

@@ -67,7 +67,16 @@ pub fn init(
         "libp2p_dcutr",
         "monero_cpp",
     ];
-    let OUR_CRATES: Vec<&str> = vec!["swap", "asb", "monero_sys", "unstoppableswap-gui-rs"];
+    let OUR_CRATES: Vec<&str> = vec![
+        "swap",
+        "asb",
+        "monero_sys",
+        "unstoppableswap-gui-rs",
+    ];
+    
+    let INFO_LEVEL_CRATES: Vec<&str> = vec![
+        "monero_rpc_pool",
+    ];
 
     // General log file for non-verbose logs
     let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
@@ -89,8 +98,10 @@ pub fn init(
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
         .json()
-        .with_filter(env_filter(level_filter, OUR_CRATES.clone())?);
+        .with_filter(env_filter_with_info_crates(level_filter, OUR_CRATES.clone(), INFO_LEVEL_CRATES.clone())?);
 
     // Layer for writing to the verbose log file
     // Crates: All crates with different levels (libp2p at INFO+, others at TRACE)
@@ -100,12 +111,15 @@ pub fn init(
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
         .json()
-        .with_filter(env_filter_with_libp2p_info(
+        .with_filter(env_filter_with_all_crates(
             LevelFilter::TRACE,
             OUR_CRATES.clone(),
             LIBP2P_CRATES.clone(),
             TOR_CRATES.clone(),
+            INFO_LEVEL_CRATES.clone(),
         )?);
 
     // Layer for writing to the terminal
@@ -116,7 +130,9 @@ pub fn init(
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
         .with_timer(UtcTime::rfc_3339())
-        .with_target(true);
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true);
 
     // Layer for writing to the Tauri guest. This will be displayed in the GUI.
     // Crates: All crates with libp2p at INFO+ level
@@ -126,24 +142,28 @@ pub fn init(
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
         .json()
-        .with_filter(env_filter_with_libp2p_info(
+        .with_filter(env_filter_with_all_crates(
             level_filter,
             OUR_CRATES.clone(),
             LIBP2P_CRATES.clone(),
             TOR_CRATES.clone(),
+            INFO_LEVEL_CRATES.clone(),
         )?);
 
     // If trace_stdout is true, we log all messages to the terminal
     // Otherwise, we only log the bare minimum
     let terminal_layer_env_filter = match trace_stdout {
-        true => env_filter_with_libp2p_info(
+        true => env_filter_with_all_crates(
             LevelFilter::TRACE,
             OUR_CRATES.clone(),
             LIBP2P_CRATES.clone(),
             TOR_CRATES.clone(),
+            INFO_LEVEL_CRATES.clone(),
         )?,
-        false => env_filter(level_filter, OUR_CRATES.clone())?,
+        false => env_filter_with_info_crates(level_filter, OUR_CRATES.clone(), INFO_LEVEL_CRATES.clone())?,
     };
 
     let final_terminal_layer = match format {
@@ -185,6 +205,29 @@ fn env_filter(level_filter: LevelFilter, crates: Vec<&str>) -> Result<EnvFilter>
     Ok(filter)
 }
 
+/// This function controls which crate's logs actually get logged and from which level, with info-level crates at INFO level or higher.
+fn env_filter_with_info_crates(
+    level_filter: LevelFilter,
+    our_crates: Vec<&str>,
+    info_level_crates: Vec<&str>,
+) -> Result<EnvFilter> {
+    let mut filter = EnvFilter::from_default_env();
+
+    // Add directives for each crate in the provided list
+    for crate_name in our_crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    for crate_name in info_level_crates {
+        filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
+    }
+
+    Ok(filter)
+}
+
 /// This function controls which crate's logs actually get logged and from which level, with libp2p crates at INFO level or higher.
 fn env_filter_with_libp2p_info(
     level_filter: LevelFilter,
@@ -211,6 +254,42 @@ fn env_filter_with_libp2p_info(
             "{}={}",
             crate_name, &level_filter
         ))?);
+    }
+
+    Ok(filter)
+}
+
+/// This function controls which crate's logs actually get logged and from which level, including all crate categories.
+fn env_filter_with_all_crates(
+    level_filter: LevelFilter,
+    our_crates: Vec<&str>,
+    libp2p_crates: Vec<&str>,
+    tor_crates: Vec<&str>,
+    info_level_crates: Vec<&str>,
+) -> Result<EnvFilter> {
+    let mut filter = EnvFilter::from_default_env();
+
+    // Add directives for each crate in the provided list
+    for crate_name in our_crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    for crate_name in libp2p_crates {
+        filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
+    }
+
+    for crate_name in tor_crates {
+        filter = filter.add_directive(Directive::from_str(&format!(
+            "{}={}",
+            crate_name, &level_filter
+        ))?);
+    }
+
+    for crate_name in info_level_crates {
+        filter = filter.add_directive(Directive::from_str(&format!("{}=INFO", crate_name))?);
     }
 
     Ok(filter)

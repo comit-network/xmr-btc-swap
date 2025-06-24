@@ -20,7 +20,9 @@ use std::fmt;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once};
-use tauri_bindings::{TauriBackgroundProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle};
+use tauri_bindings::{
+    MoneroNodeConfig, TauriBackgroundProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
 use tor_rtcompat::tokio::TokioRustlsRuntime;
@@ -188,12 +190,13 @@ pub struct Context {
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_manager: Option<Arc<monero::Wallets>>,
     tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
+    monero_rpc_pool_handle: Option<Arc<monero_rpc_pool::PoolHandle>>,
 }
 
 /// A conveniant builder struct for [`Context`].
 #[must_use = "ContextBuilder must be built to be useful"]
 pub struct ContextBuilder {
-    monero: Option<Monero>,
+    monero_config: Option<MoneroNodeConfig>,
     bitcoin: Option<Bitcoin>,
     data: Option<PathBuf>,
     is_testnet: bool,
@@ -216,7 +219,7 @@ impl ContextBuilder {
     /// Basic builder with default options for mainnet
     pub fn mainnet() -> Self {
         ContextBuilder {
-            monero: None,
+            monero_config: None,
             bitcoin: None,
             data: None,
             is_testnet: false,
@@ -235,8 +238,8 @@ impl ContextBuilder {
     }
 
     /// Configures the Context to initialize a Monero wallet with the given configuration.
-    pub fn with_monero(mut self, monero: impl Into<Option<Monero>>) -> Self {
-        self.monero = monero.into();
+    pub fn with_monero(mut self, monero_config: impl Into<Option<MoneroNodeConfig>>) -> Self {
+        self.monero_config = monero_config.into();
         self
     }
 
@@ -247,8 +250,8 @@ impl ContextBuilder {
     }
 
     /// Attach a handle to Tauri to the Context for emitting events etc.
-    pub fn with_tauri(mut self, tauri: impl Into<Option<TauriHandle>>) -> Self {
-        self.tauri_handle = tauri.into();
+    pub fn with_tauri(mut self, tauri_handle: impl Into<Option<TauriHandle>>) -> Self {
+        self.tauri_handle = tauri_handle.into();
         self
     }
 
@@ -364,17 +367,61 @@ impl ContextBuilder {
         };
 
         let initialize_monero_wallet = async {
-            match self.monero {
-                Some(monero) => {
+            match self.monero_config {
+                Some(monero_config) => {
                     let monero_progress_handle = tauri_handle
                         .new_background_process_with_initial_progress(
                             TauriBackgroundProgress::OpeningMoneroWallet,
                             (),
                         );
 
+                    // Handle the different monero configurations
+                    let (monero_node_address, rpc_pool_handle) = match monero_config {
+                        MoneroNodeConfig::Pool => {
+                            // Start RPC pool and use it
+                            match monero_rpc_pool::start_server_with_random_port(
+                                monero_rpc_pool::config::Config::new_random_port(
+                                    "127.0.0.1".to_string(),
+                                    data_dir.join("monero-rpc-pool"),
+                                ),
+                                match self.is_testnet {
+                                    true => crate::monero::Network::Stagenet,
+                                    false => crate::monero::Network::Mainnet,
+                                },
+                            )
+                            .await
+                            {
+                                Ok((server_info, mut status_receiver, pool_handle)) => {
+                                    let rpc_url =
+                                        format!("http://{}:{}", server_info.host, server_info.port);
+                                    tracing::info!("Monero RPC Pool started on {}", rpc_url);
+
+                                    // Start listening for pool status updates and forward them to frontend
+                                    if let Some(ref handle) = self.tauri_handle {
+                                        let pool_tauri_handle = handle.clone();
+                                        tokio::spawn(async move {
+                                            while let Ok(status) = status_receiver.recv().await {
+                                                pool_tauri_handle.emit_pool_status_update(status);
+                                            }
+                                        });
+                                    }
+
+                                    (Some(rpc_url), Some(Arc::new(pool_handle)))
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to start Monero RPC Pool: {}", e);
+                                    (None, None)
+                                }
+                            }
+                        }
+                        MoneroNodeConfig::SingleNode { url } => {
+                            (if url.is_empty() { None } else { Some(url) }, None)
+                        }
+                    };
+
                     let wallets = init_monero_wallet(
                         data_dir.as_path(),
-                        monero.monero_node_address.map(|url| url.to_string()),
+                        monero_node_address,
                         env_config,
                         tauri_handle.clone(),
                     )
@@ -382,9 +429,9 @@ impl ContextBuilder {
 
                     monero_progress_handle.finish();
 
-                    Ok(Some(wallets))
+                    Ok((Some(wallets), rpc_pool_handle))
                 }
-                None => Ok(None),
+                None => Ok((None, None)),
             }
         };
 
@@ -405,7 +452,7 @@ impl ContextBuilder {
             Ok(maybe_tor_client)
         };
 
-        let (bitcoin_wallet, monero_manager, tor) = tokio::try_join!(
+        let (bitcoin_wallet, (monero_manager, monero_rpc_pool_handle), tor) = tokio::try_join!(
             initialize_bitcoin_wallet,
             initialize_monero_wallet,
             initialize_tor_client,
@@ -443,6 +490,7 @@ impl ContextBuilder {
             tasks,
             tauri_handle: self.tauri_handle,
             tor_client: tor,
+            monero_rpc_pool_handle,
         };
 
         Ok(context)
@@ -476,6 +524,7 @@ impl Context {
             tasks: PendingTaskList::default().into(),
             tauri_handle: None,
             tor_client: None,
+            monero_rpc_pool_handle: None,
         }
     }
 
@@ -507,7 +556,7 @@ async fn init_bitcoin_wallet(
     env_config: EnvConfig,
     bitcoin_target_block: u16,
     tauri_handle_option: Option<TauriHandle>,
-) -> Result<bitcoin::Wallet> {
+) -> Result<bitcoin::Wallet<bdk_wallet::rusqlite::Connection, bitcoin::wallet::Client>> {
     let mut builder = bitcoin::wallet::WalletBuilder::default()
         .seed(seed.clone())
         .network(env_config.bitcoin_network)
@@ -634,6 +683,23 @@ impl Config {
             is_testnet: false,
             data_dir,
         }
+    }
+}
+
+impl From<Monero> for MoneroNodeConfig {
+    fn from(monero: Monero) -> Self {
+        match monero.monero_node_address {
+            Some(url) => MoneroNodeConfig::SingleNode {
+                url: url.to_string(),
+            },
+            None => MoneroNodeConfig::Pool,
+        }
+    }
+}
+
+impl From<Monero> for Option<MoneroNodeConfig> {
+    fn from(monero: Monero) -> Self {
+        Some(MoneroNodeConfig::from(monero))
     }
 }
 

@@ -197,7 +197,7 @@ where
         &self,
         kind: &str,
         f: F,
-    ) -> Result<T, crate::bitcoin::electrum_balancer::MultiError>
+    ) -> Result<T, MultiError>
     where
         F: Fn(&C) -> Result<T, Error> + Send + Sync + Clone + 'static,
         T: Send + 'static,

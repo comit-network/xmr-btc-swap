@@ -1,6 +1,6 @@
 [package]
 name = "unstoppableswap-gui-rs"
-version = "2.2.0-beta"
+version = "2.3.0-beta.1"
 authors = [ "binarybaron", "einliterflasche", "unstoppableswap" ]
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,6 +16,7 @@ tauri-build = { version = "^2.0.0", features = [ "config-json5" ] }
 
 [dependencies]
 anyhow = "1"
+monero-rpc-pool = { path = "../monero-rpc-pool" }
 rustls = { version = "0.23.26", default-features = false, features = ["ring"] }
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"

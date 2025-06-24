@@ -1,0 +1,116 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT \n                n.id as \"id!: i64\",\n                n.scheme,\n                n.host,\n                n.port,\n                n.full_url,\n                n.network,\n                n.first_seen_at,\n                CAST(COALESCE(stats.success_count, 0) AS INTEGER) as \"success_count!: i64\",\n                CAST(COALESCE(stats.failure_count, 0) AS INTEGER) as \"failure_count!: i64\",\n                stats.last_success as \"last_success?: String\",\n                stats.last_failure as \"last_failure?: String\",\n                stats.last_checked as \"last_checked?: String\",\n                CAST(CASE WHEN reliable_nodes.node_id IS NOT NULL THEN 1 ELSE 0 END AS INTEGER) as \"is_reliable!: i64\",\n                stats.avg_latency_ms as \"avg_latency_ms?: f64\",\n                stats.min_latency_ms as \"min_latency_ms?: f64\",\n                stats.max_latency_ms as \"max_latency_ms?: f64\",\n                stats.last_latency_ms as \"last_latency_ms?: f64\"\n            FROM monero_nodes n\n            LEFT JOIN (\n                SELECT \n                    node_id,\n                    SUM(CASE WHEN was_successful THEN 1 ELSE 0 END) as success_count,\n                    SUM(CASE WHEN NOT was_successful THEN 1 ELSE 0 END) as failure_count,\n                    MAX(CASE WHEN was_successful THEN timestamp END) as last_success,\n                    MAX(CASE WHEN NOT was_successful THEN timestamp END) as last_failure,\n                    MAX(timestamp) as last_checked,\n                    AVG(CASE WHEN was_successful AND latency_ms IS NOT NULL THEN latency_ms END) as avg_latency_ms,\n                    MIN(CASE WHEN was_successful AND latency_ms IS NOT NULL THEN latency_ms END) as min_latency_ms,\n                    MAX(CASE WHEN was_successful AND latency_ms IS NOT NULL THEN latency_ms END) as max_latency_ms,\n                    (SELECT latency_ms FROM health_checks hc2 WHERE hc2.node_id = health_checks.node_id ORDER BY timestamp DESC LIMIT 1) as last_latency_ms\n                FROM health_checks \n                GROUP BY node_id\n            ) stats ON n.id = stats.node_id\n            LEFT JOIN (\n                SELECT DISTINCT node_id FROM (\n                    SELECT \n                        n2.id as node_id,\n                        COALESCE(s2.success_count, 0) as success_count,\n                        COALESCE(s2.failure_count, 0) as failure_count,\n                        s2.avg_latency_ms,\n                        (CAST(COALESCE(s2.success_count, 0) AS REAL) / CAST(COALESCE(s2.success_count, 0) + COALESCE(s2.failure_count, 0) AS REAL)) * \n                        (MIN(COALESCE(s2.success_count, 0) + COALESCE(s2.failure_count, 0), 200) / 200.0) * 0.8 +\n                        CASE \n                            WHEN s2.avg_latency_ms IS NOT NULL THEN (1.0 - (MIN(s2.avg_latency_ms, 2000) / 2000.0)) * 0.2\n                            ELSE 0.0 \n                        END as reliability_score\n                    FROM monero_nodes n2\n                    LEFT JOIN (\n                        SELECT \n                            node_id,\n                            SUM(CASE WHEN was_successful THEN 1 ELSE 0 END) as success_count,\n                            SUM(CASE WHEN NOT was_successful THEN 1 ELSE 0 END) as failure_count,\n                            AVG(CASE WHEN was_successful AND latency_ms IS NOT NULL THEN latency_ms END) as avg_latency_ms\n                        FROM health_checks \n                        GROUP BY node_id\n                    ) s2 ON n2.id = s2.node_id\n                    WHERE n2.network = ? AND (COALESCE(s2.success_count, 0) + COALESCE(s2.failure_count, 0)) > 0\n                    ORDER BY reliability_score DESC\n                    LIMIT 4\n                )\n            ) reliable_nodes ON n.id = reliable_nodes.node_id\n            WHERE n.network = ? AND (COALESCE(stats.success_count, 0) + COALESCE(stats.failure_count, 0)) > 0\n            ORDER BY \n                (CAST(COALESCE(stats.success_count, 0) AS REAL) / CAST(COALESCE(stats.success_count, 0) + COALESCE(stats.failure_count, 0) AS REAL)) DESC,\n                stats.avg_latency_ms ASC\n            LIMIT ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "scheme",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "host",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "port",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "full_url",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "network",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "first_seen_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "success_count!: i64",
+        "ordinal": 7,
+        "type_info": "Null"
+      },
+      {
+        "name": "failure_count!: i64",
+        "ordinal": 8,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_success?: String",
+        "ordinal": 9,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_failure?: String",
+        "ordinal": 10,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_checked?: String",
+        "ordinal": 11,
+        "type_info": "Null"
+      },
+      {
+        "name": "is_reliable!: i64",
+        "ordinal": 12,
+        "type_info": "Null"
+      },
+      {
+        "name": "avg_latency_ms?: f64",
+        "ordinal": 13,
+        "type_info": "Null"
+      },
+      {
+        "name": "min_latency_ms?: f64",
+        "ordinal": 14,
+        "type_info": "Null"
+      },
+      {
+        "name": "max_latency_ms?: f64",
+        "ordinal": 15,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_latency_ms?: f64",
+        "ordinal": 16,
+        "type_info": "Float"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      true
+    ]
+  },
+  "hash": "549f5ef13ec7bf5d987dcb893753a9c903edcafa3a66bd82965b40a9e7f238b6"
+}

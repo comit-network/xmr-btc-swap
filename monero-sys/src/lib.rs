@@ -1054,7 +1054,7 @@ impl FfiWallet {
         monero::Address::from_str(&address.to_string()).expect("wallet's own address to be valid")
     }
 
-    fn set_daemon_address(&mut self, address: &str) -> anyhow::Result<()> {
+    pub fn set_daemon_address(&mut self, address: &str) -> anyhow::Result<()> {
         tracing::debug!(%address, "Setting daemon address");
 
         let_cxx_string!(address = address);

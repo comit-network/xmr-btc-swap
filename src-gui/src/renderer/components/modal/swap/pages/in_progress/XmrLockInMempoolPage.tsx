@@ -1,12 +1,13 @@
 import { Box, DialogContentText } from "@mui/material";
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
+import { formatConfirmations } from "utils/formatUtils";
 import MoneroTransactionInfoBox from "../../MoneroTransactionInfoBox";
 
 export default function XmrLockTxInMempoolPage({
   xmr_lock_tx_confirmations,
   xmr_lock_txid,
 }: TauriSwapProgressEventContent<"XmrLockTxInMempool">) {
-  const additionalContent = `Confirmations: ${xmr_lock_tx_confirmations}/10`;
+  const additionalContent = `Confirmations: ${formatConfirmations(xmr_lock_tx_confirmations, 10)}`;
 
   return (
     <Box>

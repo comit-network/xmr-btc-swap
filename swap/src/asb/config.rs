@@ -242,6 +242,12 @@ pub struct Monero {
     pub finality_confirmations: Option<u64>,
     #[serde(with = "crate::monero::network")]
     pub network: monero::Network,
+    #[serde(default = "default_monero_node_pool")]
+    pub monero_node_pool: bool,
+}
+
+fn default_monero_node_pool() -> bool {
+    false
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -461,6 +467,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             daemon_url: monero_daemon_url,
             finality_confirmations: None,
             network: monero_network,
+            monero_node_pool: false,
         },
         tor: TorConf {
             register_hidden_service,
@@ -511,6 +518,7 @@ mod tests {
                 daemon_url: defaults.monero_daemon_address,
                 finality_confirmations: None,
                 network: monero::Network::Stagenet,
+                monero_node_pool: false,
             },
             tor: Default::default(),
             maker: Maker {
@@ -556,6 +564,7 @@ mod tests {
                 daemon_url: defaults.monero_daemon_address,
                 finality_confirmations: None,
                 network: monero::Network::Mainnet,
+                monero_node_pool: false,
             },
             tor: Default::default(),
             maker: Maker {
@@ -611,6 +620,7 @@ mod tests {
                 daemon_url: defaults.monero_daemon_address,
                 finality_confirmations: None,
                 network: monero::Network::Mainnet,
+                monero_node_pool: false,
             },
             tor: Default::default(),
             maker: Maker {

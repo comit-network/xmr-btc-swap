@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "2.2.0-beta"
+version = "2.3.0-beta.1"
 authors = ["The COMIT guys <hello@comit.network>"]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -13,7 +13,7 @@ tauri = ["dep:tauri"]
 
 [dependencies]
 anyhow = "1"
-arti-client = { version = "0.25.0", features = ["static-sqlite", "tokio", "rustls"], default-features = false }
+arti-client = { version = "0.25.0", features = ["static-sqlite", "tokio", "rustls", "onion-service-service"], default-features = false }
 async-compression = { version = "0.3", features = ["bzip2", "tokio"] }
 async-trait = "0.1"
 asynchronous-codec = "0.7.0"
@@ -40,11 +40,13 @@ ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 libp2p = { version = "0.53.2", features = ["tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa"] }
-libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", branch = "main", features = ["listen-onion-service"] }
+libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", rev = "e6b913e0f1ac1fc90b3ee4dd31b5511140c4a9af", features = ["listen-onion-service"] }
 moka = { version = "0.12", features = ["sync", "future"] }
 monero = { version = "0.12", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }
+monero-rpc-pool = { path = "../monero-rpc-pool" }
 monero-sys = { path = "../monero-sys" }
+electrum-pool = { path = "../electrum-pool" }
 once_cell = "1.19"
 pem = "3.0"
 proptest = "1"

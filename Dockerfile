@@ -36,17 +36,22 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Rust 1.82
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.82.0
+# Install Rust 1.85
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.85.0
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY . .
 
-# Update submodules recursively
-# Force update to handle any local changes in submodules
-RUN git submodule sync --recursive && git submodule update --init --recursive --force
+# Check that submodules are present (they should be initialized before building)
+RUN if [ ! -f "monero-sys/monero/CMakeLists.txt" ]; then \
+        echo "ERROR: Submodules not initialized. Run 'git submodule update --init --recursive' before building Docker image."; \
+        exit 1; \
+    fi
 
 WORKDIR /build/swap
+
+# Act as if we are in a GitHub Actions environment
+ENV DOCKER_BUILD=true
 
 RUN cargo build -vv --bin=asb
 
