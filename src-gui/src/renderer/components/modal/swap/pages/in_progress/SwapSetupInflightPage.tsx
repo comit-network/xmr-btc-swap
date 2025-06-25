@@ -64,7 +64,16 @@ export default function SwapSetupInflightPage({
     request.content.details.content;
 
   return (
-    <>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "space-between",
+        justifyContent: "space-between",
+        height: "100%",
+        flex: 1,
+      }}
+    >
       {/* Grid layout for perfect alignment */}
       <Box
         sx={{
@@ -76,8 +85,11 @@ export default function SwapSetupInflightPage({
         }}
       >
         {/* Row 1: Bitcoin box */}
-        <Box>
-          <BitcoinMainBox btc_lock_amount={btc_lock_amount} />
+        <Box sx={{ height: "100%" }}>
+          <BitcoinMainBox
+            btc_lock_amount={btc_lock_amount}
+            btc_network_fee={btc_network_fee}
+          />
         </Box>
 
         {/* Row 1: Animated arrow */}
@@ -94,20 +106,6 @@ export default function SwapSetupInflightPage({
         {/* Row 1: Monero main box */}
         <Box>
           <MoneroMainBox
-            monero_receive_pool={monero_receive_pool}
-            xmr_receive_amount={xmr_receive_amount}
-          />
-        </Box>
-
-        {/* Row 2: Empty space */}
-        <Box />
-
-        {/* Row 2: Empty space */}
-        <Box />
-
-        {/* Row 2: Secondary content */}
-        <Box>
-          <MoneroSecondaryContent
             monero_receive_pool={monero_receive_pool}
             xmr_receive_amount={xmr_receive_amount}
           />
@@ -145,7 +143,7 @@ export default function SwapSetupInflightPage({
           {`Confirm (${timeLeft}s)`}
         </PromiseInvokeButton>
       </Box>
-    </>
+    </Box>
   );
 }
 
@@ -162,42 +160,70 @@ interface BitcoinSendSectionProps {
   btc_network_fee: number;
 }
 
-const BitcoinMainBox = ({ btc_lock_amount }: { btc_lock_amount: number }) => (
-  <Box
-    sx={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: 1.5,
-      border: 1,
-      gap: "0.5rem 1rem",
-      borderColor: "warning.main",
-      borderRadius: 1,
-      backgroundColor: (theme) => theme.palette.warning.light + "10",
-      background: (theme) =>
-        `linear-gradient(135deg, ${theme.palette.warning.light}20, ${theme.palette.warning.light}05)`,
-      flex: "1 1 0",
-      height: "100%", // Match the height of the Monero box
-    }}
-  >
-    <Typography
-      variant="body1"
-      sx={(theme) => ({
-        color: theme.palette.text.primary,
-      })}
+const BitcoinMainBox = ({
+  btc_lock_amount,
+  btc_network_fee,
+}: {
+  btc_lock_amount: number;
+  btc_network_fee: number;
+}) => (
+  <Box sx={{ position: "relative", height: "100%" }}>
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 1.5,
+        border: 1,
+        gap: "0.5rem 1rem",
+        borderColor: "warning.main",
+        borderRadius: 1,
+        backgroundColor: (theme) => theme.palette.warning.light + "10",
+        background: (theme) =>
+          `linear-gradient(135deg, ${theme.palette.warning.light}20, ${theme.palette.warning.light}05)`,
+        height: "100%", // Match the height of the Monero box
+      }}
     >
-      You send
-    </Typography>
-    <Typography
-      variant="body1"
-      sx={(theme) => ({
-        fontWeight: "bold",
-        color: theme.palette.warning.dark,
-        textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-      })}
+      <Typography
+        variant="body1"
+        sx={(theme) => ({
+          color: theme.palette.text.primary,
+        })}
+      >
+        You send
+      </Typography>
+      <Typography
+        variant="h5"
+        sx={(theme) => ({
+          fontWeight: "bold",
+          color: theme.palette.warning.dark,
+          textShadow: "0 1px 2px rgba(0,0,0,0.1)",
+        })}
+      >
+        <SatsAmount amount={btc_lock_amount} />
+      </Typography>
+    </Box>
+
+    {/* Network fee box attached to the bottom */}
+    <Box
+      sx={{
+        position: "absolute",
+        bottom: "calc(-50%)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        padding: "0.25rem 0.75rem",
+        backgroundColor: (theme) => theme.palette.warning.main,
+        color: (theme) => theme.palette.warning.contrastText,
+        borderRadius: "4px",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        whiteSpace: "nowrap",
+        zIndex: 1,
+      }}
     >
-      <SatsAmount amount={btc_lock_amount} />
-    </Typography>
+      Network fee: <SatsAmount amount={btc_network_fee} />
+    </Box>
   </Box>
 );
 
@@ -357,69 +383,88 @@ const MoneroMainBox = ({
   );
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 1.5,
-        border: 1,
-        gap: "0.5rem 1rem",
-        borderColor: "success.main",
-        borderRadius: 1,
-        backgroundColor: (theme) => theme.palette.success.light + "10",
-        background: (theme) =>
-          `linear-gradient(135deg, ${theme.palette.success.light}20, ${theme.palette.success.light}05)`,
-        flex: "1 1 0",
-      }}
-    >
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
-        <Typography
-          variant="body1"
-          sx={(theme) => ({
-            color: theme.palette.text.primary,
-            fontWeight: 700,
-            letterSpacing: 0.5,
-          })}
-        >
-          {highestPercentagePool.label}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            fontFamily: "monospace",
-            fontSize: "0.65rem",
-            color: (theme) => theme.palette.text.secondary,
-          }}
-        >
-          <TruncatedText truncateMiddle limit={15}>
-            {highestPercentagePool.address}
-          </TruncatedText>
-        </Typography>
-      </Box>
+    <Box sx={{ position: "relative" }}>
       <Box
         sx={{
           display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          justifyContent: "center",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: 1.5,
+          border: 1,
+          gap: "0.5rem 1rem",
+          borderColor: "success.main",
+          borderRadius: 1,
+          backgroundColor: (theme) => theme.palette.success.light + "10",
+          background: (theme) =>
+            `linear-gradient(135deg, ${theme.palette.success.light}20, ${theme.palette.success.light}05)`,
+          flex: "1 1 0",
         }}
       >
-        <Typography
-          variant="h5"
-          sx={(theme) => ({
-            fontWeight: "bold",
-            color: theme.palette.success.dark,
-            textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-          })}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+          <Typography
+            variant="body1"
+            sx={(theme) => ({
+              color: theme.palette.text.primary,
+              fontWeight: 700,
+              letterSpacing: 0.5,
+            })}
+          >
+            {highestPercentagePool.label}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              fontFamily: "monospace",
+              fontSize: "0.65rem",
+              color: (theme) => theme.palette.text.secondary,
+            }}
+          >
+            <TruncatedText truncateMiddle limit={15}>
+              {highestPercentagePool.address}
+            </TruncatedText>
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            justifyContent: "center",
+          }}
         >
-          <PiconeroAmount
-            amount={
-              (highestPercentagePool.percentage * Number(xmr_receive_amount)) /
-              100
-            }
-          />
-        </Typography>
+          <Typography
+            variant="h5"
+            sx={(theme) => ({
+              fontWeight: "bold",
+              color: theme.palette.success.dark,
+              textShadow: "0 1px 2px rgba(0,0,0,0.1)",
+            })}
+          >
+            <PiconeroAmount
+              amount={
+                (highestPercentagePool.percentage *
+                  Number(xmr_receive_amount)) /
+                100
+              }
+            />
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Secondary Monero content attached to the bottom */}
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: "calc(-100%)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 1,
+        }}
+      >
+        <MoneroSecondaryContent
+          monero_receive_pool={monero_receive_pool}
+          xmr_receive_amount={xmr_receive_amount}
+        />
       </Box>
     </Box>
   );

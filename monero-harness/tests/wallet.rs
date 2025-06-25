@@ -35,7 +35,6 @@ async fn fund_transfer_and_check_tx_key() {
         .await
         .unwrap();
     monero.start_miner().await.unwrap();
-    let miner_address = monero.wallet("miner").unwrap().address().await.unwrap();
 
     tracing::info!("Waiting for Alice to catch up");
 
