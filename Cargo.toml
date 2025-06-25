@@ -2,9 +2,6 @@
 resolver = "2"
 members = ["electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "src-tauri", "swap"]
 
-[profile.release]
-opt-level = 0
-
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51
 jsonrpc_client = { git = "https://github.com/delta1/rust-jsonrpc-client.git", rev = "3b6081697cd616c952acb9c2f02d546357d35506" }

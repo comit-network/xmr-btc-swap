@@ -282,7 +282,7 @@ namespace monero_rust_log
             }
 
             // Call the rust function to forward the log message.
-            forward_cpp_log(
+            monero_rust_log::forward_cpp_log(
                 span_name.c_str(),
                 level,
                 m->file().length() > 0 ? m->file() : "",
@@ -339,3 +339,14 @@ namespace monero_rust_log
         installed = false;
     }
 } // namespace
+
+#include <map>
+#include <vector>
+#include <string>
+
+// The following is a hack to ensure the linker includes the pair destructor in the binary
+using String = std::string;
+using StringMap = std::map<String, String>;
+using StringVec = std::vector<String>;
+
+static std::pair<StringMap, StringVec> _monero_sys_pair_instantiation;
