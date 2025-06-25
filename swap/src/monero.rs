@@ -307,7 +307,7 @@ impl MoneroAddressPool {
         self.0.iter().map(|address| address.address()).collect()
     }
 
-    /// Returns a vector of all percentages as f64 values.
+    /// Returns a vector of all percentages as f64 values (0-1 range).
     pub fn percentages(&self) -> Vec<f64> {
         self.0
             .iter()
@@ -903,10 +903,11 @@ mod tests {
 
         let address = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse().unwrap();
 
-        // Valid percentages should work
+        // Valid percentages should work (0-1 range)
         assert!(LabeledMoneroAddress::new(address, Decimal::ZERO, "test".to_string()).is_ok());
         assert!(LabeledMoneroAddress::new(address, Decimal::ONE, "test".to_string()).is_ok());
         assert!(LabeledMoneroAddress::new(address, Decimal::new(5, 1), "test".to_string()).is_ok()); // 0.5
+        assert!(LabeledMoneroAddress::new(address, Decimal::new(9925, 4), "test".to_string()).is_ok()); // 0.9925
 
         // Invalid percentages should fail
         assert!(

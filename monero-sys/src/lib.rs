@@ -1623,7 +1623,7 @@ impl FfiWallet {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - Percentages don't sum to 100.0
+    /// - Percentages don't sum to 1.0
     /// - Balance is zero
     /// - There are more outputs than piconeros in balance
     fn distribute(balance: monero::Amount, percentages: &[f64]) -> Result<Vec<monero::Amount>> {
@@ -1633,8 +1633,8 @@ impl FfiWallet {
 
         const TOLERANCE: f64 = 1e-6;
         let sum: f64 = percentages.iter().sum();
-        if (sum - 100.0).abs() > TOLERANCE {
-            bail!("Percentages must sum to 100 (actual sum: {})", sum);
+        if (sum - 1.0).abs() > TOLERANCE {
+            bail!("Percentages must sum to 1 (actual sum: {})", sum);
         }
 
         // Handle the case where distributable amount is zero
@@ -1652,7 +1652,7 @@ impl FfiWallet {
 
         // Distribute amounts according to ratios, except for the last one
         for &percentage in &percentages[..percentages.len() - 1] {
-            let amount_pico = ((balance.as_pico() as f64) * percentage / 100.0).floor() as u64;
+            let amount_pico = ((balance.as_pico() as f64) * percentage).floor() as u64;
             let amount = Amount::from_pico(amount_pico);
             amounts.push(amount);
             total += amount;
@@ -1917,13 +1917,13 @@ mod tests {
             return TestResult::discard();
         }
 
-        // Ensure percentages are valid (non-negative and sum to approximately 100.0)
-        if percentages.iter().any(|&p| p < 0.0 || p > 100.0) {
+        // Ensure percentages are valid (non-negative and sum to approximately 1.0)
+        if percentages.iter().any(|&p| p < 0.0 || p > 1.0) {
             return TestResult::discard();
         }
 
         let percentage_sum: f64 = percentages.iter().sum();
-        if (percentage_sum - 100.0).abs() > 1e-6 {
+        if (percentage_sum - 1.0).abs() > 1e-6 {
             return TestResult::discard();
         }
 
@@ -1947,12 +1947,12 @@ mod tests {
             return TestResult::discard();
         }
 
-        if percentages.iter().any(|&p| p < 0.0 || p > 100.0) {
+        if percentages.iter().any(|&p| p < 0.0 || p > 1.0) {
             return TestResult::discard();
         }
 
         let percentage_sum: f64 = percentages.iter().sum();
-        if (percentage_sum - 100.0).abs() > 1e-6 {
+        if (percentage_sum - 1.0).abs() > 1e-6 {
             return TestResult::discard();
         }
 
@@ -1973,12 +1973,12 @@ mod tests {
             return TestResult::discard();
         }
 
-        if percentages.iter().any(|&p| p < 0.0 || p > 100.0) {
+        if percentages.iter().any(|&p| p < 0.0 || p > 1.0) {
             return TestResult::discard();
         }
 
         let percentage_sum: f64 = percentages.iter().sum();
-        if (percentage_sum - 100.0).abs() > 1e-6 {
+        if (percentage_sum - 1.0).abs() > 1e-6 {
             return TestResult::discard();
         }
 
@@ -1991,7 +1991,7 @@ mod tests {
         let mut percentages_respected = true;
         for i in 0..percentages.len() - 1 {
             let expected_amount =
-                ((balance.as_pico() as f64) * percentages[i] / 100.0).floor() as u64;
+                ((balance.as_pico() as f64) * percentages[i]).floor() as u64;
             if amounts[i].as_pico() != expected_amount {
                 percentages_respected = false;
                 break;
@@ -2013,7 +2013,7 @@ mod tests {
     #[test]
     fn test_distribute_zero_balance() {
         let balance = monero::Amount::from_pico(0);
-        let percentages = vec![50.0, 50.0];
+        let percentages = vec![0.5, 0.5];
 
         let amounts = FfiWallet::distribute(balance, &percentages);
         assert!(amounts.is_err());
@@ -2022,7 +2022,7 @@ mod tests {
     #[test]
     fn test_distribute_insufficient_balance_for_outputs() {
         let balance = monero::Amount::from_pico(2);
-        let percentages = vec![30.0, 30.0, 40.0]; // 3 outputs but only 2 piconeros
+        let percentages = vec![0.3, 0.3, 0.4]; // 3 outputs but only 2 piconeros
 
         let amounts = FfiWallet::distribute(balance, &percentages);
         assert!(amounts.is_err());
@@ -2031,7 +2031,7 @@ mod tests {
     #[test]
     fn test_distribute_simple_case() {
         let balance = monero::Amount::from_pico(1000);
-        let percentages = vec![50.0, 30.0, 20.0];
+        let percentages = vec![0.5, 0.3, 0.2];
 
         let amounts = FfiWallet::distribute(balance, &percentages).unwrap();
 
@@ -2051,7 +2051,7 @@ mod tests {
     #[test]
     fn test_distribute_small_donation() {
         let balance = monero::Amount::from_pico(1000);
-        let percentages = vec![99.9, 0.1];
+        let percentages = vec![0.999, 0.001];
 
         let amounts = FfiWallet::distribute(balance, &percentages).unwrap();
 
@@ -2068,9 +2068,9 @@ mod tests {
     }
 
     #[test]
-    fn test_distribute_percentages_not_sum_to_100() {
+    fn test_distribute_percentages_not_sum_to_1() {
         let balance = monero::Amount::from_pico(1000);
-        let percentages = vec![50.0, 30.0]; // Only sums to 80%
+        let percentages = vec![0.5, 0.3]; // Only sums to 0.8
 
         let amounts = FfiWallet::distribute(balance, &percentages);
         assert!(amounts.is_err());
