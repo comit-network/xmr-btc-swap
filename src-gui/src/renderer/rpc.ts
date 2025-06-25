@@ -186,12 +186,12 @@ export async function buyXmr(
     address_pool.push(
       {
         address: monero_receive_address,
-        percentage: 100 - donation_percentage * 100,
+        percentage: 1 - donation_percentage,
         label: "Your wallet",
       },
       {
         address: donation_address,
-        percentage: donation_percentage * 100,
+        percentage: donation_percentage,
         label: "Tip to the developers",
       },
     );

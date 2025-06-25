@@ -343,6 +343,23 @@ impl MoneroAddressPool {
 
         Ok(())
     }
+
+    /// Assert that the sum of the percentages in the address pool is 1 (allowing for a small tolerance)
+    pub fn assert_sum_to_one(&self) -> Result<()> {
+        let sum = self
+            .0
+            .iter()
+            .map(|address| address.percentage())
+            .sum::<Decimal>();
+
+        const TOLERANCE: f64 = 1e-6;
+
+        if (sum - Decimal::ONE).abs() > Decimal::from_f64(TOLERANCE).unwrap() {
+            bail!("Address pool percentages do not sum to 1");
+        }
+
+        Ok(())
+    }
 }
 
 impl From<::monero::Address> for MoneroAddressPool {
@@ -907,7 +924,9 @@ mod tests {
         assert!(LabeledMoneroAddress::new(address, Decimal::ZERO, "test".to_string()).is_ok());
         assert!(LabeledMoneroAddress::new(address, Decimal::ONE, "test".to_string()).is_ok());
         assert!(LabeledMoneroAddress::new(address, Decimal::new(5, 1), "test".to_string()).is_ok()); // 0.5
-        assert!(LabeledMoneroAddress::new(address, Decimal::new(9925, 4), "test".to_string()).is_ok()); // 0.9925
+        assert!(
+            LabeledMoneroAddress::new(address, Decimal::new(9925, 4), "test".to_string()).is_ok()
+        ); // 0.9925
 
         // Invalid percentages should fail
         assert!(

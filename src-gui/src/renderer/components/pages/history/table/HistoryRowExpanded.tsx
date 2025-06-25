@@ -133,7 +133,7 @@ export default function HistoryRowExpanded({
                           color: theme.palette.text.primary,
                         })}
                       >
-                        {pool.label} ({pool.percentage}%)
+                        {pool.label} ({pool.percentage * 100}%)
                       </Typography>
                       <Typography
                         variant="caption"

@@ -1990,8 +1990,7 @@ mod tests {
         // We check all but the last amount since the last one gets the remainder
         let mut percentages_respected = true;
         for i in 0..percentages.len() - 1 {
-            let expected_amount =
-                ((balance.as_pico() as f64) * percentages[i]).floor() as u64;
+            let expected_amount = ((balance.as_pico() as f64) * percentages[i]).floor() as u64;
             if amounts[i].as_pico() != expected_amount {
                 percentages_respected = false;
                 break;

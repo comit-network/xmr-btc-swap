@@ -55,7 +55,7 @@ export default function XmrRedeemInMempoolPage(
                           color: theme.palette.text.primary,
                         })}
                       >
-                        {pool.label} ({pool.percentage}%)
+                        {pool.label} ({pool.percentage * 100}%)
                       </Typography>
                     </Box>
                     <Typography
