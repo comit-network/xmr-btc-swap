@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT address, percentage, label\n        FROM monero_addresses\n        WHERE swap_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "address",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "percentage",
+        "ordinal": 1,
+        "type_info": "Float"
+      },
+      {
+        "name": "label",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [false, false, false]
+  },
+  "hash": "dff8b986c3dde27b8121775e48a58564fa346b038866699210a63f8a33b03f0b"
+}

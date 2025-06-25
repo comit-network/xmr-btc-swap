@@ -5,7 +5,7 @@ use crate::bitcoin::{
     TxLock, Txid, Wallet,
 };
 use crate::monero::wallet::WatchRequest;
-use crate::monero::{self, TxHash};
+use crate::monero::{self, MoneroAddressPool, TxHash};
 use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
@@ -717,7 +717,7 @@ impl State5 {
         &self,
         monero_wallet: &monero::Wallets,
         swap_id: Uuid,
-        monero_receive_address: monero::Address,
+        monero_receive_pool: MoneroAddressPool,
     ) -> Result<Vec<TxHash>> {
         let (spend_key, view_key) = self.xmr_keys();
 
@@ -742,15 +742,17 @@ impl State5 {
             .await
             .context("Couldn't get Monero blockheight")?;
 
-        tracing::debug!(%swap_id, receive_address=%monero_receive_address, "Sweeping Monero to receive address");
+        tracing::debug!(%swap_id, receive_address=?monero_receive_pool, "Sweeping Monero to receive address");
 
         let tx_hashes = wallet
-            .clone()
-            .sweep(&monero_receive_address.clone())
+            .sweep_multi(
+                &monero_receive_pool.addresses(),
+                &monero_receive_pool.percentages(),
+            )
             .await
             .context("Failed to redeem Monero")?
             .into_iter()
-            .map(TxHash)
+            .map(|tx_receipt| TxHash(tx_receipt.txid))
             .collect();
 
         tracing::info!(%swap_id, txids=?tx_hashes, "Monero sweep completed");

@@ -1,5 +1,6 @@
 use super::request::BalanceResponse;
 use crate::bitcoin;
+use crate::monero::MoneroAddressPool;
 use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
 use anyhow::{anyhow, Context, Result};
 use bitcoin::Txid;
@@ -43,6 +44,7 @@ pub struct LockBitcoinDetails {
     pub btc_network_fee: bitcoin::Amount,
     #[typeshare(serialized_as = "number")]
     pub xmr_receive_amount: monero::Amount,
+    pub monero_receive_pool: MoneroAddressPool,
     #[typeshare(serialized_as = "string")]
     pub swap_id: Uuid,
 }
@@ -629,8 +631,7 @@ pub enum TauriSwapProgressEvent {
     XmrRedeemInMempool {
         #[typeshare(serialized_as = "Vec<string>")]
         xmr_redeem_txids: Vec<monero::TxHash>,
-        #[typeshare(serialized_as = "string")]
-        xmr_redeem_address: monero::Address,
+        xmr_receive_pool: MoneroAddressPool,
     },
     CancelTimelockExpired,
     BtcCancelled {

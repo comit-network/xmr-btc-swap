@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Users can donate a small percentage of their swap to the projects donation address. Donations will be used to fund development. This is completely optional and **disabled** by default. Monero is used exclusively for donations, ensuring full anonymity for users. Donations are only ever send for successful swaps (not refunded ones). We clearly and transparently state where how much Monero is going before the user approves a swap.
+
 ## [2.3.0-beta.2] - 2025-06-24
 
 - ASB + GUI + CLI: We now cache fee estimates for the Bitcoin wallet for up to 2 minutes. This improves the speed of fee estimation and reduces the number of requests to the Electrum servers.

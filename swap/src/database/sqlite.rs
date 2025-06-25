@@ -1,11 +1,15 @@
 use crate::cli::api::tauri_bindings::TauriEmitter;
 use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::database::Swap;
-use crate::monero::{Address, TransferProof};
+use crate::monero::LabeledMoneroAddress;
+use crate::monero::MoneroAddressPool;
+use crate::monero::TransferProof;
 use crate::protocol::{Database, State};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
 use sqlx::sqlite::{Sqlite, SqliteConnectOptions};
 use sqlx::{ConnectOptions, Pool, SqlitePool};
 use std::path::Path;
@@ -96,43 +100,76 @@ impl Database for SqliteDatabase {
         Ok(peer_id)
     }
 
-    async fn insert_monero_address(&self, swap_id: Uuid, address: Address) -> Result<()> {
+    async fn insert_monero_address_pool(
+        &self,
+        swap_id: Uuid,
+        address: MoneroAddressPool,
+    ) -> Result<()> {
         let swap_id = swap_id.to_string();
-        let address = address.to_string();
 
-        sqlx::query!(
-            r#"
-        insert into monero_addresses (
-            swap_id,
-            address
-            ) values (?, ?);
-        "#,
-            swap_id,
-            address
-        )
-        .execute(&self.pool)
-        .await?;
+        for labeled_address in address.iter() {
+            let address_str = labeled_address.address().to_string();
+            let percentage_f64 = labeled_address
+                .percentage()
+                .to_f64()
+                .expect("Decimal should convert to f64");
+            let label_str = labeled_address.label();
+
+            sqlx::query!(
+                r#"
+            insert into monero_addresses (
+                swap_id,
+                address,
+                percentage,
+                label
+                ) values (?, ?, ?, ?);
+            "#,
+                swap_id,
+                address_str,
+                percentage_f64,
+                label_str
+            )
+            .execute(&self.pool)
+            .await?;
+        }
 
         Ok(())
     }
 
-    async fn get_monero_address(&self, swap_id: Uuid) -> Result<Address> {
+    async fn get_monero_address_pool(&self, swap_id: Uuid) -> Result<MoneroAddressPool> {
         let swap_id = swap_id.to_string();
 
         let row = sqlx::query!(
             r#"
-        SELECT address
+        SELECT address, percentage, label
         FROM monero_addresses
         WHERE swap_id = ?
         "#,
             swap_id
         )
-        .fetch_one(&self.pool)
+        .fetch_all(&self.pool)
         .await?;
 
-        let address = row.address.parse()?;
+        if row.is_empty() {
+            return Err(anyhow!(
+                "No Monero address pool found for swap ID: {}",
+                swap_id
+            ));
+        }
 
-        Ok(address)
+        let addresses = row
+            .iter()
+            .map(|row| -> Result<LabeledMoneroAddress> {
+                let address = row.address.parse()?;
+                let percentage = Decimal::from_f64(row.percentage).expect("Invalid percentage");
+                let label = row.label.clone();
+
+                LabeledMoneroAddress::new(address, percentage, label)
+                    .map_err(|e| anyhow::anyhow!("Invalid percentage in database: {}", e))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(MoneroAddressPool::new(addresses))
     }
 
     async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>> {
@@ -484,17 +521,55 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_insert_load_monero_address() -> Result<()> {
+    async fn test_insert_and_load_monero_address_pool() -> Result<()> {
+        use crate::monero::{LabeledMoneroAddress, MoneroAddressPool};
+        use rust_decimal::Decimal;
+
         let db = setup_test_db().await?;
 
         let swap_id = Uuid::new_v4();
-        let monero_address = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?;
 
-        db.insert_monero_address(swap_id, monero_address).await?;
+        // Create multiple labeled addresses with valid percentages that sum to 1
+        let address1 = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?; // Stagenet address
+        let address2 = "44Ato7HveWidJYUAVw5QffEcEtSH1DwzSP3FPPkHxNAS4LX9CqgucphTisH978FLHE34YNEx7FcbBfQLQUU8m3NUC4VqsRa".parse()?; // Mainnet address
+        let address3 = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?; // Same as address1 for simplicity
 
-        let loaded_monero_address = db.get_monero_address(swap_id).await?;
+        let labeled_addresses = vec![
+            LabeledMoneroAddress::new(address1, Decimal::new(5, 1), "Primary".to_string())
+                .map_err(|e| anyhow!(e))?, // 0.5
+            LabeledMoneroAddress::new(address2, Decimal::new(3, 1), "Secondary".to_string())
+                .map_err(|e| anyhow!(e))?, // 0.3
+            LabeledMoneroAddress::new(address3, Decimal::new(2, 1), "Tertiary".to_string())
+                .map_err(|e| anyhow!(e))?, // 0.2
+        ];
 
-        assert_eq!(monero_address, loaded_monero_address);
+        let address_pool = MoneroAddressPool::new(labeled_addresses);
+
+        // Insert the address pool
+        db.insert_monero_address_pool(swap_id, address_pool.clone())
+            .await?;
+
+        // Load the address pool back
+        let loaded_address_pool = db.get_monero_address_pool(swap_id).await?;
+
+        // Verify they are equal
+        assert_eq!(address_pool.addresses(), loaded_address_pool.addresses());
+        assert_eq!(
+            address_pool.percentages(),
+            loaded_address_pool.percentages()
+        );
+
+        // Verify each labeled address individually
+        let original_addresses: Vec<_> = address_pool.iter().collect();
+        let loaded_addresses: Vec<_> = loaded_address_pool.iter().collect();
+
+        assert_eq!(original_addresses.len(), loaded_addresses.len());
+
+        for (orig, loaded) in original_addresses.iter().zip(loaded_addresses.iter()) {
+            assert_eq!(orig.address(), loaded.address());
+            assert_eq!(orig.percentage(), loaded.percentage());
+            assert_eq!(orig.label(), loaded.label());
+        }
 
         Ok(())
     }

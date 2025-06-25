@@ -492,7 +492,12 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.env_config,
             handle,
-            self.monero_wallet.main_wallet().await.main_address().await,
+            self.monero_wallet
+                .main_wallet()
+                .await
+                .main_address()
+                .await
+                .into(),
         )
         .await?;
 
@@ -524,7 +529,12 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.env_config,
             handle,
-            self.monero_wallet.main_wallet().await.main_address().await,
+            self.monero_wallet
+                .main_wallet()
+                .await
+                .main_address()
+                .await
+                .into(),
             self.bitcoin_wallet.new_address().await?,
             btc_amount,
             bitcoin::Amount::from_sat(1000), // Fixed fee of 1000 satoshis for now

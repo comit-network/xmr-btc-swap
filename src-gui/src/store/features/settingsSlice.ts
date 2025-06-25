@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Theme } from "renderer/components/theme";
 
+export type DonateToDevelopmentTip = false | 0.0005 | 0.0075;
+
 const DEFAULT_RENDEZVOUS_POINTS = [
   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
   "/dns4/discover2.unstoppableswap.net/tcp/8888/p2p/12D3KooWGRvf7qVQDrNR5nfYD6rKrbgeTi9x8RrbdxbmsPvxL4mw",
@@ -22,6 +24,9 @@ export interface SettingsState {
   userHasSeenIntroduction: boolean;
   /// List of rendezvous points
   rendezvousPoints: string[];
+  /// Does the user want to donate parts of his swaps to funding the development
+  /// of the project?
+  donateToDevelopment: DonateToDevelopmentTip;
 }
 
 export enum FiatCurrency {
@@ -124,6 +129,7 @@ const initialState: SettingsState = {
   useMoneroRpcPool: true, // Default to using RPC pool
   userHasSeenIntroduction: false,
   rendezvousPoints: DEFAULT_RENDEZVOUS_POINTS,
+  donateToDevelopment: false, // Default to no donation
 };
 
 const alertsSlice = createSlice({
@@ -212,6 +218,12 @@ const alertsSlice = createSlice({
     setUseMoneroRpcPool(slice, action: PayloadAction<boolean>) {
       slice.useMoneroRpcPool = action.payload;
     },
+    setDonateToDevelopment(
+      slice,
+      action: PayloadAction<DonateToDevelopmentTip>,
+    ) {
+      slice.donateToDevelopment = action.payload;
+    },
   },
 });
 
@@ -228,6 +240,7 @@ export const {
   setUserHasSeenIntroduction,
   addRendezvousPoint,
   removeRendezvousPoint,
+  setDonateToDevelopment,
 } = alertsSlice.actions;
 
 export default alertsSlice.reducer;

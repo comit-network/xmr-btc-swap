@@ -1,0 +1,63 @@
+# Applies the new functionality from: https://github.com/monero-project/monero/pull/8861
+# to the wallet2_api
+# The pull request only added it for wallet2 (which is different from wallet2_api)
+
+diff --git a/src/wallet/api/wallet.cpp b/src/wallet/api/wallet.cpp
+index 96393eaaa..f2f8e7fbb 100644
+--- a/src/wallet/api/wallet.cpp
++++ b/src/wallet/api/wallet.cpp
+@@ -1777,7 +1777,7 @@ PendingTransaction* WalletImpl::restoreMultisigTransaction(const string& signDat
+ //    - unconfirmed_transfer_details;
+ //    - confirmed_transfer_details)
+ 
+-PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<string> &dst_addr, const string &payment_id, optional<std::vector<uint64_t>> amount, uint32_t mixin_count, PendingTransaction::Priority priority, uint32_t subaddr_account, std::set<uint32_t> subaddr_indices)
++PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<string> &dst_addr, const string &payment_id, optional<std::vector<uint64_t>> amount, uint32_t mixin_count, PendingTransaction::Priority priority, uint32_t subaddr_account, std::set<uint32_t> subaddr_indices, std::set<uint32_t> subtract_fee_from_outputs)
+ 
+ {
+     clearStatus();
+@@ -1862,7 +1862,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<stri
+             if (amount) {
+                 transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, fake_outs_count,
+                                                                             adjusted_priority,
+-                                                                            extra, subaddr_account, subaddr_indices);
++                                                                            extra, subaddr_account, subaddr_indices, subtract_fee_from_outputs);
+             } else {
+                 transaction->m_pending_tx = m_wallet->create_transactions_all(0, info.address, info.is_subaddress, 1, fake_outs_count,
+                                                                               adjusted_priority,
+@@ -1949,7 +1949,7 @@ PendingTransaction *WalletImpl::createTransaction(const string &dst_addr, const
+                                                   PendingTransaction::Priority priority, uint32_t subaddr_account, std::set<uint32_t> subaddr_indices)
+ 
+ {
+-    return createTransactionMultDest(std::vector<string> {dst_addr}, payment_id, amount ? (std::vector<uint64_t> {*amount}) : (optional<std::vector<uint64_t>>()), mixin_count, priority, subaddr_account, subaddr_indices);
++    return createTransactionMultDest(std::vector<string> {dst_addr}, payment_id, amount ? (std::vector<uint64_t> {*amount}) : (optional<std::vector<uint64_t>>()), mixin_count, priority, subaddr_account, subaddr_indices, {});
+ }
+ 
+ PendingTransaction *WalletImpl::createSweepUnmixableTransaction()
+diff --git a/src/wallet/api/wallet.h b/src/wallet/api/wallet.h
+index b7f77a186..f81f13ac2 100644
+--- a/src/wallet/api/wallet.h
++++ b/src/wallet/api/wallet.h
+@@ -157,7 +157,8 @@ public:
+                                         optional<std::vector<uint64_t>> amount, uint32_t mixin_count,
+                                         PendingTransaction::Priority priority = PendingTransaction::Priority_Low,
+                                         uint32_t subaddr_account = 0,
+-                                        std::set<uint32_t> subaddr_indices = {}) override;
++                                        std::set<uint32_t> subaddr_indices = {},
++                                        std::set<uint32_t> subtract_fee_from_outputs = {}) override;
+     PendingTransaction * createTransaction(const std::string &dst_addr, const std::string &payment_id,
+                                         optional<uint64_t> amount, uint32_t mixin_count,
+                                         PendingTransaction::Priority priority = PendingTransaction::Priority_Low,
+diff --git a/src/wallet/api/wallet2_api.h b/src/wallet/api/wallet2_api.h
+index ca807ac87..f5f0a8f39 100644
+--- a/src/wallet/api/wallet2_api.h
++++ b/src/wallet/api/wallet2_api.h
+@@ -936,7 +936,8 @@ struct Wallet
+                                                    optional<std::vector<uint64_t>> amount, uint32_t mixin_count,
+                                                    PendingTransaction::Priority = PendingTransaction::Priority_Low,
+                                                    uint32_t subaddr_account = 0,
+-                                                   std::set<uint32_t> subaddr_indices = {}) = 0;
++                                                   std::set<uint32_t> subaddr_indices = {},
++                                                   std::set<uint32_t> subtract_fee_from_outputs = {}) = 0;
+ 
+     /*!
+      * \brief createTransaction creates transaction. if dst_addr is an integrated address, payment_id is ignored

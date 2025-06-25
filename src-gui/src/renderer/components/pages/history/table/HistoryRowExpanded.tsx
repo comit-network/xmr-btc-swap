@@ -6,13 +6,12 @@ import {
   TableCell,
   TableContainer,
   TableRow,
+  Typography,
 } from "@mui/material";
-import { OpenInNew } from "@mui/icons-material";
 import { GetSwapInfoResponse } from "models/tauriModel";
 import ActionableMonospaceTextBox from "renderer/components/other/ActionableMonospaceTextBox";
 import MonospaceTextBox from "renderer/components/other/MonospaceTextBox";
 import {
-  MoneroBitcoinExchangeRate,
   MoneroBitcoinExchangeRateFromAmounts,
   PiconeroAmount,
   SatsAmount,
@@ -107,6 +106,48 @@ export default function HistoryRowExpanded({
                 >
                   <MonospaceTextBox>{swap.tx_lock_id}</MonospaceTextBox>
                 </Link>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Monero receive pool</TableCell>
+              <TableCell>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {swap.monero_receive_pool.map((pool, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.5,
+                        padding: 1,
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        backgroundColor: (theme) => theme.palette.action.hover,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={(theme) => ({
+                          fontWeight: 600,
+                          color: theme.palette.text.primary,
+                        })}
+                      >
+                        {pool.label} ({pool.percentage}%)
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: "monospace",
+                          color: (theme) => theme.palette.text.secondary,
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {pool.address}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
               </TableCell>
             </TableRow>
           </TableBody>

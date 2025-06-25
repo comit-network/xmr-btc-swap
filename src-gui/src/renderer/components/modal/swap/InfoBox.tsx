@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 
 type Props = {
   id?: string;
-  title: ReactNode;
+  title: ReactNode | null;
   mainContent: ReactNode;
   additionalContent: ReactNode;
   loading: boolean;
@@ -30,7 +30,7 @@ export default function InfoBox({
         gap: 1,
       }}
     >
-      <Typography variant="subtitle1">{title}</Typography>
+      {title ? <Typography variant="subtitle1">{title}</Typography> : null}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         {icon}
         {mainContent}

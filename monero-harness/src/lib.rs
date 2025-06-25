@@ -280,20 +280,12 @@ impl<'c> Monero {
         Ok(())
     }
 
-    /// Funds a specific wallet address with XMR
-    ///
-    /// This function is useful when you want to fund an address that isn't managed by
-    /// a wallet in the testcontainer setup, like an external wallet address.
-    pub async fn fund_address(&self, address: &str, amount: u64) -> Result<()> {
-        let monerod = &self.monerod;
-
-        // Make sure miner has funds by generating blocks
-        monerod.generate_blocks(120, address.to_string()).await?;
-
-        // Mine more blocks to confirm the transaction
-        monerod.generate_blocks(10, address.to_string()).await?;
-
-        tracing::info!("Successfully funded address with {} piconero", amount);
+    pub async fn generate_block(&self) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.to_string();
+        self.monerod()
+            .generate_blocks(15, miner_address.clone())
+            .await?;
         Ok(())
     }
 
@@ -484,11 +476,41 @@ impl MoneroWallet {
     }
 
     pub async fn transfer(&self, address: &Address, amount_pico: u64) -> Result<TxReceipt> {
+        tracing::info!(
+            "`{}` transferring {}",
+            self.name,
+            Amount::from_pico(amount_pico),
+        );
         let amount = Amount::from_pico(amount_pico);
         self.wallet
             .transfer(address, amount)
             .await
             .context("Failed to perform transfer")
+    }
+
+    pub async fn sweep(&self, address: &Address) -> Result<TxReceipt> {
+        tracing::info!("`{}` sweeping", self.name);
+
+        self.wallet
+            .sweep(address)
+            .await
+            .context("Failed to perform sweep")?
+            .into_iter()
+            .next()
+            .context("No transaction receipts returned from sweep")
+    }
+
+    pub async fn sweep_multi(&self, addresses: &[Address], ratios: &[f64]) -> Result<TxReceipt> {
+        tracing::info!("`{}` sweeping multi ({:?})", self.name, ratios);
+        self.balance().await?;
+
+        self.wallet
+            .sweep_multi(addresses, ratios)
+            .await
+            .context("Failed to perform sweep")?
+            .into_iter()
+            .next()
+            .context("No transaction receipts returned from sweep")
     }
 
     pub async fn blockchain_height(&self) -> Result<u64> {

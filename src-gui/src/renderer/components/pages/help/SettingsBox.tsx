@@ -20,16 +20,14 @@ import {
   useTheme,
   Switch,
   SelectChangeEvent,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Chip,
-  LinearProgress,
 } from "@mui/material";
 import {
   addNode,
   addRendezvousPoint,
   Blockchain,
+  DonateToDevelopmentTip,
   FiatCurrency,
   moveUpNode,
   Network,
@@ -41,12 +39,12 @@ import {
   setTheme,
   setTorEnabled,
   setUseMoneroRpcPool,
+  setDonateToDevelopment,
 } from "store/features/settingsSlice";
 import { useAppDispatch, useNodes, useSettings } from "store/hooks";
 import ValidatedTextField from "renderer/components/other/ValidatedTextField";
-import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import HelpIcon from "@mui/icons-material/HelpOutline";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import { Theme } from "renderer/components/theme";
 import {
   Add,
@@ -61,8 +59,6 @@ import { getNetwork } from "store/config";
 import { currencySymbol } from "utils/formatUtils";
 import InfoBox from "renderer/components/modal/swap/InfoBox";
 import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
-
-import { useAppSelector } from "store/hooks";
 import { getNodeStatus } from "renderer/rpc";
 import { setStatus } from "store/features/nodesSlice";
 
@@ -95,6 +91,7 @@ export default function SettingsBox() {
             <Table>
               <TableBody>
                 <TorSettings />
+                <DonationTipSetting />
                 <ElectrumRpcUrlSetting />
                 <MoneroRpcPoolSetting />
                 <MoneroNodeUrlSetting />
@@ -831,6 +828,130 @@ function RendezvousPointsSetting() {
             </DialogActions>
           </Dialog>
         )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/**
+ * A setting that allows you to set a development donation tip amount
+ */
+function DonationTipSetting() {
+  const donateToDevelopment = useSettings((s) => s.donateToDevelopment);
+  const dispatch = useAppDispatch();
+
+  const handleTipSelect = (tipAmount: DonateToDevelopmentTip) => {
+    dispatch(setDonateToDevelopment(tipAmount));
+  };
+
+  const formatTipLabel = (tip: DonateToDevelopmentTip) => {
+    if (tip === false) return "0%";
+    return `${(tip * 100).toFixed(2)}%`;
+  };
+
+  const getTipButtonColor = (
+    tip: DonateToDevelopmentTip,
+    isSelected: boolean,
+  ) => {
+    // Only show colored if selected and > 0
+    if (isSelected && tip !== false) {
+      return "#198754"; // Green for any tip > 0
+    }
+    return "#6c757d"; // Gray for all unselected or no tip
+  };
+
+  const getTipButtonSelectedColor = (tip: DonateToDevelopmentTip) => {
+    if (tip === false) return "#5c636a"; // Darker gray
+    return "#146c43"; // Darker green for any tip > 0
+  };
+
+  return (
+    <TableRow>
+      <TableCell>
+        <SettingLabel
+          label="Tip to the developers"
+          tooltip="Support the development of UnstoppableSwap by donating a small percentage of your swaps. Donations go directly to paying for infrastructure costs and developers"
+        />
+      </TableCell>
+      <TableCell>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <ToggleButtonGroup
+            value={donateToDevelopment}
+            exclusive
+            onChange={(event, newValue) => {
+              if (newValue !== null) {
+                handleTipSelect(newValue);
+              }
+            }}
+            aria-label="Development tip amount"
+            size="small"
+            sx={{
+              width: "100%",
+              gap: 1,
+              "& .MuiToggleButton-root": {
+                flex: 1,
+                borderRadius: "8px",
+                fontWeight: "600",
+                textTransform: "none",
+                border: "2px solid",
+                "&:not(:first-of-type)": {
+                  marginLeft: "8px",
+                  borderLeft: "2px solid",
+                },
+              },
+            }}
+          >
+            {([false, 0.0005, 0.0075] as const).map((tipAmount) => (
+              <ToggleButton
+                key={String(tipAmount)}
+                value={tipAmount}
+                sx={{
+                  borderColor: `${getTipButtonColor(tipAmount, donateToDevelopment === tipAmount)} !important`,
+                  color:
+                    donateToDevelopment === tipAmount
+                      ? "white"
+                      : getTipButtonColor(
+                          tipAmount,
+                          donateToDevelopment === tipAmount,
+                        ),
+                  backgroundColor:
+                    donateToDevelopment === tipAmount
+                      ? getTipButtonColor(
+                          tipAmount,
+                          donateToDevelopment === tipAmount,
+                        )
+                      : "transparent",
+                  "&:hover": {
+                    backgroundColor: `${getTipButtonSelectedColor(tipAmount)} !important`,
+                    color: "white !important",
+                  },
+                  "&.Mui-selected": {
+                    backgroundColor: `${getTipButtonColor(tipAmount, true)} !important`,
+                    color: "white !important",
+                    "&:hover": {
+                      backgroundColor: `${getTipButtonSelectedColor(tipAmount)} !important`,
+                    },
+                  },
+                }}
+              >
+                {formatTipLabel(tipAmount)}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <Typography variant="subtitle2">
+            <ul style={{ margin: 0, padding: "0 1.5rem" }}>
+              <li>
+                Tips go <strong>directly</strong> towards paying for
+                infrastructure costs and developers
+              </li>
+              <li>
+                Only ever sent for <strong>successful</strong> swaps
+              </li>{" "}
+              (refunds are not counted)
+              <li>Monero is used for the tips, giving you full anonymity</li>
+            </ul>
+          </Typography>
+        </Box>
       </TableCell>
     </TableRow>
   );

@@ -1,6 +1,7 @@
-import { Link, Typography } from "@mui/material";
+import { Box, Link, Typography } from "@mui/material";
 import { ReactNode } from "react";
 import InfoBox from "./InfoBox";
+import TruncatedText from "renderer/components/other/TruncatedText";
 
 export type TransactionInfoBoxProps = {
   title: string;
@@ -24,12 +25,14 @@ export default function TransactionInfoBox({
       title={title}
       mainContent={
         <Typography variant="h5">
-          {txId ?? "Transaction ID not available"}
+          <TruncatedText truncateMiddle limit={40}>
+            {txId ?? "Transaction ID not available"}
+          </TruncatedText>
         </Typography>
       }
       loading={loading}
       additionalContent={
-        <>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography variant="subtitle2">{additionalContent}</Typography>
           {explorerUrlCreator != null &&
             txId != null && ( // Only show the link if the txId is not null and we have a creator for the explorer URL
@@ -39,7 +42,7 @@ export default function TransactionInfoBox({
                 </Link>
               </Typography>
             )}
-        </>
+        </Box>
       }
       icon={icon}
     />

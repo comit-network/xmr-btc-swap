@@ -4,8 +4,8 @@ use crate::cli::api::request::{
     GetHistoryArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, WithdrawBtcArgs,
 };
 use crate::cli::api::Context;
-use crate::monero;
 use crate::monero::monero_address;
+use crate::monero::{self, MoneroAddressPool};
 use anyhow::Result;
 use bitcoin::address::NetworkUnchecked;
 use libp2p::core::Multiaddr;
@@ -68,8 +68,8 @@ where
             monero_receive_address,
             tor,
         } => {
-            let monero_receive_address =
-                monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
+            let monero_receive_pool: MoneroAddressPool =
+                monero_address::validate_is_testnet(monero_receive_address, is_testnet)?.into();
 
             let bitcoin_change_address = bitcoin_change_address
                 .map(|address| bitcoin_address::validate(address, is_testnet))
@@ -91,7 +91,7 @@ where
             BuyXmrArgs {
                 seller,
                 bitcoin_change_address,
-                monero_receive_address,
+                monero_receive_pool,
             }
             .request(context.clone())
             .await?;

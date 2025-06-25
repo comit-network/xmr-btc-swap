@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.98"
-backoff = "0.4.0"
+backoff = { version = "0.4.0", features = ["futures", "tokio"] }
 cxx = "1.0.137"
 monero = { version = "0.12", features = ["serde_support"] }
 tokio = { version = "1.44.2", features = ["sync", "time", "rt"] }
@@ -14,10 +14,13 @@ tracing = "0.1.41"
 [build-dependencies]
 cmake = "0.1.54"
 cxx-build = "1.0.137"
+diffy = "0.4.2"
 
 [dev-dependencies]
 anyhow = "1.0.98"
 futures = "0.3.31"
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
 tempfile = "3.19.1"
 testcontainers = "0.15"
 tokio = { version = "1.44.2", features = ["full"] }

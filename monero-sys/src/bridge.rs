@@ -232,6 +232,15 @@ pub mod ffi {
             dest_address: &CxxString,
         ) -> Result<*mut PendingTransaction>;
 
+        /// Create a multi-sweep transaction.
+        fn createTransactionMultiDest(
+            wallet: Pin<&mut Wallet>,
+            dest_addresses: &CxxVector<CxxString>,
+            amounts: &CxxVector<u64>,
+        ) -> *mut PendingTransaction;
+
+        fn vector_string_push_back(v: Pin<&mut CxxVector<CxxString>>, s: &CxxString);
+
         /// Get the status of a pending transaction.
         fn status(self: &PendingTransaction) -> Result<i32>;
 

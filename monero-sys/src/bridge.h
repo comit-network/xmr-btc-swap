@@ -122,11 +122,60 @@ namespace Monero
         return wallet.createTransaction(dest_address, "", Monero::optional<uint64_t>(amount), 0, PendingTransaction::Priority_Default);
     }
 
+    /**
+     * Create a transaction that spends all the unlocked balance to a single destination.
+     */
     inline PendingTransaction *createSweepTransaction(
         Wallet &wallet,
         const std::string &dest_address)
     {
         return wallet.createTransaction(dest_address, "", Monero::optional<uint64_t>(), 0, PendingTransaction::Priority_Default);
+    }
+
+    /**
+     * Creates a transaction that spends the unlocked balance to multiple destinations with given ratios.
+     * Ratiosn must sum to 1.
+     */
+    inline PendingTransaction *createTransactionMultiDest(
+        Wallet &wallet,
+        const std::vector<std::string> &dest_addresses,
+        const std::vector<uint64_t> &amounts)
+    {
+        size_t n = dest_addresses.size();
+
+        // Check if we have any destinations at all
+        if (n == 0)
+        {
+            // wallet.setStatusError("Number of destinations must be greater than 0");
+            return nullptr;
+        }
+
+        // Check if the number of destinations and sweep ratios match
+        if (amounts.size() != n)
+        {
+            // wallet.setStatusError("Number of destinations and sweep ratios must match");
+            return nullptr;
+        }
+
+        // Build the actual multi‐dest transaction
+        // No change left -> wallet drops it
+        // N outputs, fee should be the same as the one estimated above
+        
+        // Find the highest output and choose it for subtract_fee_indices
+        std::set<uint32_t> subtract_fee_indices;
+        auto max_it = std::max_element(amounts.begin(), amounts.end());
+        size_t max_index = std::distance(amounts.begin(), max_it);
+        subtract_fee_indices.insert(static_cast<uint32_t>(max_index));
+        
+        return wallet.createTransactionMultDest(
+            dest_addresses,
+            "", // No Payment ID
+            Monero::optional<std::vector<uint64_t>>(amounts),
+            0, // No mixin count
+            PendingTransaction::Priority_Default,
+            0, // subaddr_account
+            {}, // subaddr_indices
+            subtract_fee_indices); // Subtract fee from all outputs
     }
 
     inline bool setWalletDaemon(Wallet &wallet, const std::string &daemon_address)
@@ -168,6 +217,13 @@ namespace Monero
     inline std::unique_ptr<std::string> walletFilename(const Wallet &wallet)
     {
         return std::make_unique<std::string>(wallet.filename());
+    }
+
+    inline void vector_string_push_back(
+        std::vector<std::string> &v,
+        const std::string &s)
+    {
+        v.push_back(s);
     }
 }
 
@@ -226,7 +282,7 @@ namespace monero_rust_log
             }
 
             // Call the rust function to forward the log message.
-            monero_rust_log::forward_cpp_log(
+            forward_cpp_log(
                 span_name.c_str(),
                 level,
                 m->file().length() > 0 ? m->file() : "",
