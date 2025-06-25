@@ -230,10 +230,11 @@ export async function initializeContext() {
     store.getState().settings.nodes[network][Blockchain.Monero][0] ?? null;
 
   // Check the state of the Monero node
-  const isMoneroNodeOnline = await getMoneroNodeStatus(moneroNodeUrl, network);
 
   const moneroNodeConfig =
-    useMoneroRpcPool || moneroNodeUrl == null || !isMoneroNodeOnline
+    useMoneroRpcPool ||
+    moneroNodeUrl == null ||
+    !(await getMoneroNodeStatus(moneroNodeUrl, network))
       ? { type: "Pool" as const }
       : {
           type: "SingleNode" as const,

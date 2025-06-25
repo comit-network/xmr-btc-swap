@@ -17,8 +17,8 @@ export function piconerosToXmr(piconeros: number): number {
 
 export function isXmrAddressValid(address: string, stagenet: boolean) {
   const re = stagenet
-    ? "^(5[0-9A-Za-z]{94}|5[0-9A-Za-z]{105})$"
-    : "^(?:[48][0-9A-Za-z]{94}|4[0-9A-Za-z]{105})$";
+    ? "^(?:[57][0-9A-Za-z]{94}|[57][0-9A-Za-z]{105})$"
+    : "^(?:[48][0-9A-Za-z]{94}|[48][0-9A-Za-z]{105})$";
   return new RegExp(`(?:^${re}$)`).test(address);
 }
 
