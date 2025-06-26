@@ -261,21 +261,21 @@ const PoolBreakdown = ({
             display: "flex",
             justifyContent: "flex-start",
             alignItems: "stretch",
-            padding: pool.percentage >= 5 ? 1.5 : 1.2,
+            padding: pool.percentage >= 0.05 ? 1.5 : 1.2,
             border: 1,
             borderColor:
-              pool.percentage >= 5 ? "success.main" : "success.light",
+              pool.percentage >= 0.05 ? "success.main" : "success.light",
             borderRadius: 1,
             backgroundColor: (theme) =>
-              pool.percentage >= 5
+              pool.percentage >= 0.05
                 ? theme.palette.success.light + "10"
                 : theme.palette.action.hover,
             width: "100%", // Ensure full width
             minWidth: 0,
-            opacity: pool.percentage >= 5 ? 1 : 0.75,
-            transform: pool.percentage >= 5 ? "scale(1)" : "scale(0.95)",
+            opacity: pool.percentage >= 0.05 ? 1 : 0.75,
+            transform: pool.percentage >= 0.05 ? "scale(1)" : "scale(0.95)",
             animation:
-              pool.percentage >= 5
+              pool.percentage >= 0.05
                 ? "poolPulse 2s ease-in-out infinite"
                 : "none",
             "@keyframes poolPulse": {
@@ -337,7 +337,7 @@ const PoolBreakdown = ({
               justifyContent: "center",
             }}
           >
-            {pool.percentage >= 5 && (
+            {pool.percentage >= 0.05 && (
               <Typography
                 variant="body2"
                 sx={(theme) => ({
@@ -348,7 +348,7 @@ const PoolBreakdown = ({
                 })}
               >
                 <PiconeroAmount
-                  amount={(pool.percentage * Number(xmr_receive_amount)) / 100}
+                  amount={pool.percentage * Number(xmr_receive_amount)}
                 />
               </Typography>
             )}
@@ -359,7 +359,7 @@ const PoolBreakdown = ({
                 whiteSpace: "nowrap",
               })}
             >
-              {pool.percentage}%
+              {pool.percentage * 100}%
             </Typography>
           </Box>
         </Box>
@@ -442,9 +442,7 @@ const MoneroMainBox = ({
           >
             <PiconeroAmount
               amount={
-                (highestPercentagePool.percentage *
-                  Number(xmr_receive_amount)) /
-                100
+                highestPercentagePool.percentage * Number(xmr_receive_amount)
               }
             />
           </Typography>
