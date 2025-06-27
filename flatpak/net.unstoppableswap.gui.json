@@ -21,8 +21,8 @@
       "sources": [
         {
           "type": "file",
-          "url": "https://github.com/UnstoppableSwap/core/releases/download/2.0.3/UnstoppableSwap_2.0.3_amd64.deb",
-          "sha256": "dae3ac67a22f6907acf8560643470d625c92ce3c8dc1fff77ea9370c9ccdf962",
+          "url": "https://cdn.crabnebula.app/download/unstoppableswap/unstoppableswap-gui-rs/latest/platform/debian-x86_64",
+          "sha256": "f1fdb9dc164ed45e31fbba7209da23fa4cb1d461442c9dd0b6bc763b8bf1bb59",
           "only-arches": ["x86_64"]
         }
       ],
