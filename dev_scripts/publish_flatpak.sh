@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # UnstoppableSwap Flatpak Build and Deploy Script
 # Usage: ./flatpak-build.sh [--push] [--branch BRANCH] [--no-gpg]
 # Example: ./flatpak-build.sh --push --branch gh-pages

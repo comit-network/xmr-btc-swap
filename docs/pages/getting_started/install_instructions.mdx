@@ -9,7 +9,7 @@ Unless you know what you're doing, you probably want to use the precompiled bina
 
 Precompiled binaries of the _GUI_ are available for most platforms. Simply download the appropriate binary for your system and follow the instructions.
 
-<Tabs items={['Windows', 'macOS (Silicon)', 'macOS (Intel)', 'Linux (x86_64)', 'Linux (arm64)']}>
+<Tabs items={['Windows', 'macOS (Silicon)', 'macOS (Intel)', 'Linux (x86_64)', 'Linux (arm64)', 'Flatpak']}>
   <Tabs.Tab>
     1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_x64-setup.exe)
     2. Open the downloaded `.exe` installer
@@ -39,6 +39,29 @@ Precompiled binaries of the _GUI_ are available for most platforms. Simply downl
   </Tabs.Tab>
   <Tabs.Tab>
     Due to limitations with our CI pipeline, we currently can't provide precompiled binaries for arm64 linux systems.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    For Linux systems with Flatpak support, you can install UnstoppableSwap directly from our Flatpak repository:
+
+    ```bash filename="install.sh"
+    # Add the UnstoppableSwap repository
+    flatpak remote-add --user unstoppableswap https://unstoppableswap.github.io/core/unstoppableswap.flatpakrepo
+
+    # Install the application
+    flatpak install unstoppableswap net.unstoppableswap.gui
+
+    # Run the application
+    flatpak run net.unstoppableswap.gui
+    ```
+
+    **Requirements:**
+    - Flatpak 1.0 or newer
+    - x86_64 architecture
+
+    **Updates:**
+    ```bash
+    flatpak update net.unstoppableswap.gui
+    ```
   </Tabs.Tab>
 </Tabs>
 
