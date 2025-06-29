@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: Lowered the Monero lock retry timeout to 10minutes. Aftet that timeout we will start an early refund.
+
 ## [2.3.1] - 2025-06-25
 
 - GUI: Users can donate a small percentage of their swap to the projects donation address. Donations will be used to fund development. This is completely optional and **disabled** by default. Monero is used exclusively for donations, ensuring full anonymity for users. Donations are only ever send for successful swaps (not refunded ones). We clearly and transparently state where how much Monero is going before the user approves a swap.
