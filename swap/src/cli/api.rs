@@ -7,7 +7,6 @@ use crate::common::tracing_util::Format;
 use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
-use crate::monero::wallet_rpc;
 use crate::monero::Wallets;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
@@ -376,48 +375,41 @@ impl ContextBuilder {
                             (),
                         );
 
-                    // Handle the different monero configurations
+                    // If we are instructed to use a pool, we start it and use it
+                    // Otherwise we use the single node address provided by the user
                     let (monero_node_address, rpc_pool_handle) = match monero_config {
                         MoneroNodeConfig::Pool => {
                             // Start RPC pool and use it
-                            match monero_rpc_pool::start_server_with_random_port(
-                                monero_rpc_pool::config::Config::new_random_port(
-                                    "127.0.0.1".to_string(),
-                                    data_dir.join("monero-rpc-pool"),
-                                ),
-                                match self.is_testnet {
-                                    true => crate::monero::Network::Stagenet,
-                                    false => crate::monero::Network::Mainnet,
-                                },
-                            )
-                            .await
-                            {
-                                Ok((server_info, mut status_receiver, pool_handle)) => {
-                                    let rpc_url =
-                                        format!("http://{}:{}", server_info.host, server_info.port);
-                                    tracing::info!("Monero RPC Pool started on {}", rpc_url);
+                            let (server_info, mut status_receiver, pool_handle) =
+                                monero_rpc_pool::start_server_with_random_port(
+                                    monero_rpc_pool::config::Config::new_random_port(
+                                        "127.0.0.1".to_string(),
+                                        data_dir.join("monero-rpc-pool"),
+                                    ),
+                                    match self.is_testnet {
+                                        true => crate::monero::Network::Stagenet,
+                                        false => crate::monero::Network::Mainnet,
+                                    },
+                                )
+                                .await?;
 
-                                    // Start listening for pool status updates and forward them to frontend
-                                    if let Some(ref handle) = self.tauri_handle {
-                                        let pool_tauri_handle = handle.clone();
-                                        tokio::spawn(async move {
-                                            while let Ok(status) = status_receiver.recv().await {
-                                                pool_tauri_handle.emit_pool_status_update(status);
-                                            }
-                                        });
+                            let rpc_url =
+                                format!("http://{}:{}", server_info.host, server_info.port);
+                            tracing::info!("Monero RPC Pool started on {}", rpc_url);
+
+                            // Start listening for pool status updates and forward them to frontend
+                            if let Some(ref handle) = self.tauri_handle {
+                                let pool_tauri_handle = handle.clone();
+                                tokio::spawn(async move {
+                                    while let Ok(status) = status_receiver.recv().await {
+                                        pool_tauri_handle.emit_pool_status_update(status);
                                     }
-
-                                    (Some(rpc_url), Some(Arc::new(pool_handle)))
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to start Monero RPC Pool: {}", e);
-                                    (None, None)
-                                }
+                                });
                             }
+
+                            (rpc_url, Some(Arc::new(pool_handle)))
                         }
-                        MoneroNodeConfig::SingleNode { url } => {
-                            (if url.is_empty() { None } else { Some(url) }, None)
-                        }
+                        MoneroNodeConfig::SingleNode { url } => (url, None),
                     };
 
                     let wallets = init_monero_wallet(
@@ -583,27 +575,16 @@ async fn init_bitcoin_wallet(
 
 async fn init_monero_wallet(
     data_dir: &Path,
-    monero_daemon_address: impl Into<Option<String>>,
+    monero_daemon_address: String,
     env_config: EnvConfig,
     tauri_handle: Option<TauriHandle>,
 ) -> Result<Arc<Wallets>> {
     let network = env_config.monero_network;
-
-    // Use the ./monero/monero-data directory for backwards compatibility
     let wallet_dir = data_dir.join("monero").join("monero-data");
 
-    let daemon = if let Some(addr) = monero_daemon_address.into() {
-        monero_sys::Daemon {
-            address: addr,
-            ssl: false,
-        }
-    } else {
-        let node = wallet_rpc::choose_monero_node(env_config.monero_network).await?;
-        tracing::debug!(%node, "Automatically selected monero node");
-        monero_sys::Daemon {
-            address: node.to_string(),
-            ssl: false,
-        }
+    let daemon = monero_sys::Daemon {
+        address: monero_daemon_address,
+        ssl: false,
     };
 
     // This is the name of a wallet we only use for blockchain monitoring

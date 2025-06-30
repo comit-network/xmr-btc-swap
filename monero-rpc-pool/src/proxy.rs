@@ -16,7 +16,7 @@ enum HandlerError {
     NoNodes,
     PoolError(String),
     RequestError(String),
-    AllRequestsFailed(Vec<(String, String)>), // Vec of (node_url, error_message)
+    AllRequestsFailed(Vec<(String, String)>),
 }
 
 impl std::fmt::Display for HandlerError {
@@ -150,8 +150,8 @@ async fn raw_http_request(
 }
 
 async fn record_success(state: &AppState, scheme: &str, host: &str, port: i64, latency_ms: f64) {
-    let node_pool_guard = state.node_pool.read().await;
-    if let Err(e) = node_pool_guard
+    if let Err(e) = state
+        .node_pool
         .record_success(scheme, host, port, latency_ms)
         .await
     {
@@ -163,8 +163,7 @@ async fn record_success(state: &AppState, scheme: &str, host: &str, port: i64, l
 }
 
 async fn record_failure(state: &AppState, scheme: &str, host: &str, port: i64) {
-    let node_pool_guard = state.node_pool.read().await;
-    if let Err(e) = node_pool_guard.record_failure(scheme, host, port).await {
+    if let Err(e) = state.node_pool.record_failure(scheme, host, port).await {
         error!(
             "Failed to record failure for {}://{}:{}: {}",
             scheme, host, port, e
@@ -173,15 +172,12 @@ async fn record_failure(state: &AppState, scheme: &str, host: &str, port: i64) {
 }
 
 async fn single_raw_request(
-    state: &AppState,
     node_url: (String, String, i64),
     path: &str,
     method: &str,
     headers: &HeaderMap,
     body: Option<&[u8]>,
 ) -> Result<(Response, (String, String, i64), f64), HandlerError> {
-    let (scheme, host, port) = &node_url;
-
     let start_time = Instant::now();
 
     match raw_http_request(node_url.clone(), path, method, headers, body).await {
@@ -199,42 +195,37 @@ async fn single_raw_request(
                         .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
                     if is_jsonrpc_error(&body_bytes) {
-                        record_failure(state, scheme, host, *port).await;
                         return Err(HandlerError::RequestError("JSON-RPC error".to_string()));
                     }
 
                     // Reconstruct response with the body we consumed
                     let response = Response::from_parts(parts, Body::from(body_bytes));
-                    record_success(state, scheme, host, *port, latency_ms).await;
                     Ok((response, node_url, latency_ms))
                 } else {
                     // For non-JSON-RPC endpoints, HTTP success is enough
-                    record_success(state, scheme, host, *port, latency_ms).await;
                     Ok((response, node_url, latency_ms))
                 }
             } else {
                 // Non-200 status codes are failures
-                record_failure(state, scheme, host, *port).await;
                 Err(HandlerError::RequestError(format!(
                     "HTTP {}",
                     response.status()
                 )))
             }
         }
-        Err(e) => {
-            record_failure(state, scheme, host, *port).await;
-            Err(e)
-        }
+        Err(e) => Err(e),
     }
 }
 
-async fn race_requests(
+async fn sequential_requests(
     state: &AppState,
     path: &str,
     method: &str,
     headers: &HeaderMap,
     body: Option<&[u8]>,
 ) -> Result<Response, HandlerError> {
+    const POOL_SIZE: usize = 20;
+
     // Extract JSON-RPC method for better logging
     let jsonrpc_method = if path == "/json_rpc" {
         if let Some(body_data) = body {
@@ -245,22 +236,21 @@ async fn race_requests(
     } else {
         None
     };
-    const POOL_SIZE: usize = 20;
-    let mut tried_nodes = std::collections::HashSet::new();
-    let mut pool_index = 0;
+
+    let mut tried_nodes = 0;
     let mut collected_errors: Vec<(String, String)> = Vec::new();
 
-    // Get the exclusive pool of 20 nodes once at the beginning
+    // Get the pool of nodes
     let available_pool = {
-        let node_pool_guard = state.node_pool.read().await;
-        let reliable_nodes = node_pool_guard
+        let nodes = state
+            .node_pool
             .get_top_reliable_nodes(POOL_SIZE)
             .await
             .map_err(|e| HandlerError::PoolError(e.to_string()))?;
 
-        let pool: Vec<(String, String, i64)> = reliable_nodes
+        let pool: Vec<(String, String, i64)> = nodes
             .into_iter()
-            .map(|node| (node.scheme, node.host, node.port))
+            .map(|node| (node.scheme, node.host, node.port as i64))
             .collect();
 
         pool
@@ -270,142 +260,59 @@ async fn race_requests(
         return Err(HandlerError::NoNodes);
     }
 
-    // Power of Two Choices within the exclusive pool
-    while pool_index < available_pool.len() && tried_nodes.len() < POOL_SIZE {
-        let mut node1_option = None;
-        let mut node2_option = None;
-
-        // Select first untried node from pool
-        for (i, node) in available_pool.iter().enumerate().skip(pool_index) {
-            if !tried_nodes.contains(node) {
-                node1_option = Some(node.clone());
-                pool_index = i + 1;
-                break;
-            }
-        }
-
-        // Select second untried node from pool (different from first)
-        for node in available_pool.iter().skip(pool_index) {
-            if !tried_nodes.contains(node) && Some(node) != node1_option.as_ref() {
-                node2_option = Some(node.clone());
-                break;
-            }
-        }
-
-        // If we can't get any new nodes from the pool, we've exhausted our options
-        if node1_option.is_none() && node2_option.is_none() {
-            break;
-        }
-
-        // Store node URLs for error tracking before consuming them
-        let current_nodes: Vec<(String, String, i64)> = [&node1_option, &node2_option]
-            .iter()
-            .filter_map(|opt| opt.as_ref())
-            .cloned()
-            .collect();
-
-        let mut requests = Vec::new();
-
-        if let Some(node1) = node1_option {
-            tried_nodes.insert(node1.clone());
-            requests.push(single_raw_request(
-                state,
-                node1.clone(),
-                path,
-                method,
-                headers,
-                body,
-            ));
-        }
-
-        if let Some(node2) = node2_option {
-            tried_nodes.insert(node2.clone());
-            requests.push(single_raw_request(
-                state,
-                node2.clone(),
-                path,
-                method,
-                headers,
-                body,
-            ));
-        }
-
-        if requests.is_empty() {
-            break;
-        }
+    // Try nodes one by one sequentially
+    for node in available_pool.iter().take(POOL_SIZE) {
+        tried_nodes += 1;
+        let node_display = format!("{}://{}:{}", node.0, node.1, node.2);
 
         match &jsonrpc_method {
             Some(rpc_method) => debug!(
-                "Racing {} requests to {} (JSON-RPC: {}): {} nodes (tried {} so far)",
+                "Trying {} request to {} (JSON-RPC: {}) - attempt {} of {}",
                 method,
-                path,
+                node_display,
                 rpc_method,
-                requests.len(),
-                tried_nodes.len()
+                tried_nodes,
+                available_pool.len().min(POOL_SIZE)
             ),
             None => debug!(
-                "Racing {} requests to {}: {} nodes (tried {} so far)",
+                "Trying {} request to {} - attempt {} of {}",
                 method,
-                path,
-                requests.len(),
-                tried_nodes.len()
+                node_display,
+                tried_nodes,
+                available_pool.len().min(POOL_SIZE)
             ),
         }
 
-        // Handle the requests based on how many we have
-        let result = match requests.len() {
-            1 => {
-                // Only one request
-                requests.into_iter().next().unwrap().await
-            }
-            2 => {
-                // Two requests - race them
-                let mut iter = requests.into_iter();
-                let req1 = iter.next().unwrap();
-                let req2 = iter.next().unwrap();
-
-                tokio::select! {
-                    result1 = req1 => result1,
-                    result2 = req2 => result2,
-                }
-            }
-            _ => unreachable!("We only add 1 or 2 requests"),
-        };
-
-        match result {
+        match single_raw_request(node.clone(), path, method, headers, body).await {
             Ok((response, winning_node, latency_ms)) => {
                 let (scheme, host, port) = &winning_node;
-                let winning_node = format!("{}://{}:{}", scheme, host, port);
+                let winning_node_display = format!("{}://{}:{}", scheme, host, port);
 
                 match &jsonrpc_method {
-                    Some(rpc_method) => {
-                        debug!(
+                    Some(rpc_method) => debug!(
                         "{} response from {} ({}ms) - SUCCESS after trying {} nodes! JSON-RPC: {}",
-                        method, winning_node, latency_ms, tried_nodes.len(), rpc_method
-                    )
-                    }
+                        method, winning_node_display, latency_ms, tried_nodes, rpc_method
+                    ),
                     None => debug!(
                         "{} response from {} ({}ms) - SUCCESS after trying {} nodes!",
-                        method,
-                        winning_node,
-                        latency_ms,
-                        tried_nodes.len()
+                        method, winning_node_display, latency_ms, tried_nodes
                     ),
                 }
-                record_success(state, scheme, host, *port, latency_ms).await;
+
+                record_success(state, &node.0, &node.1, node.2, latency_ms).await;
+
                 return Ok(response);
             }
             Err(e) => {
-                // Since we don't know which specific node failed in the race,
-                // record the error for all nodes in this batch
-                for (scheme, host, port) in &current_nodes {
-                    let node_display = format!("{}://{}:{}", scheme, host, port);
-                    collected_errors.push((node_display, e.to_string()));
-                }
+                collected_errors.push((node_display.clone(), e.to_string()));
+
                 debug!(
-                    "Request failed: {} - retrying with different nodes from pool...",
-                    e
+                    "Request failed with node {} with error {} - trying next node...",
+                    node_display, e
                 );
+
+                record_failure(state, &node.0, &node.1, node.2).await;
+
                 continue;
             }
         }
@@ -421,14 +328,14 @@ async fn race_requests(
         Some(rpc_method) => error!(
             "All {} requests failed after trying {} nodes (JSON-RPC: {}). Detailed errors:\n{}",
             method,
-            tried_nodes.len(),
+            tried_nodes,
             rpc_method,
             detailed_errors.join("\n")
         ),
         None => error!(
             "All {} requests failed after trying {} nodes. Detailed errors:\n{}",
             method,
-            tried_nodes.len(),
+            tried_nodes,
             detailed_errors.join("\n")
         ),
     }
@@ -446,7 +353,7 @@ async fn proxy_request(
     headers: &HeaderMap,
     body: Option<&[u8]>,
 ) -> Response {
-    match race_requests(state, path, method, headers, body).await {
+    match sequential_requests(state, path, method, headers, body).await {
         Ok(res) => res,
         Err(handler_error) => {
             let error_response = match &handler_error {
@@ -505,7 +412,7 @@ async fn proxy_request(
 }
 
 #[axum::debug_handler]
-pub async fn simple_proxy_handler(
+pub async fn proxy_handler(
     State(state): State<AppState>,
     method: Method,
     uri: axum::http::Uri,
@@ -553,11 +460,9 @@ pub async fn simple_proxy_handler(
 }
 
 #[axum::debug_handler]
-pub async fn simple_stats_handler(State(state): State<AppState>) -> Response {
+pub async fn stats_handler(State(state): State<AppState>) -> Response {
     async move {
-        let node_pool_guard = state.node_pool.read().await;
-
-        match node_pool_guard.get_current_status().await {
+        match state.node_pool.get_current_status().await {
             Ok(status) => {
                 let stats_json = serde_json::json!({
                     "status": "healthy",

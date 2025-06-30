@@ -6,46 +6,49 @@ use axum::{
     Router,
 };
 use monero::Network;
-use tokio::sync::RwLock;
+
 use tokio::task::JoinHandle;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 
-fn network_to_string(network: &Network) -> String {
-    match network {
-        Network::Mainnet => "mainnet".to_string(),
-        Network::Stagenet => "stagenet".to_string(),
-        Network::Testnet => "testnet".to_string(),
+pub trait ToNetworkString {
+    fn to_network_string(&self) -> String;
+}
+
+impl ToNetworkString for Network {
+    fn to_network_string(&self) -> String {
+        match self {
+            Network::Mainnet => "mainnet".to_string(),
+            Network::Stagenet => "stagenet".to_string(),
+            Network::Testnet => "testnet".to_string(),
+        }
     }
 }
 
 pub mod config;
 pub mod database;
-pub mod discovery;
 pub mod pool;
-pub mod simple_handlers;
+pub mod proxy;
+pub mod types;
 
 use config::Config;
 use database::Database;
-use discovery::NodeDiscovery;
 use pool::{NodePool, PoolStatus};
-use simple_handlers::{simple_proxy_handler, simple_stats_handler};
+use proxy::{proxy_handler, stats_handler};
 
 #[derive(Clone)]
 pub struct AppState {
-    pub node_pool: Arc<RwLock<NodePool>>,
+    pub node_pool: Arc<NodePool>,
 }
 
 /// Manages background tasks for the RPC pool
 pub struct PoolHandle {
     pub status_update_handle: JoinHandle<()>,
-    pub discovery_handle: JoinHandle<()>,
 }
 
 impl Drop for PoolHandle {
     fn drop(&mut self) {
         self.status_update_handle.abort();
-        self.discovery_handle.abort();
     }
 }
 
@@ -65,64 +68,41 @@ async fn create_app_with_receiver(
     PoolHandle,
 )> {
     // Initialize database
-    let db = Database::new_with_data_dir(config.data_dir.clone()).await?;
+    let db = Database::new(config.data_dir.clone()).await?;
 
     // Initialize node pool with network
-    let network_str = network_to_string(&network);
+    let network_str = network.to_network_string();
     let (node_pool, status_receiver) = NodePool::new(db.clone(), network_str.clone());
-    let node_pool = Arc::new(RwLock::new(node_pool));
-
-    // Initialize discovery service
-    let discovery = NodeDiscovery::new(db.clone())?;
+    let node_pool = Arc::new(node_pool);
 
     // Publish initial status immediately to ensure first event is sent
-    {
-        let pool_guard = node_pool.read().await;
-        if let Err(e) = pool_guard.publish_status_update().await {
-            error!("Failed to publish initial status update: {}", e);
-        }
+    if let Err(e) = node_pool.publish_status_update().await {
+        error!("Failed to publish initial status update: {}", e);
     }
 
-    // Start background tasks
+    // Send status updates every 10 seconds
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
     let node_pool_for_health_check = node_pool.clone();
     let status_update_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
-
         loop {
-            interval.tick().await;
-
-            // Publish status update
-            let pool_guard = node_pool_for_health_check.read().await;
-            if let Err(e) = pool_guard.publish_status_update().await {
+            if let Err(e) = node_pool_for_health_check.publish_status_update().await {
                 error!("Failed to publish status update: {}", e);
             }
-        }
-    });
 
-    // Start periodic discovery task
-    let discovery_clone = discovery.clone();
-    let network_clone = network;
-    let discovery_handle = tokio::spawn(async move {
-        if let Err(e) = discovery_clone.periodic_discovery_task(network_clone).await {
-            error!(
-                "Periodic discovery task failed for network {}: {}",
-                network_to_string(&network_clone),
-                e
-            );
+            interval.tick().await;
         }
     });
 
     let pool_handle = PoolHandle {
         status_update_handle,
-        discovery_handle,
     };
 
     let app_state = AppState { node_pool };
 
     // Build the app
     let app = Router::new()
-        .route("/stats", get(simple_stats_handler))
-        .route("/*path", any(simple_proxy_handler))
+        .route("/stats", get(stats_handler))
+        .route("/*path", any(proxy_handler))
         .layer(CorsLayer::permissive())
         .with_state(app_state);
 

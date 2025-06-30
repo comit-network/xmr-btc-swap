@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT \n                COUNT(*) as total,\n                CAST(SUM(CASE WHEN stats.success_count > 0 THEN 1 ELSE 0 END) AS INTEGER) as \"reachable!: i64\",\n                CAST(SUM(CASE WHEN stats.success_count > stats.failure_count AND stats.success_count > 0 THEN 1 ELSE 0 END) AS INTEGER) as \"reliable!: i64\"\n            FROM monero_nodes n\n            LEFT JOIN (\n                SELECT \n                    node_id,\n                    SUM(CASE WHEN was_successful THEN 1 ELSE 0 END) as success_count,\n                    SUM(CASE WHEN NOT was_successful THEN 1 ELSE 0 END) as failure_count\n                FROM health_checks \n                GROUP BY node_id\n            ) stats ON n.id = stats.node_id\n            WHERE n.network = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "total",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "reachable!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "reliable!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [false, true, true]
+  },
+  "hash": "7bc8d637e7cf020bff58d05109ae88e56672e95e0e638af99e82df5b00595e77"
+}

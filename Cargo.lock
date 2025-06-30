@@ -5974,7 +5974,6 @@ dependencies = [
  "axum",
  "chrono",
  "clap 4.5.40",
- "dirs 5.0.1",
  "futures",
  "monero",
  "monero-rpc",

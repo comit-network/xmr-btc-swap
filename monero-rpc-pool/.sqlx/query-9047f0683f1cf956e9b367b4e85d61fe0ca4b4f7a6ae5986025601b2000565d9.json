@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO health_checks (node_id, timestamp, was_successful, latency_ms)\n            SELECT id, datetime('now'), ?, ?\n            FROM monero_nodes \n            WHERE scheme = ? AND host = ? AND port = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "9047f0683f1cf956e9b367b4e85d61fe0ca4b4f7a6ae5986025601b2000565d9"
+}
