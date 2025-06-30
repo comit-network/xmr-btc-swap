@@ -229,7 +229,7 @@ mod byte_array {
             phantom: PhantomData<(T, [u8; N])>,
         }
 
-        impl<'de, T, const N: usize> serde::de::Visitor<'de> for Visitor<T, N>
+        impl<T, const N: usize> serde::de::Visitor<'_> for Visitor<T, N>
         where
             T: TryFrom<[u8; N]>,
         {

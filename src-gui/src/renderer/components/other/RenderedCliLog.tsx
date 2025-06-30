@@ -16,7 +16,7 @@ function RenderedCliLog({ log }: { log: CliLog }) {
   };
 
   return (
-    <Box>
+    <Box sx={{ display: "flex", flexDirection: "column" }}>
       <Box
         style={{
           display: "flex",
@@ -33,7 +33,6 @@ function RenderedCliLog({ log }: { log: CliLog }) {
           <Chip label={target.split("::")[0]} size="small" variant="outlined" />
         )}
         <Chip label={timestamp} size="small" variant="outlined" />
-        <Typography variant="subtitle2">{fields.message}</Typography>
       </Box>
       <Box
         sx={{
@@ -43,6 +42,7 @@ function RenderedCliLog({ log }: { log: CliLog }) {
           flexDirection: "column",
         }}
       >
+        <Typography variant="subtitle2">{fields.message}</Typography>
         {Object.entries(fields).map(([key, value]) => {
           if (key !== "message") {
             return (
@@ -62,10 +62,12 @@ export default function CliLogsBox({
   label,
   logs,
   topRightButton = null,
+  autoScroll = false,
 }: {
   label: string;
   logs: (CliLog | string)[];
   topRightButton?: ReactNode;
+  autoScroll?: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -85,6 +87,7 @@ export default function CliLogsBox({
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}
       topRightButton={topRightButton}
+      autoScroll={autoScroll}
       rows={memoizedLogs.map((log) =>
         typeof log === "string" ? (
           <Typography key={log} component="pre">

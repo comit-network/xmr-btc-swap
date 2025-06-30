@@ -183,7 +183,7 @@ impl Wallets {
     pub async fn wait_until_confirmed(
         &self,
         watch_request: WatchRequest,
-        listener: Option<impl Fn(u64) + Send + 'static>,
+        listener: Option<impl Fn((u64, u64)) + Send + 'static>,
     ) -> Result<()> {
         let wallet = self.main_wallet().await;
 

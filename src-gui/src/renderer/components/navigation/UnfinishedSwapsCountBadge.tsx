@@ -1,10 +1,11 @@
+import React from "react";
 import { Badge } from "@mui/material";
 import { useResumeableSwapsCountExcludingPunished } from "store/hooks";
 
 export default function UnfinishedSwapsBadge({
   children,
 }: {
-  children: JSX.Element;
+  children: React.ReactNode;
 }) {
   const resumableSwapsCount = useResumeableSwapsCountExcludingPunished();
 

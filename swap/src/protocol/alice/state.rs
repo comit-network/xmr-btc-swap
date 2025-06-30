@@ -576,8 +576,12 @@ impl State3 {
         monero_wallet
             .wait_until_confirmed(
                 self.lock_xmr_watch_request(transfer_proof_2, 10),
-                Some(move |confirmations| {
-                    tracing::debug!(%confirmations, "Monero lock transaction confirmed");
+                Some(move |(confirmations, target_confirmations)| {
+                    tracing::debug!(
+                        %confirmations,
+                        %target_confirmations,
+                        "Monero lock transaction got a confirmation"
+                    );
                 }),
             )
             .await

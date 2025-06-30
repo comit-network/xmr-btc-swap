@@ -446,7 +446,11 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub fn lock_xmr_watch_request(&self, transfer_proof: TransferProof) -> WatchRequest {
+    pub fn lock_xmr_watch_request(
+        &self,
+        transfer_proof: TransferProof,
+        confirmation_target: u64,
+    ) -> WatchRequest {
         let S_b_monero =
             monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
         let S = self.S_a_monero + S_b_monero;
@@ -455,7 +459,7 @@ impl State3 {
             public_spend_key: S,
             public_view_key: self.v.public(),
             transfer_proof,
-            confirmation_target: self.min_monero_confirmations,
+            confirmation_target,
             expected_amount: self.xmr.into(),
         }
     }
@@ -471,6 +475,7 @@ impl State3 {
             s_b: self.s_b,
             S_a_bitcoin: self.S_a_bitcoin,
             v: self.v,
+            xmr: self.xmr,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -501,6 +506,7 @@ impl State3 {
             tx_refund_encsig: self.tx_refund_encsig.clone(),
             tx_refund_fee: self.tx_refund_fee,
             tx_cancel_fee: self.tx_cancel_fee,
+            xmr: self.xmr,
         }
     }
 
@@ -531,22 +537,6 @@ impl State3 {
         ))
     }
 
-    pub fn attempt_cooperative_redeem(
-        &self,
-        s_a: monero::PrivateKey,
-        monero_wallet_restore_blockheight: BlockHeight,
-        lock_transfer_proof: TransferProof,
-    ) -> State5 {
-        State5 {
-            s_a,
-            s_b: self.s_b,
-            v: self.v,
-            tx_lock: self.tx_lock.clone(),
-            monero_wallet_restore_blockheight,
-            lock_transfer_proof,
-        }
-    }
-
     pub fn construct_tx_early_refund(&self) -> bitcoin::TxEarlyRefund {
         bitcoin::TxEarlyRefund::new(&self.tx_lock, &self.refund_address, self.tx_refund_fee)
     }
@@ -572,6 +562,7 @@ pub struct State4 {
     s_b: monero::Scalar,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     #[serde(with = "address_serde")]
@@ -612,6 +603,7 @@ impl State4 {
                 s_a,
                 s_b: self.s_b,
                 v: self.v,
+                xmr: self.xmr,
                 tx_lock: self.tx_lock.clone(),
                 monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
                 lock_transfer_proof: self.lock_transfer_proof.clone(),
@@ -682,6 +674,7 @@ impl State4 {
             tx_refund_encsig: self.tx_refund_encsig,
             tx_refund_fee: self.tx_refund_fee,
             tx_cancel_fee: self.tx_cancel_fee,
+            xmr: self.xmr,
         }
     }
 
@@ -696,6 +689,7 @@ pub struct State5 {
     s_a: monero::PrivateKey,
     s_b: monero::Scalar,
     v: monero::PrivateViewKey,
+    xmr: monero::Amount,
     tx_lock: bitcoin::TxLock,
     pub monero_wallet_restore_blockheight: BlockHeight,
     pub lock_transfer_proof: TransferProof,
@@ -711,6 +705,23 @@ impl State5 {
 
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
+    }
+
+    pub fn lock_xmr_watch_request_for_sweep(&self) -> monero::wallet::WatchRequest {
+        let S_b_monero =
+            monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
+        let S_a_monero = monero::PublicKey::from_private_key(&self.s_a);
+        let S = S_a_monero + S_b_monero;
+
+        monero::wallet::WatchRequest {
+            public_spend_key: S,
+            public_view_key: self.v.public(),
+            transfer_proof: self.lock_transfer_proof.clone(),
+            // To sweep the funds we need 10 full confirmations because
+            // Monero requires 10 on an UTXO before it can be spent.
+            confirmation_target: 10,
+            expected_amount: self.xmr.into(),
+        }
     }
 
     pub async fn redeem_xmr(
@@ -767,6 +778,7 @@ pub struct State6 {
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
     v: monero::PrivateViewKey,
+    pub xmr: monero::Amount,
     pub monero_wallet_restore_blockheight: BlockHeight,
     pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
@@ -885,15 +897,19 @@ impl State6 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
+
     pub fn attempt_cooperative_redeem(
         &self,
-        s_a: monero::PrivateKey,
+        s_a: monero::Scalar,
         lock_transfer_proof: TransferProof,
     ) -> State5 {
+        let s_a = monero::PrivateKey::from_scalar(s_a);
+
         State5 {
             s_a,
             s_b: self.s_b,
             v: self.v,
+            xmr: self.xmr,
             tx_lock: self.tx_lock.clone(),
             monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
             lock_transfer_proof,

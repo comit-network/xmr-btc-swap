@@ -304,8 +304,12 @@ where
                 monero_wallet
                     .wait_until_confirmed(
                         state3.lock_xmr_watch_request(transfer_proof.clone(), 1),
-                        Some(|confirmations| {
-                            tracing::debug!(%confirmations, "Monero lock tx got new confirmation")
+                        Some(|(confirmations, target_confirmations)| {
+                            tracing::debug!(
+                                %confirmations,
+                                %target_confirmations,
+                                "Monero lock tx got new confirmation"
+                            )
                         }),
                     )
                     .await

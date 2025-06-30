@@ -615,7 +615,7 @@ impl WalletHandle {
         destination_address: &monero::Address,
         expected_amount: monero::Amount,
         confirmations: u64,
-        listener: Option<impl Fn(u64) + Send + 'static>,
+        listener: Option<impl Fn((u64, u64)) + Send + 'static>,
     ) -> anyhow::Result<()> {
         tracing::info!(%txid, %destination_address, amount=%expected_amount, %confirmations, "Waiting until transaction is confirmed");
 
@@ -659,7 +659,7 @@ impl WalletHandle {
 
             // If the listener exists, notify it of the result
             if let Some(listener) = &listener {
-                listener(tx_status.confirmations);
+                listener((tx_status.confirmations, confirmations));
             }
 
             // Stop when we have the required number of confirmations

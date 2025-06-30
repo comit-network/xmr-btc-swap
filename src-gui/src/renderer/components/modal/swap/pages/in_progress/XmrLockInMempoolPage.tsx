@@ -6,8 +6,9 @@ import MoneroTransactionInfoBox from "../../MoneroTransactionInfoBox";
 export default function XmrLockTxInMempoolPage({
   xmr_lock_tx_confirmations,
   xmr_lock_txid,
+  xmr_lock_tx_target_confirmations,
 }: TauriSwapProgressEventContent<"XmrLockTxInMempool">) {
-  const additionalContent = `Confirmations: ${formatConfirmations(xmr_lock_tx_confirmations, 10)}`;
+  const additionalContent = `Confirmations: ${formatConfirmations(xmr_lock_tx_confirmations, xmr_lock_tx_target_confirmations)}`;
 
   return (
     <Box>

@@ -83,7 +83,8 @@ function getActiveStep(state: SwapState | null): PathStep | null {
 
     // Step 3: Waiting for XMR redemption
     // Bitcoin has been redeemed by Alice, now waiting for us to redeem Monero
-    case "BtcRedeemed":
+    case "WaitingForXmrConfirmationsBeforeRedeem":
+    case "RedeemingMonero":
       return [PathType.HAPPY_PATH, 3, isReleased];
 
     // Step 4: Swap completed successfully
@@ -162,9 +163,9 @@ function SwapStepper({
 
 const HAPPY_PATH_STEP_LABELS = [
   { label: "Locking your BTC", duration: "~12min" },
-  { label: "They lock their XMR", duration: "~18min" },
+  { label: "They lock their XMR", duration: "~10min" },
   { label: "They redeem the BTC", duration: "~2min" },
-  { label: "Redeeming your XMR", duration: "~2min" },
+  { label: "Redeeming your XMR", duration: "~10min" },
 ];
 
 const UNHAPPY_PATH_STEP_LABELS = [

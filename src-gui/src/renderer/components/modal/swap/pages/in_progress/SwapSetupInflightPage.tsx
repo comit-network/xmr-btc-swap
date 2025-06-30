@@ -481,7 +481,8 @@ const MoneroSecondaryContent = ({
 // Arrow animation styling extracted for reuse
 const arrowSx = {
   fontSize: "3rem",
-  color: (theme: any) => theme.palette.primary.main,
+  color: (theme: { palette: { primary: { main: string } } }) =>
+    theme.palette.primary.main,
   animation: "slideArrow 2s infinite",
   "@keyframes slideArrow": {
     "0%": {
