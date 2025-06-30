@@ -17,11 +17,7 @@ export default function WaitingForXmrConfirmationsBeforeRedeemPage({
       <MoneroTransactionInfoBox
         title="Monero Lock Transaction"
         txId={xmr_lock_txid}
-        additionalContent={
-        additionalContent={
-          `Confirmations: ${xmr_lock_tx_confirmations}/${xmr_lock_tx_target_confirmations}`
-        }
-        }
+        additionalContent={`Confirmations: ${xmr_lock_tx_confirmations}/${xmr_lock_tx_target_confirmations}`}
         loading
       />
     </Box>
