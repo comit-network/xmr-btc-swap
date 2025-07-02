@@ -281,11 +281,7 @@ impl ContextBuilder {
 
     /// Takes the builder, initializes the context by initializing the wallets and other components and returns the Context.
     pub async fn build(self) -> Result<Context> {
-        // These are needed for everything else, and are blocking calls
         let data_dir = &data::data_dir_from(self.data, self.is_testnet)?;
-        let env_config = env_config_from(self.is_testnet);
-        let seed = &Seed::from_file_or_generate(data_dir.as_path())
-            .context("Failed to read seed in file")?;
 
         // Initialize logging
         let format = if self.json { Format::Json } else { Format::Raw };
@@ -311,6 +307,12 @@ impl ContextBuilder {
                 "Setting up context"
             );
         });
+
+        // These are needed for everything else, and are blocking calls
+        let env_config = env_config_from(self.is_testnet);
+        let seed = &Seed::from_file_or_generate(data_dir.as_path(), self.tauri_handle.clone())
+            .await
+            .context("Failed to read seed in file")?;
 
         // Create the data structure we use to manage the swap lock
         let swap_lock = Arc::new(SwapLock::new());
@@ -698,14 +700,16 @@ pub mod api_test {
     pub const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
     impl Config {
-        pub fn default(
+        pub async fn default(
             is_testnet: bool,
             data_dir: Option<PathBuf>,
             debug: bool,
             json: bool,
         ) -> Self {
             let data_dir = data::data_dir_from(data_dir, is_testnet).unwrap();
-            let seed = Seed::from_file_or_generate(data_dir.as_path()).unwrap();
+            let seed = Seed::from_file_or_generate(data_dir.as_path(), None)
+                .await
+                .unwrap();
             let env_config = env_config_from(is_testnet);
 
             Self {

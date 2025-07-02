@@ -1,3 +1,4 @@
+use crate::cli::api::tauri_bindings::{SeedChoice, TauriEmitter, TauriHandle};
 use crate::fs::ensure_directory_exists;
 use ::bitcoin::bip32::Xpriv as ExtendedPrivKey;
 use anyhow::{Context, Result};
@@ -5,6 +6,7 @@ use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
 use bitcoin::secp256k1::{self, SecretKey};
 use libp2p::identity;
+use monero_seed::{Language, Seed as MoneroSeed};
 use pem::{encode, Pem};
 use rand::prelude::*;
 use std::ffi::OsStr;
@@ -12,6 +14,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use zeroize::Zeroizing;
 
 pub const SEED_LENGTH: usize = 32;
 
@@ -60,20 +63,57 @@ impl Seed {
         identity::Keypair::ed25519_from_bytes(bytes).expect("we always pass 32 bytes")
     }
 
-    pub fn from_file_or_generate(data_dir: &Path) -> Result<Self, Error> {
+    pub async fn from_file_or_generate(
+        data_dir: &Path,
+        tauri_handle: Option<TauriHandle>,
+    ) -> Result<Self> {
         let file_path_buf = data_dir.join("seed.pem");
         let file_path = Path::new(&file_path_buf);
 
         if file_path.exists() {
-            return Self::from_file(file_path);
+            return Self::from_file(file_path).context("Couldn't get seed from file");
         }
 
         tracing::debug!("No seed file found, creating at {}", file_path.display());
 
-        let random_seed = Seed::random()?;
-        random_seed.write_to(file_path.to_path_buf())?;
+        // In debug mode, we allow the user to enter a seed manually.
+        #[cfg(debug_assertions)]
+        {
+            let new_seed = match tauri_handle {
+                Some(tauri_handle) => {
+                    let seed_choice = tauri_handle.request_seed_selection().await?;
+                    let seed_entered = match seed_choice {
+                        SeedChoice::RandomSeed => Seed::random()?,
+                        SeedChoice::FromSeed { seed } => {
+                            println!("seed: {}", seed);
+                            let monero_seed =
+                                MoneroSeed::from_string(Language::English, Zeroizing::new(seed))
+                                    .unwrap();
+                            Seed(*monero_seed.entropy())
+                        }
+                    };
 
-        Ok(random_seed)
+                    //TODO: Send error type to front end
+
+                    seed_entered
+                }
+                None => {
+                    let random_seed = Seed::random()?;
+                    random_seed
+                }
+            };
+
+            new_seed.write_to(file_path.to_path_buf())?;
+            Ok(new_seed)
+        }
+
+        // In release mode, we generate a random seed.
+        #[cfg(not(debug_assertions))]
+        {
+            let new_seed = Seed::random()?;
+            new_seed.write_to(file_path.to_path_buf())?;
+            Ok(new_seed)
+        }
     }
 
     /// Derive a new seed using the given scope.

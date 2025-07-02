@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "src-tauri", "swap"]
+members = ["electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "seed", "src-tauri", "swap"]
 
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51
@@ -11,3 +11,6 @@ monero = { git = "https://github.com/comit-network/monero-rs", rev = "818f38b" }
 bdk_wallet = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_wallet" }
 bdk_electrum = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_electrum" }
 bdk_chain = { git = "https://github.com/Einliterflasche/bdk", branch = "bump/rusqlite-0.32", package = "bdk_chain" }
+
+[workspace.lints]
+rust.unused_crate_dependencies = "warn"

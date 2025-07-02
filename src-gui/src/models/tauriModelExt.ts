@@ -253,27 +253,38 @@ export function isGetSwapInfoResponseWithTimelock(
   return response.timelock !== null;
 }
 
-export type PendingApprovalRequest = Extract<
-  ApprovalRequest,
-  { state: "Pending" }
->;
+export type PendingApprovalRequest = ApprovalRequest & {
+  content: Extract<ApprovalRequest["request_status"], { state: "Pending" }>;
+};
 
-export type PendingLockBitcoinApprovalRequest = PendingApprovalRequest & {
-  content: {
-    details: { type: "LockBitcoin" };
-  };
+export type PendingLockBitcoinApprovalRequest = ApprovalRequest & {
+  request: Extract<ApprovalRequest["request"], { type: "LockBitcoin" }>;
+  content: Extract<ApprovalRequest["request_status"], { state: "Pending" }>;
+};
+
+export type PendingSeedSelectionApprovalRequest = ApprovalRequest & {
+  type: "SeedSelection";
+  content: Extract<ApprovalRequest["request_status"], { state: "Pending" }>;
 };
 
 export function isPendingLockBitcoinApprovalEvent(
   event: ApprovalRequest,
 ): event is PendingLockBitcoinApprovalRequest {
-  // Check if the request is pending
-  if (event.state !== "Pending") {
-    return false;
-  }
+  // Check if the request is a LockBitcoin request and is pending
+  return (
+    event.request.type === "LockBitcoin" &&
+    event.request_status.state === "Pending"
+  );
+}
 
-  // Check if the request is a LockBitcoin request
-  return event.content.details.type === "LockBitcoin";
+export function isPendingSeedSelectionApprovalEvent(
+  event: ApprovalRequest,
+): event is PendingSeedSelectionApprovalRequest {
+  // Check if the request is a SeedSelection request and is pending
+  return (
+    event.request.type === "SeedSelection" &&
+    event.request_status.state === "Pending"
+  );
 }
 
 export function isPendingBackgroundProcess(

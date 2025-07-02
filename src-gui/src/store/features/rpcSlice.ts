@@ -137,7 +137,7 @@ export const rpcSlice = createSlice({
     },
     approvalEventReceived(slice, action: PayloadAction<ApprovalRequest>) {
       const event = action.payload;
-      const requestId = event.content.request_id;
+      const requestId = event.request_id;
       slice.state.approvalRequests[requestId] = event;
     },
     backgroundProgressEventReceived(

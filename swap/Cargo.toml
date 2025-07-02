@@ -46,6 +46,7 @@ moka = { version = "0.12", features = ["sync", "future"] }
 monero = { version = "0.12", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }
 monero-rpc-pool = { path = "../monero-rpc-pool" }
+monero-seed = { version = "0.1.0", path = "../seed" }
 monero-sys = { path = "../monero-sys" }
 once_cell = "1.19"
 pem = "3.0"
@@ -86,6 +87,7 @@ unsigned-varint = { version = "0.8.0", features = ["codec", "asynchronous_codec"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1.9", features = ["serde", "v4"] }
 void = "1"
+zeroize = "1.8.1"
 
 [target.'cfg(not(windows))'.dependencies]
 tokio-tar = "0.3"

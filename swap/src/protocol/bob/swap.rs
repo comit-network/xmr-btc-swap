@@ -1,9 +1,7 @@
 use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
-use crate::cli::api::tauri_bindings::ApprovalRequestDetails;
-use crate::cli::api::tauri_bindings::{
-    LockBitcoinDetails, TauriEmitter, TauriHandle, TauriSwapProgressEvent,
-};
+use crate::cli::api::tauri_bindings::LockBitcoinDetails;
+use crate::cli::api::tauri_bindings::{TauriEmitter, TauriHandle, TauriSwapProgressEvent};
 use crate::cli::EventLoopHandle;
 use crate::common::retry;
 use crate::monero::MoneroAddressPool;
@@ -166,19 +164,19 @@ async fn next_state(
                 .context("Failed to get lock amount")?
                 .value;
 
-            let request = ApprovalRequestDetails::LockBitcoin(LockBitcoinDetails {
+            let details = LockBitcoinDetails {
                 btc_lock_amount,
                 btc_network_fee,
                 xmr_receive_amount,
                 monero_receive_pool,
                 swap_id,
-            });
+            };
 
             // We request approval before publishing the Bitcoin lock transaction,
             // as the exchange rate determined at this step might be different
             // from the one we previously displayed to the user.
             let approval_result = event_emitter
-                .request_approval(request, PRE_BTC_LOCK_APPROVAL_TIMEOUT_SECS)
+                .request_bitcoin_approval(details, PRE_BTC_LOCK_APPROVAL_TIMEOUT_SECS)
                 .await;
 
             match approval_result {

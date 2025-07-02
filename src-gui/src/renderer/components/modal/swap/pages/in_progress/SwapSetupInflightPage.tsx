@@ -20,9 +20,7 @@ function useActiveLockBitcoinApprovalRequest(): PendingLockBitcoinApprovalReques
   const activeSwapId = useActiveSwapId();
 
   return (
-    approvals?.find(
-      (r) => r.content.details.content.swap_id === activeSwapId,
-    ) || null
+    approvals?.find((r) => r.request.content.swap_id === activeSwapId) || null
   );
 }
 
@@ -32,10 +30,18 @@ export default function SwapSetupInflightPage({
   const request = useActiveLockBitcoinApprovalRequest();
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
-
-  const expiresAtMs = request?.content.expiration_ts * 1000 || 0;
+  const expirationTs =
+    request?.request_status.state === "Pending"
+      ? request.request_status.content.expiration_ts
+      : null;
 
   useEffect(() => {
+    if (expirationTs == null) {
+      return;
+    }
+
+    const expiresAtMs = expirationTs * 1000 || 0;
+
     const tick = () => {
       const remainingMs = Math.max(expiresAtMs - Date.now(), 0);
       setTimeLeft(Math.ceil(remainingMs / 1000));
@@ -44,11 +50,11 @@ export default function SwapSetupInflightPage({
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [expiresAtMs]);
+  }, [request, expirationTs]);
 
   // If we do not have an approval request yet for the Bitcoin lock transaction, we haven't received the offer from Alice yet
   // Display a loading spinner to the user for as long as the swap_setup request is in flight
-  if (!request) {
+  if (request == null) {
     return (
       <CircularProgressWithSubtitle
         description={
@@ -61,7 +67,7 @@ export default function SwapSetupInflightPage({
   }
 
   const { btc_network_fee, monero_receive_pool, xmr_receive_amount } =
-    request.content.details.content;
+    request.request.content;
 
   return (
     <Box
@@ -124,7 +130,9 @@ export default function SwapSetupInflightPage({
           variant="text"
           size="large"
           sx={(theme) => ({ color: theme.palette.text.secondary })}
-          onInvoke={() => resolveApproval(request.content.request_id, false)}
+          onInvoke={() =>
+            resolveApproval(request.request_id, false as unknown as object)
+          }
           displayErrorSnackbar
           requiresContext
         >
@@ -135,7 +143,9 @@ export default function SwapSetupInflightPage({
           variant="contained"
           color="primary"
           size="large"
-          onInvoke={() => resolveApproval(request.content.request_id, true)}
+          onInvoke={() =>
+            resolveApproval(request.request_id, true as unknown as object)
+          }
           displayErrorSnackbar
           requiresContext
           endIcon={<CheckIcon />}

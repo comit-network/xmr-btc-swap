@@ -488,7 +488,7 @@ pub mod monero_private_key {
 
     struct BytesVisitor;
 
-    impl<'de> Visitor<'de> for BytesVisitor {
+    impl Visitor<'_> for BytesVisitor {
         type Value = PrivateKey;
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

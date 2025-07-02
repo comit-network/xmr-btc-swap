@@ -43,7 +43,7 @@ impl MakeCapturingWriter {
     }
 }
 
-impl<'a> MakeWriter<'a> for MakeCapturingWriter {
+impl MakeWriter<'_> for MakeCapturingWriter {
     type Writer = CapturingWriter;
 
     fn make_writer(&self) -> Self::Writer {

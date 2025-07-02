@@ -2130,6 +2130,8 @@ dependencies = [
  "curve25519-dalek-derive",
  "digest 0.10.7",
  "fiat-crypto",
+ "group",
+ "rand_core 0.6.4",
  "rustc_version",
  "subtle",
  "zeroize",
@@ -2217,6 +2219,22 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "dalek-ff-group"
+version = "0.4.1"
+source = "git+https://github.com/serai-dex/serai#dc1b8dfccd68b7c2eb4359a1e37b55ce5e4453b5"
+dependencies = [
+ "crypto-bigint",
+ "curve25519-dalek 4.1.3",
+ "digest 0.10.7",
+ "ff",
+ "group",
+ "rand_core 0.6.4",
+ "rustversion",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -3147,6 +3165,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0b50bfb653653f9ca9095b427bed08ab8d75a137839d9ad64eb11810d5b6393"
 dependencies = [
+ "bitvec",
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -5930,6 +5949,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "monero-generators"
+version = "0.4.0"
+source = "git+https://github.com/serai-dex/serai#dc1b8dfccd68b7c2eb4359a1e37b55ce5e4453b5"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "dalek-ff-group",
+ "group",
+ "monero-io",
+ "sha3",
+ "std-shims",
+ "subtle",
+]
+
+[[package]]
 name = "monero-harness"
 version = "0.1.0"
 dependencies = [
@@ -5944,6 +5977,28 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "monero-io"
+version = "0.1.0"
+source = "git+https://github.com/serai-dex/serai#dc1b8dfccd68b7c2eb4359a1e37b55ce5e4453b5"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "std-shims",
+]
+
+[[package]]
+name = "monero-primitives"
+version = "0.1.0"
+source = "git+https://github.com/serai-dex/serai#dc1b8dfccd68b7c2eb4359a1e37b55ce5e4453b5"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "monero-generators",
+ "monero-io",
+ "sha3",
+ "std-shims",
+ "zeroize",
 ]
 
 [[package]]
@@ -5992,6 +6047,19 @@ dependencies = [
  "typeshare",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "monero-seed"
+version = "0.1.0"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "hex",
+ "monero-primitives",
+ "rand_core 0.6.4",
+ "std-shims",
+ "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -9566,6 +9634,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "std-shims"
+version = "0.1.1"
+source = "git+https://github.com/serai-dex/serai#dc1b8dfccd68b7c2eb4359a1e37b55ce5e4453b5"
+dependencies = [
+ "hashbrown 0.14.5",
+ "spin 0.9.8",
+]
+
+[[package]]
 name = "string_cache"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9741,6 +9818,7 @@ dependencies = [
  "monero-harness",
  "monero-rpc",
  "monero-rpc-pool",
+ "monero-seed",
  "monero-sys",
  "once_cell",
  "pem",
@@ -9786,6 +9864,7 @@ dependencies = [
  "uuid",
  "vergen",
  "void",
+ "zeroize",
  "zip 0.5.13",
 ]
 

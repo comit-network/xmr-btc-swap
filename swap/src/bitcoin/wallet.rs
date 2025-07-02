@@ -952,7 +952,7 @@ impl Wallet {
         //
         // At least one chunk is always required. At most total_spks / batch_size or the provided num_chunks (whichever is smaller)
         let num_chunks = max_num_chunks.min(total_spks / batch_size).max(1);
-        let chunk_size = (total_spks + num_chunks - 1) / num_chunks;
+        let chunk_size = total_spks.div_ceil(num_chunks);
 
         let mut chunks = Vec::new();
 
@@ -2208,10 +2208,7 @@ mod sync_ext {
         ///
         /// Ensures the callback is always invoked when progress reaches 100%.
         fn throttle_callback(self, min_percentage_increase: f32) -> InnerSyncCallback {
-            let mut callback = match self {
-                None => return None,
-                Some(cb) => cb,
-            };
+            let mut callback = self?;
 
             let mut last_reported_percentage: f64 = 0.0;
             let threshold = min_percentage_increase as f64 / 100.0;

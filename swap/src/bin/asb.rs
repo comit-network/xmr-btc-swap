@@ -132,8 +132,9 @@ pub async fn main() -> Result<()> {
         ));
     }
 
-    let seed =
-        Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
+    let seed = Seed::from_file_or_generate(&config.data.dir, None)
+        .await
+        .expect("Could not retrieve/initialize seed");
 
     let db_file = config.data.dir.join("sqlite");
 
