@@ -29,6 +29,7 @@ import {
   ResolveApprovalResponse,
   RedactArgs,
   RedactResponse,
+  GetCurrentSwapResponse,
   LabeledMoneroAddress,
 } from "models/tauriModel";
 import { rpcSetBalance, rpcSetSwapInfo } from "store/features/rpcSlice";
@@ -174,11 +175,22 @@ export async function withdrawBtc(address: string): Promise<string> {
 }
 
 export async function buyXmr(
-  seller: Maker,
   bitcoin_change_address: string | null,
   monero_receive_address: string,
   donation_percentage: DonateToDevelopmentTip,
 ) {
+  // Get all available makers from the Redux store
+  const state = store.getState();
+  const allMakers = [
+    ...(state.makers.registry.makers || []),
+    ...state.makers.rendezvous.makers,
+  ];
+
+  // Convert all makers to multiaddr format
+  const sellers = allMakers.map((maker) =>
+    providerToConcatenatedMultiAddr(maker),
+  );
+
   const address_pool: LabeledMoneroAddress[] = [];
   if (donation_percentage !== false) {
     const donation_address = isTestnet()
@@ -206,7 +218,8 @@ export async function buyXmr(
   }
 
   await invoke<BuyXmrArgs, BuyXmrResponse>("buy_xmr", {
-    seller: providerToConcatenatedMultiAddr(seller),
+    rendezvous_points: PRESET_RENDEZVOUS_POINTS,
+    sellers,
     monero_receive_pool: address_pool,
     bitcoin_change_address,
   });
@@ -220,6 +233,10 @@ export async function resumeSwap(swapId: string) {
 
 export async function suspendCurrentSwap() {
   await invokeNoArgs<SuspendCurrentSwapResponse>("suspend_current_swap");
+}
+
+export async function getCurrentSwapId() {
+  return await invokeNoArgs<GetCurrentSwapResponse>("get_current_swap");
 }
 
 export async function getMoneroRecoveryKeys(

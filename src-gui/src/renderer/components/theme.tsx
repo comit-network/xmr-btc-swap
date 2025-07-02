@@ -13,6 +13,15 @@ const baseTheme: ThemeOptions = {
       fontFamily: "monospace",
     },
   },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1000,
+      xl: 1536,
+    },
+  },
   components: {
     MuiButton: {
       styleOverrides: {

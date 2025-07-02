@@ -1,8 +1,6 @@
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import { formatConfirmations } from "utils/formatUtils";
-import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
-import SwapStatusAlert from "renderer/components/alert/SwapStatusAlert/SwapStatusAlert";
-import { useActiveSwapInfo } from "store/hooks";
+import BitcoinTransactionInfoBox from "renderer/components/pages/swap/swap/components/BitcoinTransactionInfoBox";
 import { Box, DialogContentText } from "@mui/material";
 
 // This is the number of blocks after which we consider the swap to be at risk of being unsuccessful
@@ -12,10 +10,8 @@ export default function BitcoinLockTxInMempoolPage({
   btc_lock_confirmations,
   btc_lock_txid,
 }: TauriSwapProgressEventContent<"BtcLockTxInMempool">) {
-  const swapInfo = useActiveSwapInfo();
-
   return (
-    <Box>
+    <>
       {(btc_lock_confirmations === undefined ||
         btc_lock_confirmations < BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD) && (
         <DialogContentText>
@@ -32,10 +28,6 @@ export default function BitcoinLockTxInMempoolPage({
           gap: "1rem",
         }}
       >
-        {btc_lock_confirmations !== undefined &&
-          btc_lock_confirmations >= BITCOIN_CONFIRMATIONS_WARNING_THRESHOLD && (
-            <SwapStatusAlert swap={swapInfo} isRunning={true} />
-          )}
         <BitcoinTransactionInfoBox
           title="Bitcoin Lock Transaction"
           txId={btc_lock_txid}
@@ -51,6 +43,6 @@ export default function BitcoinLockTxInMempoolPage({
           }
         />
       </Box>
-    </Box>
+    </>
   );
 }

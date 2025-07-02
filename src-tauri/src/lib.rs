@@ -9,10 +9,10 @@ use swap::cli::{
         request::{
             BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
             CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse, CheckSeedArgs,
-            CheckSeedResponse, ExportBitcoinWalletArgs, GetDataDirArgs, GetHistoryArgs,
-            GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs,
-            ListSellersArgs, MoneroRecoveryArgs, RedactArgs, ResolveApprovalArgs, ResumeSwapArgs,
-            SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            CheckSeedResponse, ExportBitcoinWalletArgs, GetCurrentSwapArgs, GetDataDirArgs,
+            GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs,
+            GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, RedactArgs,
+            ResolveApprovalArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
@@ -195,6 +195,7 @@ pub fn run() {
             check_monero_node,
             check_electrum_node,
             get_wallet_descriptor,
+            get_current_swap,
             get_data_dir,
             resolve_approval_request,
             redact,
@@ -249,6 +250,7 @@ tauri_command!(get_swap_info, GetSwapInfoArgs);
 tauri_command!(get_swap_infos_all, GetSwapInfosAllArgs, no_args);
 tauri_command!(get_history, GetHistoryArgs, no_args);
 tauri_command!(get_monero_addresses, GetMoneroAddressesArgs, no_args);
+tauri_command!(get_current_swap, GetCurrentSwapArgs, no_args);
 
 /// Here we define Tauri commands whose implementation is not delegated to the Request trait
 #[tauri::command]

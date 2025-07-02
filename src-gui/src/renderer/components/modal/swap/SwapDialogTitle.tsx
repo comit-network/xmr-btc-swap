@@ -1,7 +1,6 @@
 import { Box, DialogTitle, Typography } from "@mui/material";
 import DebugPageSwitchBadge from "./pages/DebugPageSwitchBadge";
 import FeedbackSubmitBadge from "./pages/FeedbackSubmitBadge";
-import TorStatusBadge from "./pages/TorStatusBadge";
 
 export default function SwapDialogTitle({
   title,
@@ -24,7 +23,6 @@ export default function SwapDialogTitle({
       <Box sx={{ display: "flex", alignItems: "center", gridGap: 1 }}>
         <FeedbackSubmitBadge />
         <DebugPageSwitchBadge enabled={debug} setEnabled={setDebug} />
-        <TorStatusBadge />
       </Box>
     </DialogTitle>
   );

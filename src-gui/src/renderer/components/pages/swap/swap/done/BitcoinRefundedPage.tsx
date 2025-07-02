@@ -1,8 +1,8 @@
 import { Box, DialogContentText } from "@mui/material";
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import { useActiveSwapInfo } from "store/hooks";
-import FeedbackInfoBox from "../../../../pages/help/FeedbackInfoBox";
-import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
+import FeedbackInfoBox from "renderer/components/pages/help/FeedbackInfoBox";
+import BitcoinTransactionInfoBox from "renderer/components/pages/swap/swap/components/BitcoinTransactionInfoBox";
 
 export function BitcoinRefundPublishedPage({
   btc_refund_txid,
@@ -66,7 +66,7 @@ function MultiBitcoinRefundedPage({
   ) : null;
 
   return (
-    <Box>
+    <>
       <DialogContentText>
         Unfortunately, the swap was not successful. However, rest assured that
         all your Bitcoin has been refunded to the specified address. The swap
@@ -87,6 +87,6 @@ function MultiBitcoinRefundedPage({
         />
         <FeedbackInfoBox />
       </Box>
-    </Box>
+    </>
   );
 }

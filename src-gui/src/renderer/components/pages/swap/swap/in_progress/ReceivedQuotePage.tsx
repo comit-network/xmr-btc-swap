@@ -4,7 +4,7 @@ import {
 } from "store/hooks";
 import CircularProgressWithSubtitle, {
   LinearProgressWithSubtitle,
-} from "../../CircularProgressWithSubtitle";
+} from "../components/CircularProgressWithSubtitle";
 
 export default function ReceivedQuotePage() {
   const syncProgress = useConservativeBitcoinSyncProgress();

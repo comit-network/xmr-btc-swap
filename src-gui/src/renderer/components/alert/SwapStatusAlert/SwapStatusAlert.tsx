@@ -14,6 +14,7 @@ import HumanizedBitcoinBlockDuration from "../../other/HumanizedBitcoinBlockDura
 import TruncatedText from "../../other/TruncatedText";
 import { SwapMoneroRecoveryButton } from "../../pages/history/table/SwapMoneroRecoveryButton";
 import { TimelockTimeline } from "./TimelockTimeline";
+import { useIsSpecificSwapRunning } from "store/hooks";
 
 /**
  * Component for displaying a list of messages.
@@ -233,13 +234,15 @@ const UNUSUAL_AMOUNT_OF_TIME_HAS_PASSED_THRESHOLD = 72 - 4;
  */
 export default function SwapStatusAlert({
   swap,
-  isRunning,
   onlyShowIfUnusualAmountOfTimeHasPassed,
 }: {
   swap: GetSwapInfoResponseExt;
-  isRunning: boolean;
   onlyShowIfUnusualAmountOfTimeHasPassed?: boolean;
 }) {
+  if (swap == null) {
+    return null;
+  }
+
   // If the swap is completed, we do not need to display anything
   if (!isGetSwapInfoResponseRunningSwap(swap)) {
     return null;
@@ -250,15 +253,17 @@ export default function SwapStatusAlert({
     return null;
   }
 
-  // If we are only showing if an unusual amount of time has passed, we need to check if the swap has been running for a while
-  if (
-    onlyShowIfUnusualAmountOfTimeHasPassed &&
+  const hasUnusualAmountOfTimePassed =
     swap.timelock.type === "None" &&
     swap.timelock.content.blocks_left >
-      UNUSUAL_AMOUNT_OF_TIME_HAS_PASSED_THRESHOLD
-  ) {
+      UNUSUAL_AMOUNT_OF_TIME_HAS_PASSED_THRESHOLD;
+
+  // If we are only showing if an unusual amount of time has passed, we need to check if the swap has been running for a while
+  if (onlyShowIfUnusualAmountOfTimeHasPassed && hasUnusualAmountOfTimePassed) {
     return null;
   }
+
+  const isRunning = useIsSpecificSwapRunning(swap.swap_id);
 
   return (
     <Alert
@@ -274,7 +279,11 @@ export default function SwapStatusAlert({
     >
       <AlertTitle>
         {isRunning ? (
-          "Swap has been running for a while"
+          hasUnusualAmountOfTimePassed ? (
+            "Swap has been running for a while"
+          ) : (
+            "Swap is running"
+          )
         ) : (
           <>
             Swap <TruncatedText>{swap.swap_id}</TruncatedText> is not running

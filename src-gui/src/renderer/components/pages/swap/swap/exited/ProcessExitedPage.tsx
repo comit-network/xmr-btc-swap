@@ -2,7 +2,7 @@ import { Box, DialogContentText } from "@mui/material";
 import { TauriSwapProgressEvent } from "models/tauriModel";
 import CliLogsBox from "renderer/components/other/RenderedCliLog";
 import { useActiveSwapInfo, useActiveSwapLogs } from "store/hooks";
-import SwapStatePage from "../SwapStatePage";
+import SwapStatePage from "renderer/components/pages/swap/swap/SwapStatePage";
 
 export default function ProcessExitedPage({
   prevState,
@@ -35,7 +35,7 @@ export default function ProcessExitedPage({
   }
 
   return (
-    <Box>
+    <>
       <DialogContentText>
         The swap was stopped but it has not been completed yet. Check the logs
         below for more information. The current GUI state is{" "}
@@ -45,6 +45,6 @@ export default function ProcessExitedPage({
       <Box>
         <CliLogsBox logs={logs} label="Logs relevant to the swap" />
       </Box>
-    </Box>
+    </>
   );
 }

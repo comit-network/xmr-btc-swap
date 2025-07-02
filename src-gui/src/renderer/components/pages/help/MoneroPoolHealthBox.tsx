@@ -11,7 +11,7 @@ import {
   LinearProgress,
   useTheme,
 } from "@mui/material";
-import InfoBox from "renderer/components/modal/swap/InfoBox";
+import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 import { ReliableNodeInfo } from "models/tauriModel";
 import NetworkWifiIcon from "@mui/icons-material/NetworkWifi";
 import { useAppSelector } from "store/hooks";

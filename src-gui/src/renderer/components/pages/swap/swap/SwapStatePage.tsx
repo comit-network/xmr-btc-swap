@@ -1,6 +1,6 @@
 import { SwapState } from "models/storeModel";
 import { TauriSwapProgressEventType } from "models/tauriModelExt";
-import CircularProgressWithSubtitle from "../CircularProgressWithSubtitle";
+import CircularProgressWithSubtitle from "./components/CircularProgressWithSubtitle";
 import BitcoinPunishedPage from "./done/BitcoinPunishedPage";
 import {
   BitcoinRefundedPage,
@@ -20,9 +20,10 @@ import SwapSetupInflightPage from "./in_progress/SwapSetupInflightPage";
 import WaitingForXmrConfirmationsBeforeRedeemPage from "./in_progress/WaitingForXmrConfirmationsBeforeRedeemPage";
 import XmrLockedPage from "./in_progress/XmrLockedPage";
 import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
-import InitPage from "./init/InitPage";
-import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
 import { exhaustiveGuard } from "utils/typescriptUtils";
+import DepositAndChooseOfferPage from "renderer/components/pages/swap/swap/init/deposit_and_choose_offer/DepositAndChooseOfferPage";
+import InitPage from "./init/InitPage";
+import { Box } from "@mui/material";
 
 export default function SwapStatePage({ state }: { state: SwapState | null }) {
   if (state === null) {
@@ -41,7 +42,7 @@ export default function SwapStatePage({ state }: { state: SwapState | null }) {
     case "WaitingForBtcDeposit":
       // This double check is necessary for the typescript compiler to infer types
       if (state.curr.type === "WaitingForBtcDeposit") {
-        return <WaitingForBitcoinDepositPage {...state.curr.content} />;
+        return <DepositAndChooseOfferPage {...state.curr.content} />;
       }
       break;
     case "SwapSetupInflight":

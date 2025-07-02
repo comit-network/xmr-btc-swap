@@ -1,6 +1,6 @@
 import { Box } from "@mui/material";
 import ApiAlertsBox from "./ApiAlertsBox";
-import SwapWidget from "./SwapWidget";
+import SwapWidget from "./swap/SwapWidget";
 
 export default function SwapPage() {
   return (

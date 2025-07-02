@@ -1,5 +1,5 @@
 import { Box, Typography, styled } from "@mui/material";
-import InfoBox from "renderer/components/modal/swap/InfoBox";
+import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 import { useSettings } from "store/hooks";
 import { Search } from "@mui/icons-material";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";

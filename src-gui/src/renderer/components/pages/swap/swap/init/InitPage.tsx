@@ -1,12 +1,11 @@
 import { Box, Paper, Tab, Tabs, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useState } from "react";
-import RemainingFundsWillBeUsedAlert from "renderer/components/alert/RemainingFundsWillBeUsedAlert";
 import BitcoinAddressTextField from "renderer/components/inputs/BitcoinAddressTextField";
 import MoneroAddressTextField from "renderer/components/inputs/MoneroAddressTextField";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { buyXmr } from "renderer/rpc";
-import { useAppSelector, useSettings } from "store/hooks";
+import { useSettings } from "store/hooks";
 
 export default function InitPage() {
   const [redeemAddress, setRedeemAddress] = useState("");
@@ -17,12 +16,10 @@ export default function InitPage() {
   const [redeemAddressValid, setRedeemAddressValid] = useState(false);
   const [refundAddressValid, setRefundAddressValid] = useState(false);
 
-  const selectedMaker = useAppSelector((state) => state.makers.selectedMaker);
   const donationRatio = useSettings((s) => s.donateToDevelopment);
 
   async function init() {
     await buyXmr(
-      selectedMaker,
       useExternalRefundAddress ? refundAddress : null,
       redeemAddress,
       donationRatio,
@@ -30,7 +27,7 @@ export default function InitPage() {
   }
 
   return (
-    <Box>
+    <>
       <Box
         sx={{
           display: "flex",
@@ -38,7 +35,6 @@ export default function InitPage() {
           gap: 1.5,
         }}
       >
-        <RemainingFundsWillBeUsedAlert />
         <MoneroAddressTextField
           label="Monero redeem address"
           address={redeemAddress}
@@ -84,8 +80,7 @@ export default function InitPage() {
         <PromiseInvokeButton
           disabled={
             (!refundAddressValid && useExternalRefundAddress) ||
-            !redeemAddressValid ||
-            !selectedMaker
+            !redeemAddressValid
           }
           variant="contained"
           color="primary"
@@ -95,9 +90,9 @@ export default function InitPage() {
           onInvoke={init}
           displayErrorSnackbar
         >
-          Begin swap
+          Continue
         </PromiseInvokeButton>
       </Box>
-    </Box>
+    </>
   );
 }

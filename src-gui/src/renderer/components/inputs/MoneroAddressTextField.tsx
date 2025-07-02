@@ -53,6 +53,9 @@ export default function MoneroAddressTextField({
       setAddresses(response.addresses);
     };
     fetchAddresses();
+
+    const interval = setInterval(fetchAddresses, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Event handlers

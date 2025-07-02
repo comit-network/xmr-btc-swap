@@ -57,7 +57,7 @@ import {
 
 import { getNetwork } from "store/config";
 import { currencySymbol } from "utils/formatUtils";
-import InfoBox from "renderer/components/modal/swap/InfoBox";
+import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
 import { getNodeStatus } from "renderer/rpc";
 import { setStatus } from "store/features/nodesSlice";

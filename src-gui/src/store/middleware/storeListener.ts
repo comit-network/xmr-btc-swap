@@ -1,4 +1,5 @@
 import { createListenerMiddleware } from "@reduxjs/toolkit";
+import { throttle, debounce } from "lodash";
 import {
   getAllSwapInfos,
   checkBitcoinBalance,
@@ -21,6 +22,33 @@ import {
   setConversation,
 } from "store/features/conversationsSlice";
 import { TauriContextStatusEvent } from "models/tauriModel";
+
+// Create a Map to store throttled functions per swap_id
+const throttledGetSwapInfoFunctions = new Map<
+  string,
+  ReturnType<typeof throttle>
+>();
+
+// Function to get or create a throttled getSwapInfo for a specific swap_id
+const getThrottledSwapInfoUpdater = (swapId: string) => {
+  if (!throttledGetSwapInfoFunctions.has(swapId)) {
+    // Create a throttled function that executes at most once every 2 seconds
+    // but will wait for 3 seconds of quiet during rapid calls (using debounce)
+    const debouncedGetSwapInfo = debounce(() => {
+      logger.debug(`Executing getSwapInfo for swap ${swapId}`);
+      getSwapInfo(swapId);
+    }, 3000); // 3 seconds debounce for rapid calls
+
+    const throttledFunction = throttle(debouncedGetSwapInfo, 2000, {
+      leading: true, // Execute immediately on first call
+      trailing: true, // Execute on trailing edge if needed
+    });
+
+    throttledGetSwapInfoFunctions.set(swapId, throttledFunction);
+  }
+
+  return throttledGetSwapInfoFunctions.get(swapId)!;
+};
 
 export function createMainListeners() {
   const listener = createListenerMiddleware();
@@ -57,11 +85,14 @@ export function createMainListeners() {
         await checkBitcoinBalance();
       }
 
-      // Update the swap info
+      // Update the swap info using throttled function
       logger.info(
-        "Swap progress event received, updating swap info from database...",
+        "Swap progress event received, scheduling throttled swap info update...",
       );
-      await getSwapInfo(action.payload.swap_id);
+      const throttledUpdater = getThrottledSwapInfoUpdater(
+        action.payload.swap_id,
+      );
+      throttledUpdater();
     },
   });
 

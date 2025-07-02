@@ -9,7 +9,7 @@ import {
   Link,
   DialogContentText,
 } from "@mui/material";
-import InfoBox from "renderer/components/modal/swap/InfoBox";
+import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 import { useState } from "react";
 import { getWalletDescriptor } from "renderer/rpc";
 import { ExportBitcoinWalletResponse } from "models/tauriModel";

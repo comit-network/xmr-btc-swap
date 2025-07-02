@@ -1,6 +1,6 @@
 import { Box, DialogContentText } from "@mui/material";
 import { TauriSwapProgressEventContent } from "models/tauriModelExt";
-import MoneroTransactionInfoBox from "../../MoneroTransactionInfoBox";
+import MoneroTransactionInfoBox from "../components/MoneroTransactionInfoBox";
 
 export default function WaitingForXmrConfirmationsBeforeRedeemPage({
   xmr_lock_txid,

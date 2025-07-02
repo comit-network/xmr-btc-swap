@@ -5,7 +5,13 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
 } from "@mui/material";
+import CircleIcon from "@mui/icons-material/Circle";
 import { suspendCurrentSwap } from "renderer/rpc";
 import PromiseInvokeButton from "../PromiseInvokeButton";
 
@@ -20,10 +26,42 @@ export default function SwapSuspendAlert({
 }: SwapCancelAlertProps) {
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Force stop running operation?</DialogTitle>
+      <DialogTitle>Suspend running swap?</DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          Are you sure you want to force stop the running swap?
+        <DialogContentText component="div">
+          <List dense>
+            <ListItem sx={{ pl: 0 }}>
+              <ListItemIcon sx={{ minWidth: "30px" }}>
+                <CircleIcon sx={{ fontSize: "8px" }} />
+              </ListItemIcon>
+              <ListItemText primary="The swap and any network requests between you and the maker will be paused until you resume" />
+            </ListItem>
+            <ListItem sx={{ pl: 0 }}>
+              <ListItemIcon sx={{ minWidth: "30px" }}>
+                <CircleIcon sx={{ fontSize: "8px" }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <>
+                    Refund timelocks will <strong>not</strong> be paused. They
+                    will continue to count down until they expire
+                  </>
+                }
+              />
+            </ListItem>
+            <ListItem sx={{ pl: 0 }}>
+              <ListItemIcon sx={{ minWidth: "30px" }}>
+                <CircleIcon sx={{ fontSize: "8px" }} />
+              </ListItemIcon>
+              <ListItemText primary="You can monitor the timelock on the history page" />
+            </ListItem>
+            <ListItem sx={{ pl: 0 }}>
+              <ListItemIcon sx={{ minWidth: "30px" }}>
+                <CircleIcon sx={{ fontSize: "8px" }} />
+              </ListItemIcon>
+              <ListItemText primary="If the refund timelock expires, a refund will be initiated in the background. This still requires the app to be running." />
+            </ListItem>
+          </List>
         </DialogContentText>
       </DialogContent>
       <DialogActions>
@@ -35,7 +73,7 @@ export default function SwapSuspendAlert({
           onSuccess={onClose}
           onInvoke={suspendCurrentSwap}
         >
-          Force stop
+          Suspend
         </PromiseInvokeButton>
       </DialogActions>
     </Dialog>

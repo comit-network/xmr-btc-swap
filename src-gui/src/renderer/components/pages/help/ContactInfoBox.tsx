@@ -1,6 +1,6 @@
 import { Box, Button, Typography } from "@mui/material";
 import { open } from "@tauri-apps/plugin-shell";
-import InfoBox from "../../modal/swap/InfoBox";
+import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 
 const GITHUB_ISSUE_URL =
   "https://github.com/UnstoppableSwap/core/issues/new/choose";

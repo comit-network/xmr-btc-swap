@@ -1,8 +1,5 @@
 import { Box, Button, IconButton, Tooltip } from "@mui/material";
-import {
-  FileCopyOutlined,
-  CropFree as CropFreeIcon,
-} from "@mui/icons-material";
+import { FileCopyOutlined, QrCode as QrCodeIcon } from "@mui/icons-material";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useState } from "react";
 import MonospaceTextBox from "./MonospaceTextBox";
@@ -111,7 +108,7 @@ export default function ActionableMonospaceTextBox({
                     size="small"
                     sx={{ marginLeft: 1 }}
                   >
-                    <CropFreeIcon />
+                    <QrCodeIcon />
                   </IconButton>
                 </Tooltip>
               )}

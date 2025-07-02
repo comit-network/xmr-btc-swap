@@ -1,5 +1,5 @@
 import { DialogContentText } from "@mui/material";
-import BitcoinTransactionInfoBox from "../../swap/BitcoinTransactionInfoBox";
+import BitcoinTransactionInfoBox from "renderer/components/pages/swap/swap/components/BitcoinTransactionInfoBox";
 
 export default function BtcTxInMempoolPageContent({
   withdrawTxId,

@@ -2,6 +2,7 @@ use crate::cli::api::tauri_bindings::{
     ListSellersProgress, TauriBackgroundProgress, TauriBackgroundProgressHandle, TauriEmitter,
     TauriHandle,
 };
+use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::{quote, swarm};
@@ -16,7 +17,7 @@ use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{identity, ping, rendezvous, Multiaddr, PeerId, Swarm};
 use semver::Version;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -30,6 +31,102 @@ fn build_identify_config(identity: identity::Keypair) -> identify::Config {
     let protocol_version = "/comit/xmr/btc/1.0.0".to_string();
     let agent_version = format!("cli/{}", env!("CARGO_PKG_VERSION"));
     identify::Config::new(protocol_version, identity.public()).with_agent_version(agent_version)
+}
+
+/// Returns a function that when called will return sorted list of sellers, with [Online](Status::Online) listed first.
+///
+/// First uses the rendezvous node to discover peers in the given namespace,
+/// then fetches a quote from each peer that was discovered. If fetching a quote
+/// from a discovered peer fails the seller's status will be
+/// [Unreachable](Status::Unreachable).
+///
+/// If a database is provided, it will be used to get the list of peers that
+/// have already been discovered previously and attempt to fetch a quote from them.
+pub async fn list_sellers_init(
+    rendezvous_points: Vec<(PeerId, Multiaddr)>,
+    namespace: XmrBtcNamespace,
+    maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
+    identity: identity::Keypair,
+    db: Option<Arc<dyn Database + Send + Sync>>,
+    tauri_handle: Option<TauriHandle>,
+    sender: Option<::tokio::sync::watch::Sender<Vec<SellerStatus>>>,
+    sellers: Vec<Multiaddr>,
+) -> Result<
+    impl Fn() -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Vec<SellerStatus>> + Send + 'static>,
+        > + Send
+        + Sync
+        + 'static,
+> {
+    // Capture variables needed to build an EventLoop on each invocation
+    let rendezvous_points_clone = rendezvous_points.clone();
+    let namespace_clone = namespace;
+    let maybe_tor_client_clone = maybe_tor_client.clone();
+    let identity_clone = identity.clone();
+    let db_clone = db.clone();
+    let tauri_handle_clone = tauri_handle.clone();
+    let sellers_clone = sellers.clone();
+
+    Ok(move || {
+        // Clone captured values inside the closure to avoid moving them and thus implement `Fn`
+        let rendezvous_points = rendezvous_points_clone.clone();
+        let namespace = namespace_clone;
+        let maybe_tor_client = maybe_tor_client_clone.clone();
+        let identity = identity_clone.clone();
+        let db = db_clone.clone();
+        let tauri_handle = tauri_handle_clone.clone();
+        let sender = sender.clone();
+        let sellers = sellers_clone.clone();
+
+        Box::pin(async move {
+            // Build a fresh swarm and event loop for every call so the closure can be invoked multiple times.
+            let behaviour = Behaviour {
+                rendezvous: rendezvous::client::Behaviour::new(identity.clone()),
+                quote: quote::cli(),
+                ping: ping::Behaviour::new(
+                    ping::Config::new().with_timeout(Duration::from_secs(60)),
+                ),
+                identify: identify::Behaviour::new(build_identify_config(identity.clone())),
+            };
+
+            // TODO: Dont use unwrap
+            let swarm = swarm::cli(identity, maybe_tor_client, behaviour)
+                .await
+                .unwrap();
+
+            // Get peers from the database, add them to the dial queue
+            let mut external_dial_queue = match db {
+                Some(db) => match db.get_all_peer_addresses().await {
+                    Ok(peers) => VecDeque::from(peers),
+                    Err(err) => {
+                        tracing::error!(%err, "Failed to get peers from database for list_sellers");
+                        VecDeque::new()
+                    }
+                },
+                None => VecDeque::new(),
+            };
+
+            // Get peers the user has manually passed in, add them to the dial queue
+            for seller_addr in sellers {
+                if let Some((peer_id, multiaddr)) = seller_addr.split_peer_id() {
+                    external_dial_queue.push_back((peer_id, vec![multiaddr]));
+                }
+            }
+
+            let event_loop = EventLoop::new(
+                swarm,
+                rendezvous_points,
+                namespace,
+                external_dial_queue,
+                tauri_handle,
+            );
+
+            event_loop.run(sender).await
+        })
+            as std::pin::Pin<
+                Box<dyn std::future::Future<Output = Vec<SellerStatus>> + Send + 'static>,
+            >
+    })
 }
 
 /// Returns sorted list of sellers, with [Online](Status::Online) listed first.
@@ -49,38 +146,23 @@ pub async fn list_sellers(
     db: Option<Arc<dyn Database + Send + Sync>>,
     tauri_handle: Option<TauriHandle>,
 ) -> Result<Vec<SellerStatus>> {
-    let behaviour = Behaviour {
-        rendezvous: rendezvous::client::Behaviour::new(identity.clone()),
-        quote: quote::cli(),
-        ping: ping::Behaviour::new(ping::Config::new().with_timeout(Duration::from_secs(60))),
-        identify: identify::Behaviour::new(build_identify_config(identity.clone())),
-    };
-    let swarm = swarm::cli(identity, maybe_tor_client, behaviour).await?;
-
-    // If a database is passed in: Fetch all peer addresses from the database and fetch quotes from them
-    let external_dial_queue = match db {
-        Some(db) => {
-            let peers = db.get_all_peer_addresses().await?;
-            VecDeque::from(peers)
-        }
-        None => VecDeque::new(),
-    };
-
-    let event_loop = EventLoop::new(
-        swarm,
+    let fetch_fn = list_sellers_init(
         rendezvous_points,
         namespace,
-        external_dial_queue,
+        maybe_tor_client,
+        identity,
+        db,
         tauri_handle,
-    );
-    let sellers = event_loop.run().await;
-
-    Ok(sellers)
+        None,
+        Vec::new(),
+    )
+    .await?;
+    Ok(fetch_fn().await)
 }
 
 #[serde_as]
 #[typeshare]
-#[derive(Debug, Serialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub struct QuoteWithAddress {
     /// The multiaddr of the seller (at which we were able to connect to and get the quote from)
     #[serde_as(as = "DisplayFromStr")]
@@ -578,7 +660,49 @@ impl EventLoop {
         }
     }
 
-    async fn run(mut self) -> Vec<SellerStatus> {
+    fn build_current_sellers(&self) -> Vec<SellerStatus> {
+        let mut sellers: Vec<SellerStatus> = self
+            .peer_states
+            .values()
+            .filter_map(|peer_state| match peer_state {
+                PeerState::Complete {
+                    peer_id,
+                    version,
+                    quote,
+                    reachable_addresses,
+                } => Some(SellerStatus::Online(QuoteWithAddress {
+                    peer_id: *peer_id,
+                    multiaddr: reachable_addresses[0].clone(),
+                    quote: *quote,
+                    version: version.clone(),
+                })),
+                PeerState::Failed { peer_id, .. } => {
+                    Some(SellerStatus::Unreachable(UnreachableSeller {
+                        peer_id: *peer_id,
+                    }))
+                }
+                _ => None, // Skip pending states for partial updates
+            })
+            .collect();
+
+        sellers.sort();
+        sellers
+    }
+
+    fn emit_partial_update(
+        &self,
+        sender: &Option<::tokio::sync::watch::Sender<Vec<SellerStatus>>>,
+    ) {
+        if let Some(sender) = sender {
+            let current_sellers = self.build_current_sellers();
+            let _ = sender.send(current_sellers);
+        }
+    }
+
+    async fn run(
+        mut self,
+        sender: Option<::tokio::sync::watch::Sender<Vec<SellerStatus>>>,
+    ) -> Vec<SellerStatus> {
         // Dial all rendezvous points initially
         for (peer_id, multiaddr) in &self.rendezvous_points {
             let dial_opts = DialOpts::peer_id(*peer_id)
@@ -787,6 +911,8 @@ impl EventLoop {
 
             // If we have pending request to rendezvous points or quote requests, we continue
             if !all_rendezvous_points_requests_complete || !all_quotes_fetched {
+                // Emit partial update with any completed quotes we have so far
+                self.emit_partial_update(&sender);
                 continue;
             }
 

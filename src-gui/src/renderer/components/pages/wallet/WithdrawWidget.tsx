@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SatsAmount } from "renderer/components/other/Units";
 import { useAppSelector } from "store/hooks";
 import BitcoinIcon from "../../icons/BitcoinIcon";
-import InfoBox from "../../modal/swap/InfoBox";
+import InfoBox from "../swap/swap/components/InfoBox";
 import WithdrawDialog from "../../modal/wallet/WithdrawDialog";
 import WalletRefreshButton from "./WalletRefreshButton";
 

@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+NEVER NEVER NEVER upgrade or changr the versions used in dependencies without explicitly asking for confirmation!!

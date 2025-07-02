@@ -1,37 +1,40 @@
 use super::tauri_bindings::TauriHandle;
-use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
-use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
+use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock};
+use crate::cli::api::tauri_bindings::{SelectMakerDetails, TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
-use crate::cli::list_sellers::{QuoteWithAddress, UnreachableSeller};
+use crate::cli::list_sellers::{list_sellers_init, QuoteWithAddress, UnreachableSeller};
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
 use crate::common::{get_logs, redact};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::monero::wallet_rpc::MoneroDaemon;
 use crate::monero::MoneroAddressPool;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
+use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
-use crate::protocol::{bob, State};
+use crate::protocol::{bob, Database, State};
 use crate::{bitcoin, cli, monero};
 use ::bitcoin::address::NetworkUnchecked;
 use ::bitcoin::Txid;
 use ::monero::Network;
 use anyhow::{bail, Context as AnyContext, Result};
+use arti_client::TorClient;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use libp2p::core::Multiaddr;
-use libp2p::PeerId;
+use libp2p::{identity, PeerId};
 use monero_seed::{Language, Seed as MoneroSeed};
 use once_cell::sync::Lazy;
-use qrcode::render::unicode;
-use qrcode::QrCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
+use tokio_util::task::AbortOnDropHandle;
+use tor_rtcompat::tokio::TokioRustlsRuntime;
 use tracing::debug_span;
 use tracing::Instrument;
 use tracing::Span;
@@ -58,8 +61,10 @@ fn get_swap_tracing_span(swap_id: Uuid) -> Span {
 #[typeshare]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BuyXmrArgs {
-    #[typeshare(serialized_as = "string")]
-    pub seller: Multiaddr,
+    #[typeshare(serialized_as = "Vec<string>")]
+    pub rendezvous_points: Vec<Multiaddr>,
+    #[typeshare(serialized_as = "Vec<string>")]
+    pub sellers: Vec<Multiaddr>,
     #[typeshare(serialized_as = "Option<string>")]
     pub bitcoin_change_address: Option<bitcoin::Address<NetworkUnchecked>>,
     pub monero_receive_pool: MoneroAddressPool,
@@ -310,8 +315,9 @@ pub struct SuspendCurrentSwapArgs;
 #[typeshare]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SuspendCurrentSwapResponse {
-    #[typeshare(serialized_as = "string")]
-    pub swap_id: Uuid,
+    // If no swap was running, we still return Ok(...) but this is set to None
+    #[typeshare(serialized_as = "Option<string>")]
+    pub swap_id: Option<Uuid>,
 }
 
 impl Request for SuspendCurrentSwapArgs {
@@ -322,10 +328,19 @@ impl Request for SuspendCurrentSwapArgs {
     }
 }
 
+#[typeshare]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetCurrentSwapArgs;
 
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetCurrentSwapResponse {
+    #[typeshare(serialized_as = "Option<string>")]
+    pub swap_id: Option<Uuid>,
+}
+
 impl Request for GetCurrentSwapArgs {
-    type Response = serde_json::Value;
+    type Response = GetCurrentSwapResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
         get_current_swap(ctx).await
@@ -463,9 +478,12 @@ pub async fn suspend_current_swap(context: Arc<Context>) -> Result<SuspendCurren
     if let Some(id_value) = swap_id {
         context.swap_lock.send_suspend_signal().await?;
 
-        Ok(SuspendCurrentSwapResponse { swap_id: id_value })
+        Ok(SuspendCurrentSwapResponse {
+            swap_id: Some(id_value),
+        })
     } else {
-        bail!("No swap is currently running")
+        // If no swap was running, we still return Ok(...) with None
+        Ok(SuspendCurrentSwapResponse { swap_id: None })
     }
 }
 
@@ -593,8 +611,11 @@ pub async fn buy_xmr(
     swap_id: Uuid,
     context: Arc<Context>,
 ) -> Result<BuyXmrResponse, anyhow::Error> {
+    let _span = get_swap_tracing_span(swap_id);
+
     let BuyXmrArgs {
-        seller,
+        rendezvous_points,
+        sellers,
         bitcoin_change_address,
         monero_receive_pool,
     } = buy_xmr;
@@ -635,13 +656,103 @@ pub async fn buy_xmr(
     let env_config = context.config.env_config;
     let seed = context.config.seed.clone().context("Could not get seed")?;
 
-    let seller_peer_id = seller
-        .extract_peer_id()
-        .context("Seller address must contain peer ID")?;
+    // Prepare variables for the quote fetching process
+    let identity = seed.derive_libp2p_identity();
+    let namespace = context.config.namespace;
+    let tor_client = context.tor_client.clone();
+    let db = Some(context.db.clone());
+    let tauri_handle = context.tauri_handle.clone();
+
+    // Wait for the user to approve a seller and to deposit coins
+    // Calling determine_btc_to_swap
+    let address_len = bitcoin_wallet.new_address().await?.script_pubkey().len();
+
+    let bitcoin_wallet_for_closures = Arc::clone(&bitcoin_wallet);
+
+    // Clone bitcoin_change_address before moving it in the emit call
+    let bitcoin_change_address_for_spawn = bitcoin_change_address.clone();
+    let rendezvous_points_clone = rendezvous_points.clone();
+    let sellers_clone = sellers.clone();
+
+    // Acquire the lock before the user has selected a maker and we already have funds in the wallet
+    // because we need to be able to cancel the determine_btc_to_swap(..)
+    context.swap_lock.acquire_swap_lock(swap_id).await?;
+
+    let (seller_multiaddr, seller_peer_id, quote, tx_lock_amount, tx_lock_fee) = tokio::select! {
+        result = determine_btc_to_swap(
+            move || {
+                let rendezvous_points = rendezvous_points_clone.clone();
+                let sellers = sellers_clone.clone();
+                let namespace = namespace;
+                let identity = identity.clone();
+                let db = db.clone();
+                let tor_client = tor_client.clone();
+                let tauri_handle = tauri_handle.clone();
+
+                Box::pin(async move {
+                    fetch_quotes_task(
+                        rendezvous_points,
+                        namespace,
+                        sellers,
+                        identity,
+                        db,
+                        tor_client,
+                        tauri_handle,
+                    ).await
+                })
+            },
+            bitcoin_wallet.new_address(),
+            {
+                let wallet = Arc::clone(&bitcoin_wallet_for_closures);
+                move || {
+                    let w = wallet.clone();
+                    async move { w.balance().await }
+                }
+            },
+            {
+                let wallet = Arc::clone(&bitcoin_wallet_for_closures);
+                move || {
+                    let w = wallet.clone();
+                    async move { w.max_giveable(address_len).await }
+                }
+            },
+            {
+                let wallet = Arc::clone(&bitcoin_wallet_for_closures);
+                move || {
+                    let w = wallet.clone();
+                    async move { w.sync().await }
+                }
+            },
+            context.tauri_handle.clone(),
+            swap_id,
+            |quote_with_address| {
+                let tauri_handle = context.tauri_handle.clone();
+                Box::new(async move {
+                    let details = SelectMakerDetails {
+                        swap_id,
+                        btc_amount_to_swap: quote_with_address.quote.max_quantity,
+                        maker: quote_with_address,
+                    };
+
+                    tauri_handle.request_maker_selection(details, 300).await
+                }) as Box<dyn Future<Output = Result<bool>> + Send>
+            },
+        ) => {
+            result?
+        }
+        _ = context.swap_lock.listen_for_swap_force_suspension() => {
+            context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
+            context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+            bail!("Shutdown signal received");
+        },
+    };
+
+    // Insert the peer_id into the database
+    context.db.insert_peer_id(swap_id, seller_peer_id).await?;
 
     context
         .db
-        .insert_address(seller_peer_id, seller.clone())
+        .insert_address(seller_peer_id, seller_multiaddr.clone())
         .await?;
 
     let behaviour = cli::Behaviour::new(
@@ -658,7 +769,7 @@ pub async fn buy_xmr(
     )
     .await?;
 
-    swarm.add_peer_address(seller_peer_id, seller);
+    swarm.add_peer_address(seller_peer_id, seller_multiaddr.clone());
 
     context
         .db
@@ -667,57 +778,19 @@ pub async fn buy_xmr(
 
     tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
-    context.swap_lock.acquire_swap_lock(swap_id).await?;
+    context.tauri_handle.emit_swap_progress_event(
+        swap_id,
+        TauriSwapProgressEvent::ReceivedQuote(quote.clone()),
+    );
+
+    // Now create the event loop we use for the swap
+    let (event_loop, event_loop_handle) =
+        EventLoop::new(swap_id, swarm, seller_peer_id, context.db.clone())?;
+    let event_loop = tokio::spawn(event_loop.run().in_current_span());
 
     context
         .tauri_handle
-        .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::RequestingQuote);
-
-    let initialize_swap = tokio::select! {
-        biased;
-        _ = context.swap_lock.listen_for_swap_force_suspension() => {
-            tracing::debug!("Shutdown signal received, exiting");
-            context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
-
-            context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
-
-            bail!("Shutdown signal received");
-        },
-        result = async {
-            let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, context.db.clone())?;
-            let event_loop = tokio::spawn(event_loop.run().in_current_span());
-
-            let bid_quote = event_loop_handle.request_quote().await?;
-
-            Ok::<_, anyhow::Error>((event_loop, event_loop_handle, bid_quote))
-        } => {
-            result
-        },
-    };
-
-    let (event_loop, event_loop_handle, bid_quote) = match initialize_swap {
-        Ok(result) => result,
-        Err(error) => {
-            tracing::error!(%swap_id, "Swap initialization failed: {:#}", error);
-
-            context
-                .swap_lock
-                .release_swap_lock()
-                .await
-                .expect("Could not release swap lock");
-
-            context
-                .tauri_handle
-                .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
-
-            bail!(error);
-        }
-    };
-
-    context
-        .tauri_handle
-        .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::ReceivedQuote(bid_quote));
+        .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::ReceivedQuote(quote));
 
     context.tasks.clone().spawn(async move {
         tokio::select! {
@@ -730,6 +803,7 @@ pub async fn buy_xmr(
 
                 bail!("Shutdown signal received");
             },
+
             event_loop_result = event_loop => {
                 match event_loop_result {
                     Ok(_) => {
@@ -741,36 +815,6 @@ pub async fn buy_xmr(
                 }
             },
             swap_result = async {
-                let max_givable = || async {
-                    let (amount, fee) = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
-                    Ok((amount, fee))
-                };
-
-                let determine_amount = determine_btc_to_swap(
-                    context.config.json,
-                    bid_quote,
-                    bitcoin_wallet.new_address(),
-                    || bitcoin_wallet.balance(),
-                    max_givable,
-                    || bitcoin_wallet.sync(),
-                    context.tauri_handle.clone(),
-                    Some(swap_id)
-                );
-
-                let (tx_lock_amount, tx_lock_fee) = match determine_amount.await {
-                    Ok(val) => val,
-                    Err(error) => match error.downcast::<ZeroQuoteReceived>() {
-                        Ok(_) => {
-                            bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
-                        }
-                        Err(other) => bail!(other),
-                    },
-                };
-
-                tracing::info!(%tx_lock_amount, %tx_lock_fee, "Determined swap amount");
-
-                context.db.insert_peer_id(swap_id, seller_peer_id).await?;
-
                 let swap = Swap::new(
                     Arc::clone(&context.db),
                     swap_id,
@@ -779,7 +823,7 @@ pub async fn buy_xmr(
                     env_config,
                     event_loop_handle,
                     monero_receive_pool.clone(),
-                    bitcoin_change_address,
+                    bitcoin_change_address_for_spawn,
                     tx_lock_amount,
                     tx_lock_fee
                 ).with_event_emitter(context.tauri_handle.clone());
@@ -809,10 +853,7 @@ pub async fn buy_xmr(
         Ok::<_, anyhow::Error>(())
     }.in_current_span()).await;
 
-    Ok(BuyXmrResponse {
-        swap_id,
-        quote: bid_quote,
-    })
+    Ok(BuyXmrResponse { swap_id, quote })
 }
 
 #[tracing::instrument(fields(method = "resume_swap"), skip(context))]
@@ -1202,10 +1243,9 @@ pub async fn monero_recovery(
 }
 
 #[tracing::instrument(fields(method = "get_current_swap"), skip(context))]
-pub async fn get_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
-    Ok(json!({
-        "swap_id": context.swap_lock.get_current_swap_id().await,
-    }))
+pub async fn get_current_swap(context: Arc<Context>) -> Result<GetCurrentSwapResponse> {
+    let swap_id = context.swap_lock.get_current_swap_id().await;
+    Ok(GetCurrentSwapResponse { swap_id })
 }
 
 pub async fn resolve_approval_request(
@@ -1225,133 +1265,270 @@ pub async fn resolve_approval_request(
     Ok(ResolveApprovalResponse { success: true })
 }
 
-fn qr_code(value: &impl ToString) -> Result<String> {
-    let code = QrCode::new(value.to_string())?;
-    let qr_code = code
-        .render::<unicode::Dense1x2>()
-        .dark_color(unicode::Dense1x2::Light)
-        .light_color(unicode::Dense1x2::Dark)
-        .build();
-    Ok(qr_code)
+pub async fn fetch_quotes_task(
+    rendezvous_points: Vec<Multiaddr>,
+    namespace: XmrBtcNamespace,
+    sellers: Vec<Multiaddr>,
+    identity: identity::Keypair,
+    db: Option<Arc<dyn Database + Send + Sync>>,
+    tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
+    tauri_handle: Option<TauriHandle>,
+) -> Result<(
+    tokio::task::JoinHandle<()>,
+    ::tokio::sync::watch::Receiver<Vec<SellerStatus>>,
+)> {
+    let (tx, rx) = ::tokio::sync::watch::channel(Vec::new());
+
+    let rendezvous_nodes: Vec<_> = rendezvous_points
+        .iter()
+        .filter_map(|addr| addr.split_peer_id())
+        .collect();
+
+    let fetch_fn = list_sellers_init(
+        rendezvous_nodes,
+        namespace,
+        tor_client,
+        identity,
+        db,
+        tauri_handle,
+        Some(tx.clone()),
+        sellers,
+    )
+    .await?;
+
+    let handle = tokio::task::spawn(async move {
+        loop {
+            let sellers = fetch_fn().await;
+            let _ = tx.send(sellers);
+
+            tokio::time::sleep(std::time::Duration::from_secs(90)).await;
+        }
+    });
+
+    Ok((handle, rx))
+}
+
+// TODO: Let this take a refresh interval as an argument
+pub async fn refresh_wallet_task<FMG, TMG, FB, TB, FS, TS>(
+    max_giveable_fn: FMG,
+    balance_fn: FB,
+    sync_fn: FS,
+) -> Result<(
+    tokio::task::JoinHandle<()>,
+    ::tokio::sync::watch::Receiver<(bitcoin::Amount, bitcoin::Amount)>,
+)>
+where
+    TMG: Future<Output = Result<(bitcoin::Amount, bitcoin::Amount)>> + Send + 'static,
+    FMG: Fn() -> TMG + Send + 'static,
+    TB: Future<Output = Result<bitcoin::Amount>> + Send + 'static,
+    FB: Fn() -> TB + Send + 'static,
+    TS: Future<Output = Result<()>> + Send + 'static,
+    FS: Fn() -> TS + Send + 'static,
+{
+    let (tx, rx) = ::tokio::sync::watch::channel((bitcoin::Amount::ZERO, bitcoin::Amount::ZERO));
+
+    let handle = tokio::task::spawn(async move {
+        loop {
+            // Sync wallet before checking balance
+            let _ = sync_fn().await;
+
+            if let (Ok(balance), Ok((max_giveable, _fee))) =
+                (balance_fn().await, max_giveable_fn().await)
+            {
+                let _ = tx.send((balance, max_giveable));
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
+
+    Ok((handle, rx))
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS>(
-    json: bool,
-    bid_quote: BidQuote,
+pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FQ>(
+    quote_fetch_tasks: FQ,
+    // TODO: Shouldn't this be a function?
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
     balance: FB,
     max_giveable_fn: FMG,
     sync: FS,
     event_emitter: Option<TauriHandle>,
-    swap_id: Option<Uuid>,
-) -> Result<(bitcoin::Amount, bitcoin::Amount)>
+    swap_id: Uuid,
+    request_approval: impl Fn(QuoteWithAddress) -> Box<dyn Future<Output = Result<bool>> + Send>,
+) -> Result<(
+    Multiaddr,
+    PeerId,
+    BidQuote,
+    bitcoin::Amount,
+    bitcoin::Amount,
+)>
 where
-    TB: Future<Output = Result<bitcoin::Amount>>,
-    FB: Fn() -> TB,
-    TMG: Future<Output = Result<(bitcoin::Amount, bitcoin::Amount)>>,
-    FMG: Fn() -> TMG,
-    TS: Future<Output = Result<()>>,
-    FS: Fn() -> TS,
+    TB: Future<Output = Result<bitcoin::Amount>> + Send + 'static,
+    FB: Fn() -> TB + Send + 'static,
+    TMG: Future<Output = Result<(bitcoin::Amount, bitcoin::Amount)>> + Send + 'static,
+    FMG: Fn() -> TMG + Send + 'static,
+    TS: Future<Output = Result<()>> + Send + 'static,
+    FS: Fn() -> TS + Send + 'static,
+    FQ: Fn() -> std::pin::Pin<
+        Box<
+            dyn Future<
+                    Output = Result<(
+                        tokio::task::JoinHandle<()>,
+                        ::tokio::sync::watch::Receiver<Vec<SellerStatus>>,
+                    )>,
+                > + Send,
+        >,
+    >,
 {
-    if bid_quote.max_quantity == bitcoin::Amount::ZERO {
-        bail!(ZeroQuoteReceived)
-    }
+    // Start background tasks with watch channels
+    let (quote_fetch_handle, mut quotes_rx): (
+        _,
+        ::tokio::sync::watch::Receiver<Vec<SellerStatus>>,
+    ) = quote_fetch_tasks().await?;
+    let (wallet_refresh_handle, mut balance_rx): (
+        _,
+        ::tokio::sync::watch::Receiver<(bitcoin::Amount, bitcoin::Amount)>,
+    ) = refresh_wallet_task(max_giveable_fn, balance, sync).await?;
 
-    tracing::info!(
-        price = %bid_quote.price,
-        minimum_amount = %bid_quote.min_quantity,
-        maximum_amount = %bid_quote.max_quantity,
-        "Received quote",
-    );
+    // Get the abort handles to kill the background tasks when we exit the function
+    let quote_fetch_abort_handle = AbortOnDropHandle::new(quote_fetch_handle);
+    let wallet_refresh_abort_handle = AbortOnDropHandle::new(wallet_refresh_handle);
 
-    sync().await.context("Failed to sync of Bitcoin wallet")?;
-    let (mut max_giveable, mut spending_fee) = max_giveable_fn().await?;
+    let mut pending_approvals = FuturesUnordered::new();
 
-    if max_giveable == bitcoin::Amount::ZERO || max_giveable < bid_quote.min_quantity {
-        let deposit_address = get_new_address.await?;
-        let minimum_amount = bid_quote.min_quantity;
-        let maximum_amount = bid_quote.max_quantity;
+    let deposit_address = get_new_address.await?;
 
-        // To avoid any issus, we clip maximum_amount to never go above the
-        // total maximim Bitcoin supply
-        let maximum_amount = maximum_amount.min(bitcoin::Amount::MAX_MONEY);
+    loop {
+        // Get the latest quotes, balance and max_giveable
+        let quotes = quotes_rx.borrow().clone();
+        let (balance, max_giveable) = *balance_rx.borrow();
 
-        if !json {
-            eprintln!("{}", qr_code(&deposit_address)?);
-        }
+        let success_quotes = quotes
+            .iter()
+            .filter_map(|quote| match quote {
+                SellerStatus::Online(quote_with_address) => Some(quote_with_address.clone()),
+                SellerStatus::Unreachable(_) => None,
+            })
+            .collect::<Vec<_>>();
 
-        loop {
-            let min_outstanding = bid_quote.min_quantity - max_giveable;
-            let min_bitcoin_lock_tx_fee = spending_fee;
-            let min_deposit_until_swap_will_start = min_outstanding + min_bitcoin_lock_tx_fee;
-            let max_deposit_until_maximum_amount_is_reached = maximum_amount
-                .checked_sub(max_giveable)
-                .context("Overflow when subtracting max_giveable from maximum_amount")?
-                .checked_add(min_bitcoin_lock_tx_fee)
-                .context(format!("Overflow when adding min_bitcoin_lock_tx_fee ({min_bitcoin_lock_tx_fee}) to max_giveable ({max_giveable}) with maximum_amount ({maximum_amount})"))?;
+        // Emit a Tauri event
+        event_emitter.emit_swap_progress_event(
+            swap_id,
+            TauriSwapProgressEvent::WaitingForBtcDeposit {
+                deposit_address: deposit_address.clone(),
+                max_giveable: max_giveable,
+                min_bitcoin_lock_tx_fee: balance - max_giveable,
+                known_quotes: success_quotes.clone(),
+            },
+        );
 
-            tracing::info!(
-                "Deposit at least {} to cover the min quantity with fee!",
-                min_deposit_until_swap_will_start
-            );
-            tracing::info!(
-                %deposit_address,
-                %min_deposit_until_swap_will_start,
-                %max_deposit_until_maximum_amount_is_reached,
-                %max_giveable,
-                %minimum_amount,
-                %maximum_amount,
-                %min_bitcoin_lock_tx_fee,
-                price = %bid_quote.price,
-                "Waiting for Bitcoin deposit",
-            );
+        // Iterate through quotes and find ones that match the balance and max_giveable
+        let matching_quotes = success_quotes
+            .iter()
+            .filter_map(|quote_with_address| {
+                let quote = quote_with_address.quote;
 
-            if let Some(swap_id) = swap_id {
-                event_emitter.emit_swap_progress_event(
-                    swap_id,
-                    TauriSwapProgressEvent::WaitingForBtcDeposit {
-                        deposit_address: deposit_address.clone(),
-                        max_giveable,
-                        min_deposit_until_swap_will_start,
-                        max_deposit_until_maximum_amount_is_reached,
-                        min_bitcoin_lock_tx_fee,
-                        quote: bid_quote,
-                    },
-                );
-            }
+                if quote.min_quantity <= max_giveable && quote.max_quantity > bitcoin::Amount::ZERO
+                {
+                    let tx_lock_fee = balance - max_giveable;
+                    let tx_lock_amount = std::cmp::min(max_giveable, quote.max_quantity);
 
-            (max_giveable, spending_fee) = loop {
-                sync()
-                    .await
-                    .context("Failed to sync Bitcoin wallet while waiting for deposit")?;
-                let (new_max_givable, new_fee) = max_giveable_fn().await?;
-
-                if new_max_givable > max_giveable {
-                    break (new_max_givable, new_fee);
+                    Some((quote_with_address.clone(), tx_lock_amount, tx_lock_fee))
+                } else {
+                    None
                 }
+            })
+            .collect::<Vec<_>>();
 
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            };
+        // Put approval requests into FuturesUnordered
+        for (quote, tx_lock_amount, tx_lock_fee) in matching_quotes {
+            let future = request_approval(quote.clone());
 
-            let new_balance = balance().await?;
-            tracing::info!(%new_balance, %max_giveable, "Received Bitcoin");
+            pending_approvals.push(async move {
+                use std::pin::Pin;
+                let pinned_future = Pin::from(future);
+                let approved = pinned_future.await?;
 
-            if max_giveable < bid_quote.min_quantity {
-                tracing::info!("Deposited amount is not enough to cover `min_quantity` when accounting for network fees");
-                continue;
-            }
-
-            break;
+                if approved {
+                    Ok::<
+                        Option<(
+                            Multiaddr,
+                            PeerId,
+                            BidQuote,
+                            bitcoin::Amount,
+                            bitcoin::Amount,
+                        )>,
+                        anyhow::Error,
+                    >(Some((
+                        quote.multiaddr.clone(),
+                        quote.peer_id.clone(),
+                        quote.quote.clone(),
+                        tx_lock_amount,
+                        tx_lock_fee,
+                    )))
+                } else {
+                    Ok::<
+                        Option<(
+                            Multiaddr,
+                            PeerId,
+                            BidQuote,
+                            bitcoin::Amount,
+                            bitcoin::Amount,
+                        )>,
+                        anyhow::Error,
+                    >(None)
+                }
+            });
         }
-    };
 
-    let balance = balance().await?;
-    let fees = balance - max_giveable;
-    let max_accepted = bid_quote.max_quantity;
-    let btc_swap_amount = min(max_giveable, max_accepted);
+        tracing::info!(
+            swap_id = ?swap_id,
+            pending_approvals = ?pending_approvals.len(),
+            balance = ?balance,
+            max_giveable = ?max_giveable,
+            quotes = ?quotes,
+            "Waiting for user to select an offer"
+        );
 
-    Ok((btc_swap_amount, fees))
+        // Listen for approvals, balance changes, or quote changes
+        let result: Option<(
+            Multiaddr,
+            PeerId,
+            BidQuote,
+            bitcoin::Amount,
+            bitcoin::Amount,
+        )> = tokio::select! {
+            // Any approval request completes
+            approval_result = pending_approvals.next(), if !pending_approvals.is_empty() => {
+                match approval_result {
+                    Some(Ok(Some(result))) => Some(result),
+                    Some(Ok(None)) => None, // User rejected
+                    Some(Err(_)) => None,   // Error in approval
+                    None => None,           // No more futures
+                }
+            }
+            // Balance changed - drop all pending approval requests and and re-calculate
+            _ = balance_rx.changed() => {
+                pending_approvals.clear();
+                None
+            }
+            // Quotes changed - drop all pending approval requests and re-calculate
+            _ = quotes_rx.changed() => {
+                pending_approvals.clear();
+                None
+            }
+        };
+
+        // If user accepted an offer, return it to start the swap
+        if let Some((multiaddr, peer_id, quote, tx_lock_amount, tx_lock_fee)) = result {
+            quote_fetch_abort_handle.abort();
+            wallet_refresh_abort_handle.abort();
+
+            return Ok((multiaddr, peer_id, quote, tx_lock_amount, tx_lock_fee));
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
 }
 
 #[typeshare]

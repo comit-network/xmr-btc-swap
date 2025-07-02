@@ -4,7 +4,6 @@ import { SellerStatus } from "models/tauriModel";
 import { getStubTestnetMaker } from "store/config";
 import { rendezvousSellerToMakerStatus } from "utils/conversionUtils";
 import { isMakerOutdated } from "utils/multiAddrUtils";
-import { sortMakerList } from "utils/sortUtils";
 
 const stubTestnetMaker = getStubTestnetMaker();
 
@@ -48,10 +47,10 @@ function selectNewSelectedMaker(
   }
 
   // Otherwise we'd prefer to switch to a provider that has the newest version
-  const providers = sortMakerList([
+  const providers = [
     ...(slice.registry.makers ?? []),
     ...(slice.rendezvous.makers ?? []),
-  ]);
+  ];
 
   return providers.at(0) || null;
 }
@@ -86,7 +85,6 @@ export const makersSlice = createSlice({
       });
 
       // Sort the provider list and select a new provider if needed
-      slice.rendezvous.makers = sortMakerList(slice.rendezvous.makers);
       slice.selectedMaker = selectNewSelectedMaker(slice);
     },
     setRegistryMakers(slice, action: PayloadAction<ExtendedMakerStatus[]>) {
@@ -95,7 +93,6 @@ export const makersSlice = createSlice({
       }
 
       // Sort the provider list and select a new provider if needed
-      slice.registry.makers = sortMakerList(action.payload);
       slice.selectedMaker = selectNewSelectedMaker(slice);
     },
     registryConnectionFailed(slice) {
