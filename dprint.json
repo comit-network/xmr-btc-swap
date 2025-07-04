@@ -23,7 +23,8 @@
     "monero-sys/monero/",
     ".git/**",
     "**/node_modules/**",
-    "**/dist/**"
+    "**/dist/**",
+    "seed/**"
   ],
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.18.0.wasm",

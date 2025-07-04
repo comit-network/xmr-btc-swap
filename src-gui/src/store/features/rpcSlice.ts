@@ -140,6 +140,13 @@ export const rpcSlice = createSlice({
       const requestId = event.request_id;
       slice.state.approvalRequests[requestId] = event;
     },
+    approvalRequestsReplaced(slice, action: PayloadAction<ApprovalRequest[]>) {
+      // Clear existing approval requests and replace with new ones
+      slice.state.approvalRequests = {};
+      action.payload.forEach((approval) => {
+        slice.state.approvalRequests[approval.request_id] = approval;
+      });
+    },
     backgroundProgressEventReceived(
       slice,
       action: PayloadAction<TauriBackgroundProgressWrapper>,
@@ -165,6 +172,7 @@ export const {
   rpcSetBackgroundRefundState,
   timelockChangeEventReceived,
   approvalEventReceived,
+  approvalRequestsReplaced,
   backgroundProgressEventReceived,
   backgroundProgressEventRemoved,
 } = rpcSlice.actions;

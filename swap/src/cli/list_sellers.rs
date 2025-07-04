@@ -99,7 +99,7 @@ pub async fn list_sellers_init(
                 Some(db) => match db.get_all_peer_addresses().await {
                     Ok(peers) => VecDeque::from(peers),
                     Err(err) => {
-                        tracing::error!(%err, "Failed to get peers from database for list_sellers");
+                        tracing::trace!(%err, "Failed to get peers from database for list_sellers");
                         VecDeque::new()
                     }
                 },
@@ -714,7 +714,7 @@ impl EventLoop {
                 .insert(*peer_id, RendezvousPointStatus::Dialed);
 
             if let Err(e) = self.swarm.dial(dial_opts) {
-                tracing::error!(%peer_id, %multiaddr, error = %e, "Failed to dial rendezvous point");
+                tracing::trace!(%peer_id, %multiaddr, error = %e, "Failed to dial rendezvous point");
 
                 self.rendezvous_points_status
                     .insert(*peer_id, RendezvousPointStatus::Failed);
@@ -754,7 +754,7 @@ impl EventLoop {
                     match swarm_event {
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                             if self.is_rendezvous_point(&peer_id) {
-                                tracing::info!(
+                                tracing::trace!(
                                     "Connected to rendezvous point, discovering nodes in '{}' namespace ...",
                                     self.namespace
                                 );
@@ -769,7 +769,7 @@ impl EventLoop {
                                 );
                             } else {
                                 let address = endpoint.get_remote_address();
-                                tracing::debug!(%peer_id, %address, "Connection established to peer for list-sellers");
+                                tracing::trace!(%peer_id, %address, "Connection established to peer for list-sellers");
                                 self.reachable_asb_address.insert(peer_id, address.clone());
 
                                 // Update the peer state with the reachable address
@@ -782,7 +782,7 @@ impl EventLoop {
                         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                             if let Some(peer_id) = peer_id {
                                 if let Some(rendezvous_point) = self.get_rendezvous_point(&peer_id) {
-                                    tracing::warn!(
+                                    tracing::trace!(
                                         %peer_id,
                                         %rendezvous_point,
                                         "Failed to connect to rendezvous point: {}",
@@ -792,7 +792,7 @@ impl EventLoop {
                                     // Update the status of the rendezvous point to failed
                                     self.rendezvous_points_status.insert(peer_id, RendezvousPointStatus::Failed);
                                 } else {
-                                    tracing::warn!(
+                                    tracing::trace!(
                                         %peer_id,
                                         "Failed to connect to peer: {}",
                                         error
@@ -804,13 +804,13 @@ impl EventLoop {
                                     }
                                 }
                             } else {
-                                tracing::warn!("Failed to connect (no peer id): {}", error);
+                                tracing::trace!("Failed to connect (no peer id): {}", error);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(
                             libp2p::rendezvous::client::Event::Discovered { registrations, rendezvous_node, .. },
                         )) => {
-                            tracing::debug!(%rendezvous_node, num_peers = %registrations.len(), "Discovered peers at rendezvous point");
+                            tracing::trace!(%rendezvous_node, num_peers = %registrations.len(), "Discovered peers at rendezvous point");
 
                             for registration in registrations {
                                 let peer = registration.record.peer_id();
@@ -836,7 +836,7 @@ impl EventLoop {
                                                 let new_state = state.apply_quote(Ok(response));
                                                 self.peer_states.insert(peer, new_state);
                                             } else {
-                                                tracing::warn!(%peer, "Received bid quote from unexpected peer, this record will be removed!");
+                                                tracing::trace!(%peer, "Received bid quote from unexpected peer, this record will be removed!");
                                             }
                                         }
                                         request_response::Message::Request { .. } => unreachable!("we only request quotes, not respond")
@@ -844,7 +844,7 @@ impl EventLoop {
                                 }
                                 request_response::Event::OutboundFailure { peer, error, .. } => {
                                     if self.is_rendezvous_point(&peer) {
-                                        tracing::debug!(%peer, "Outbound failure when communicating with rendezvous node: {:#}", error);
+                                        tracing::trace!(%peer, "Outbound failure when communicating with rendezvous node: {:#}", error);
 
                                         // Update the status of the rendezvous point to failed
                                         self.rendezvous_points_status.insert(peer, RendezvousPointStatus::Failed);
@@ -855,7 +855,7 @@ impl EventLoop {
                                 }
                                 request_response::Event::InboundFailure { peer, error, .. } => {
                                     if self.is_rendezvous_point(&peer) {
-                                        tracing::debug!(%peer, "Inbound failure when communicating with rendezvous node: {:#}", error);
+                                        tracing::trace!(%peer, "Inbound failure when communicating with rendezvous node: {:#}", error);
 
                                         // Update the status of the rendezvous point to failed
                                         self.rendezvous_points_status.insert(peer, RendezvousPointStatus::Failed);
@@ -876,7 +876,7 @@ impl EventLoop {
                                     }
                                 }
                                 identify::Event::Error { peer_id, error } => {
-                                    tracing::error!(%peer_id, error = %error, "Error when identifying peer");
+                                    tracing::trace!(%peer_id, error = %error, "Error when identifying peer");
 
                                     if let Some(state) = self.peer_states.remove(&peer_id) {
                                         let failed_state = state.mark_failed(format!("Error when identifying peer: {}", error));
@@ -937,7 +937,7 @@ impl EventLoop {
                         error_message,
                         ..
                     } => {
-                        tracing::warn!(%peer_id, error = %error_message, "Peer failed");
+                        tracing::trace!(%peer_id, error = %error_message, "Peer failed");
 
                         Ok(SellerStatus::Unreachable(UnreachableSeller {
                             peer_id: *peer_id,

@@ -113,6 +113,7 @@ struct PendingApproval {
     responder: Option<oneshot::Sender<serde_json::Value>>,
     #[allow(dead_code)]
     expiration_ts: u64,
+    request: ApprovalRequest,
 }
 
 impl Drop for PendingApproval {
@@ -182,7 +183,7 @@ impl TauriHandle {
         timeout_secs: Option<u64>,
     ) -> Result<Response>
     where
-        Response: serde::de::DeserializeOwned + Clone,
+        Response: serde::de::DeserializeOwned + Clone + Serialize,
     {
         #[cfg(not(feature = "tauri"))]
         {
@@ -191,31 +192,28 @@ impl TauriHandle {
 
         #[cfg(feature = "tauri")]
         {
-            // Emit the creation of the approval request to the frontend
-            // TODO: We need to send a UUID with it here
-
+            // Create the approval request
+            // Generate the UUID
+            // Set the expiration timestamp
+            let (responder, receiver) = oneshot::channel();
             let request_id = Uuid::new_v4();
-            // No timeout = one week
             let timeout_secs = timeout_secs.unwrap_or(60 * 60 * 24 * 7);
+            let timeout_duration = Duration::from_secs(timeout_secs);
             let expiration_ts = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map_err(|e| anyhow!("Failed to get current time: {}", e))?
                 .as_secs()
-                + timeout_secs;
+                + timeout_duration.as_secs();
             let request = ApprovalRequest {
                 request: request_type,
                 request_status: RequestStatus::Pending { expiration_ts },
                 request_id,
             };
 
-            use anyhow::bail;
+            // Emit the "pending" event
             self.emit_approval(request.clone());
 
             tracing::debug!(%request, "Emitted approval request event");
-            // Construct the data structure we use to internally track the approval request
-            let (responder, receiver) = oneshot::channel();
-
-            let timeout_duration = Duration::from_secs(timeout_secs);
 
             let pending = PendingApproval {
                 responder: Some(responder),
@@ -224,6 +222,7 @@ impl TauriHandle {
                     .map_err(|e| anyhow!("Failed to get current time: {}", e))?
                     .as_secs()
                     + timeout_secs,
+                request: request.clone(),
             };
 
             // Lock map and insert the pending approval
@@ -246,41 +245,48 @@ impl TauriHandle {
             // Determine if the request will be accepted or rejected
             // Either by being resolved by the user, or by timing out
             let unparsed_response = tokio::select! {
-                res = receiver => res.map_err(|_| anyhow!("Approval responder dropped"))?,
+                res = receiver => Some(res.map_err(|_| anyhow!("Approval responder dropped"))?),
                 _ = tokio::time::sleep(timeout_duration) => {
-                    bail!("Approval request timed out and was therefore rejected");
+                    None
                 },
             };
 
-            tracing::debug!(%unparsed_response, "Received approval response");
-
-            let response: Result<Response> = serde_json::from_value(unparsed_response.clone())
-                .context("Failed to parse approval response to expected type");
+            let maybe_response: Option<Response> = match &unparsed_response {
+                Some(value) => serde_json::from_value(value.clone())
+                    .inspect_err(|e| {
+                        tracing::error!("Failed to parse approval response to expected type: {}", e)
+                    })
+                    .ok(),
+                None => None,
+            };
 
             let mut map = self
                 .0
                 .pending_approvals
                 .lock()
                 .map_err(|e| anyhow!("Failed to acquire approval lock: {}", e))?;
+
             if let Some(_pending) = map.remove(&request_id) {
-                let status = if response.is_ok() {
-                    RequestStatus::Resolved {
-                        approve_input: unparsed_response,
-                    }
-                } else {
-                    RequestStatus::Rejected
+                let status = match &maybe_response {
+                    Some(_) => RequestStatus::Resolved {
+                        approve_input: unparsed_response.unwrap_or(serde_json::Value::Bool(false)),
+                    },
+                    None => RequestStatus::Rejected,
                 };
 
+                // Set the status and emit the event
                 let mut approval = request.clone();
-                approval.request_status = status.clone();
+                approval.request_status = status;
+                self.emit_approval(approval.clone());
 
                 tracing::debug!(%approval, "Resolved approval request");
-                self.emit_approval(approval);
             }
+
+            cleanup_guard.disarm();
 
             tracing::debug!("Returning approval response");
 
-            response
+            maybe_response.context("Approval was rejected")
         }
     }
 
@@ -314,6 +320,29 @@ impl TauriHandle {
             } else {
                 Err(anyhow!("Approval not found or already handled"))
             }
+        }
+    }
+
+    pub async fn get_pending_approvals(&self) -> Result<Vec<ApprovalRequest>> {
+        #[cfg(not(feature = "tauri"))]
+        {
+            return Ok(Vec::new());
+        }
+
+        #[cfg(feature = "tauri")]
+        {
+            let pending_map = self
+                .0
+                .pending_approvals
+                .lock()
+                .map_err(|e| anyhow!("Failed to acquire approval lock: {}", e))?;
+
+            let approvals: Vec<ApprovalRequest> = pending_map
+                .values()
+                .map(|pending| pending.request.clone())
+                .collect();
+
+            Ok(approvals)
         }
     }
 }
@@ -892,19 +921,30 @@ impl ApprovalCleanupGuard {
 
 impl Drop for ApprovalCleanupGuard {
     fn drop(&mut self) {
-        if let Some(request_id) = self.request_id {
-            tracing::debug!(%request_id, "Approval handle dropped, we should cleanup now");
+        if let Some(request_id) = self.request_id.take() {
+            let approval_store = self.approval_store.clone();
+            let handle = self.handle.clone();
 
-            // Lock the Mutex
-            if let Ok(mut approval_store) = self.approval_store.lock() {
-                // Check if the request id still present in the map
-                if let Some(mut pending_approval) = approval_store.remove(&request_id) {
-                    // If there is still someone listening, send a rejection
-                    if let Some(responder) = pending_approval.responder.take() {
-                        let _ = responder.send(serde_json::Value::Bool(false));
+            tokio::task::spawn_blocking(move || {
+                tracing::debug!(%request_id, "Approval handle dropped, we should cleanup now");
+
+                // Lock the Mutex
+                if let Ok(mut approval_store) = approval_store.lock() {
+                    // Check if the request id still present in the map
+                    if let Some(mut pending_approval) = approval_store.remove(&request_id) {
+                        // If there is still someone listening, send a rejection
+                        if let Some(responder) = pending_approval.responder.take() {
+                            let _ = responder.send(serde_json::Value::Bool(false));
+                        }
+
+                        handle.emit_approval(ApprovalRequest {
+                            request: pending_approval.request.clone().request,
+                            request_status: RequestStatus::Rejected,
+                            request_id,
+                        });
                     }
                 }
-            }
+            });
         }
     }
 }

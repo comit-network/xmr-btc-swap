@@ -22,6 +22,7 @@ import {
   getSwapInfo,
   initializeContext,
   listSellersAtRendezvousPoint,
+  refreshApprovals,
   updateAllNodeStatuses,
 } from "./rpc";
 import { store } from "./store/storeRenderer";
@@ -44,6 +45,9 @@ const UPDATE_RATE_INTERVAL = 5 * 60 * 1_000;
 // Fetch all conversations every 10 minutes
 const FETCH_CONVERSATIONS_INTERVAL = 10 * 60 * 1_000;
 
+// Fetch pending approvals every 10 seconds
+const FETCH_PENDING_APPROVALS_INTERVAL = 2 * 1_000;
+
 function setIntervalImmediate(callback: () => void, interval: number): void {
   callback();
   setInterval(callback, interval);
@@ -60,6 +64,7 @@ export async function setupBackgroundTasks(): Promise<void> {
       listSellersAtRendezvousPoint(store.getState().settings.rendezvousPoints),
     DISCOVER_PEERS_INTERVAL,
   );
+  setIntervalImmediate(refreshApprovals, FETCH_PENDING_APPROVALS_INTERVAL);
 
   // Fetch all alerts
   updateAlerts();

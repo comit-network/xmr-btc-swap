@@ -8,7 +8,7 @@ use crate::common::{get_logs, redact};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::monero::wallet_rpc::MoneroDaemon;
 use crate::monero::MoneroAddressPool;
-use crate::network::quote::{BidQuote, ZeroQuoteReceived};
+use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
@@ -1657,4 +1657,10 @@ impl CheckSeedArgs {
             available: seed.is_ok(),
         })
     }
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetPendingApprovalsResponse {
+    pub approvals: Vec<crate::cli::api::tauri_bindings::ApprovalRequest>,
 }

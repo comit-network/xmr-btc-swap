@@ -19,10 +19,17 @@ export default function SwapWidget() {
       sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
     >
       <SwapStatusAlert swap={swapInfo} onlyShowIfUnusualAmountOfTimeHasPassed />
-      <Dialog fullWidth maxWidth="md" open={debug} onClose={() => setDebug(false)}>
+      <Dialog
+        fullWidth
+        maxWidth="md"
+        open={debug}
+        onClose={() => setDebug(false)}
+      >
         <DebugPage />
         <DialogActions>
-        <Button variant="outlined" onClick={() => setDebug(false)}>Close</Button>
+          <Button variant="outlined" onClick={() => setDebug(false)}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
       <Paper

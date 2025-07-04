@@ -31,8 +31,14 @@ import {
   RedactResponse,
   GetCurrentSwapResponse,
   LabeledMoneroAddress,
+  GetPendingApprovalsArgs,
+  GetPendingApprovalsResponse,
 } from "models/tauriModel";
-import { rpcSetBalance, rpcSetSwapInfo } from "store/features/rpcSlice";
+import {
+  rpcSetBalance,
+  rpcSetSwapInfo,
+  approvalRequestsReplaced,
+} from "store/features/rpcSlice";
 import { store } from "./store/storeRenderer";
 import { Maker } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
@@ -422,10 +428,23 @@ export async function resolveApproval(
   requestId: string,
   accept: object,
 ): Promise<void> {
-  await invoke<ResolveApprovalArgs, ResolveApprovalResponse>(
-    "resolve_approval_request",
-    { request_id: requestId, accept },
+  try {
+    await invoke<ResolveApprovalArgs, ResolveApprovalResponse>(
+      "resolve_approval_request",
+      { request_id: requestId, accept },
+    );
+  } catch (error) {
+    // Refresh approval list when resolve fails to keep UI in sync
+    await refreshApprovals();
+    throw error;
+  }
+}
+
+export async function refreshApprovals(): Promise<void> {
+  const response = await invokeNoArgs<GetPendingApprovalsResponse>(
+    "get_pending_approvals",
   );
+  store.dispatch(approvalRequestsReplaced(response.approvals));
 }
 
 export async function checkSeed(seed: string): Promise<boolean> {

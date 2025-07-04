@@ -10,8 +10,8 @@ use swap::cli::{
             BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
             CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse, CheckSeedArgs,
             CheckSeedResponse, ExportBitcoinWalletArgs, GetCurrentSwapArgs, GetDataDirArgs,
-            GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs,
-            GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, RedactArgs,
+            GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetPendingApprovalsResponse,
+            GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, RedactArgs,
             ResolveApprovalArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
@@ -201,6 +201,7 @@ pub fn run() {
             redact,
             save_txt_files,
             check_seed,
+            get_pending_approvals,
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -354,9 +355,23 @@ async fn resolve_approval_request(
         .resolve_approval(args.request_id.parse().unwrap(), args.accept)
         .await
         .to_string_result()?;
-    println!("Resolved approval request");
 
     Ok(())
+}
+
+#[tauri::command]
+async fn get_pending_approvals(
+    state: tauri::State<'_, RwLock<State>>,
+) -> Result<GetPendingApprovalsResponse, String> {
+    let approvals = state
+        .read()
+        .await
+        .handle
+        .get_pending_approvals()
+        .await
+        .to_string_result()?;
+
+    Ok(GetPendingApprovalsResponse { approvals })
 }
 
 /// Tauri command to initialize the Context
@@ -364,7 +379,6 @@ async fn resolve_approval_request(
 async fn initialize_context(
     settings: TauriSettings,
     testnet: bool,
-    app_handle: tauri::AppHandle,
     state: tauri::State<'_, RwLock<State>>,
 ) -> Result<(), String> {
     // When the app crashes, the monero-wallet-rpc process may not be killed

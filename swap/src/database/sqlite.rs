@@ -55,7 +55,10 @@ impl SqliteDatabase {
     }
 
     async fn run_migrations(&mut self) -> anyhow::Result<()> {
-        sqlx::migrate!("./migrations").run(&self.pool).await?;
+        sqlx::migrate!("./migrations")
+            .set_ignore_missing(true)
+            .run(&self.pool)
+            .await?;
         Ok(())
     }
 }
