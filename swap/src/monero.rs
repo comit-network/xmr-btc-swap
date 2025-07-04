@@ -371,6 +371,12 @@ impl MoneroAddressPool {
 
         Ok(())
     }
+
+    /// Returns 
+    pub fn fill_empty_addresses(&self, primary_address: monero::Address) -> Vec<monero::Address> {
+        self.0.iter().map(|address| address.address().unwrap_or(primary_address)).collect()
+    }
+
 }
 
 impl From<::monero::Address> for MoneroAddressPool {

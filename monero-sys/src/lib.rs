@@ -445,11 +445,8 @@ impl WalletHandle {
     ) -> anyhow::Result<Vec<TxReceipt>> {
         tracing::debug!(addresses=?addresses, percentages=?percentages, "Sweeping multi");
         
-        let primary_address = self.main_address().await;
-        let addresses = addresses.iter().map(|address| address.unwrap_or(primary_address));
-        let addresses: Vec<_> = addresses.collect();
-
         let percentages = percentages.to_vec();
+        let addresses = addresses.to_vec();
 
         self.call(move |wallet| wallet.sweep_multi(&addresses, &percentages))
             .await
