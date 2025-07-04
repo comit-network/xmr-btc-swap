@@ -79,7 +79,7 @@ fn main() {
         .build_arg(match (is_github_actions, is_docker_build) {
             (true, _) => "-j1",
             (_, true) => "-j1",
-            (_, _) => "-j",
+            (_, _) => "-j4",
         })
         .build();
 

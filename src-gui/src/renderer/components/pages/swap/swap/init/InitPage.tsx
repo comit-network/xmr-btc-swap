@@ -12,6 +12,8 @@ export default function InitPage() {
   const [refundAddress, setRefundAddress] = useState("");
   const [useExternalRefundAddress, setUseExternalRefundAddress] =
     useState(false);
+  const [useExternalRedeemAddress, setUseExternalRedeemAddress] =
+    useState(false);
 
   const [redeemAddressValid, setRedeemAddressValid] = useState(false);
   const [refundAddressValid, setRefundAddressValid] = useState(false);
@@ -21,7 +23,7 @@ export default function InitPage() {
   async function init() {
     await buyXmr(
       useExternalRefundAddress ? refundAddress : null,
-      redeemAddress,
+      useExternalRedeemAddress ? redeemAddress : null,
       donationRatio,
     );
   }
@@ -35,14 +37,36 @@ export default function InitPage() {
           gap: 1.5,
         }}
       >
-        <MoneroAddressTextField
-          label="Monero redeem address"
-          address={redeemAddress}
-          onAddressChange={setRedeemAddress}
-          onAddressValidityChange={setRedeemAddressValid}
-          helperText="The monero will be sent to this address if the swap is successful."
-          fullWidth
-        />
+        <Paper variant="outlined" style={{}}>
+          <Tabs
+            value={useExternalRedeemAddress ? 1 : 0}
+            indicatorColor="primary"
+            variant="fullWidth"
+            onChange={(_, newValue) =>
+              setUseExternalRedeemAddress(newValue === 1)
+            }
+          >
+            <Tab label="Redeem to internal Monero wallet" value={0} />
+            <Tab label="Redeem to external Monero address" value={1} />
+          </Tabs>
+          <Box style={{ padding: "16px" }}>
+            {useExternalRedeemAddress ? (
+              <MoneroAddressTextField
+                label="External Monero redeem address"
+                address={redeemAddress}
+                onAddressChange={setRedeemAddress}
+                onAddressValidityChange={setRedeemAddressValid}
+                helperText="The monero will be sent to this address if the swap is successful."
+                fullWidth
+              />
+            ) : (
+              <Typography variant="caption">
+                The Monero will be sent to the internal Monero wallet of the GUI. 
+                You can then withdraw them from there or use them for another swap directly.
+              </Typography>
+            )}
+          </Box>
+        </Paper>
 
         <Paper variant="outlined" style={{}}>
           <Tabs
@@ -80,7 +104,7 @@ export default function InitPage() {
         <PromiseInvokeButton
           disabled={
             (!refundAddressValid && useExternalRefundAddress) ||
-            !redeemAddressValid
+            (!redeemAddressValid && useExternalRedeemAddress)
           }
           variant="contained"
           color="primary"

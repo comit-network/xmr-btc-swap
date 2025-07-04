@@ -227,8 +227,9 @@ impl Amount {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[typeshare]
 pub struct LabeledMoneroAddress {
+    // If this is None, we will use an address of the internal Monero wallet
     #[typeshare(serialized_as = "string")]
-    address: monero::Address,
+    address: Option<monero::Address>,
     #[typeshare(serialized_as = "number")]
     percentage: Decimal,
     label: String,
@@ -246,28 +247,36 @@ impl LabeledMoneroAddress {
     /// # Errors
     ///
     /// Returns an error if the percentage is not between 0.0 and 1.0 inclusive.
-    pub fn new(
-        address: monero::Address,
+    fn new(
+        address: impl Into<Option<monero::Address>>,
         percentage: Decimal,
         label: String,
-    ) -> Result<Self, String> {
+    ) -> Result<Self> {
         if percentage < Decimal::ZERO || percentage > Decimal::ONE {
-            return Err(format!(
+            bail!(
                 "Percentage must be between 0 and 1 inclusive, got: {}",
                 percentage
-            ));
+            );
         }
 
         Ok(Self {
-            address,
+            address: address.into(),
             percentage,
             label,
         })
     }
 
+    pub fn with_address(address: monero::Address, percentage: Decimal, label: String) -> Result<Self> {
+        Self::new(address, percentage, label)
+    }
+
+    pub fn with_internal_address(percentage: Decimal, label: String) -> Result<Self> {
+        Self::new(None, percentage, label)
+    }
+
     /// Returns the Monero address.
-    pub fn address(&self) -> monero::Address {
-        self.address
+    pub fn address(&self) -> Option<monero::Address> {
+        self.address.clone()
     }
 
     /// Returns the percentage as a decimal.
@@ -303,7 +312,7 @@ impl MoneroAddressPool {
     }
 
     /// Returns a vector of all Monero addresses in the pool.
-    pub fn addresses(&self) -> Vec<monero::Address> {
+    pub fn addresses(&self) -> Vec<Option<monero::Address>> {
         self.0.iter().map(|address| address.address()).collect()
     }
 
@@ -336,8 +345,10 @@ impl MoneroAddressPool {
     /// Returns an error if any address is on a different network than expected.
     pub fn assert_network(&self, network: Network) -> Result<()> {
         for address in self.0.iter() {
-            if address.address().network != network {
-                bail!("Address pool contains addresses on the wrong network (address {} is on {:?}, expected {:?})", address.address(), address.address().network, network);
+            if let Some(address) = address.address {
+                if address.network != network {
+                    bail!("Address pool contains addresses on the wrong network (address {} is on {:?}, expected {:?})", address, address.network, network);
+                }
             }
         }
 
@@ -918,7 +929,7 @@ mod tests {
     fn labeled_monero_address_percentage_validation() {
         use rust_decimal::Decimal;
 
-        let address = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse().unwrap();
+        let address = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse::<monero::Address>().unwrap();
 
         // Valid percentages should work (0-1 range)
         assert!(LabeledMoneroAddress::new(address, Decimal::ZERO, "test".to_string()).is_ok());

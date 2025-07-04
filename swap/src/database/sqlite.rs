@@ -111,7 +111,7 @@ impl Database for SqliteDatabase {
         let swap_id = swap_id.to_string();
 
         for labeled_address in address.iter() {
-            let address_str = labeled_address.address().to_string();
+            let address_str = labeled_address.address().map(|address| address.to_string());
             let percentage_f64 = labeled_address
                 .percentage()
                 .to_f64()
@@ -163,12 +163,16 @@ impl Database for SqliteDatabase {
         let addresses = row
             .iter()
             .map(|row| -> Result<LabeledMoneroAddress> {
-                let address = row.address.parse()?;
+                let address: Option<monero::Address> = row.address.clone().map(|address| address.parse()).transpose()?;
                 let percentage = Decimal::from_f64(row.percentage).expect("Invalid percentage");
                 let label = row.label.clone();
 
-                LabeledMoneroAddress::new(address, percentage, label)
-                    .map_err(|e| anyhow::anyhow!("Invalid percentage in database: {}", e))
+                match address {
+                    Some(address) => LabeledMoneroAddress::with_address(address, percentage, label)
+                        .map_err(|e| anyhow::anyhow!("Invalid percentage in database: {}", e)),
+                    None => LabeledMoneroAddress::with_internal_address(percentage, label)
+                        .map_err(|e| anyhow::anyhow!("Invalid percentage in database: {}", e)),
+                }
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -176,14 +180,14 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>> {
-        let rows = sqlx::query!("SELECT DISTINCT address FROM monero_addresses")
+        let rows = sqlx::query!("SELECT DISTINCT address FROM monero_addresses WHERE address IS NOT NULL")
             .fetch_all(&self.pool)
             .await?;
 
         let addresses = rows
             .iter()
-            .map(|row| row.address.parse())
-            .collect::<Result<Vec<_>, _>>()?;
+            .filter_map(|row| row.address.as_ref().and_then(|address| address.parse().inspect_err(|e| tracing::error!(%address, error = ?e, "Failed to parse monero address")).ok()))
+            .collect::<Vec<_>>();
 
         Ok(addresses)
     }
@@ -538,11 +542,11 @@ mod tests {
         let address3 = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?; // Same as address1 for simplicity
 
         let labeled_addresses = vec![
-            LabeledMoneroAddress::new(address1, Decimal::new(5, 1), "Primary".to_string())
+            LabeledMoneroAddress::with_address(address1, Decimal::new(5, 1), "Primary".to_string())
                 .map_err(|e| anyhow!(e))?, // 0.5
-            LabeledMoneroAddress::new(address2, Decimal::new(3, 1), "Secondary".to_string())
+            LabeledMoneroAddress::with_address(address2, Decimal::new(3, 1), "Secondary".to_string())
                 .map_err(|e| anyhow!(e))?, // 0.3
-            LabeledMoneroAddress::new(address3, Decimal::new(2, 1), "Tertiary".to_string())
+            LabeledMoneroAddress::with_address(address3, Decimal::new(2, 1), "Tertiary".to_string())
                 .map_err(|e| anyhow!(e))?, // 0.2
         ];
 

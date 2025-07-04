@@ -1162,7 +1162,7 @@ pub async fn list_sellers(
                 peer_id,
                 version,
             }) => {
-                tracing::debug!(
+                tracing::trace!(
                     status = "Online",
                     price = %quote.price.to_string(),
                     min_quantity = %quote.min_quantity.to_string(),
@@ -1182,7 +1182,7 @@ pub async fn list_sellers(
                     .await?;
             }
             SellerStatus::Unreachable(UnreachableSeller { peer_id }) => {
-                tracing::debug!(
+                tracing::trace!(
                     status = "Unreachable",
                     peer_id = %peer_id.to_string(),
                     "Fetched peer status"

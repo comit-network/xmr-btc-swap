@@ -500,12 +500,17 @@ impl MoneroWallet {
             .context("No transaction receipts returned from sweep")
     }
 
-    pub async fn sweep_multi(&self, addresses: &[Address], ratios: &[f64]) -> Result<TxReceipt> {
+    /// Sweep multiple addresses with different ratios
+    /// If the address is `None`, the address will be set to the primary address of the
+    /// main wallet.
+    pub async fn sweep_multi(&self, addresses: &[impl Into<Option<Address>> + Clone], ratios: &[f64]) -> Result<TxReceipt> {
         tracing::info!("`{}` sweeping multi ({:?})", self.name, ratios);
         self.balance().await?;
 
+        let addresses: Vec<Option<Address>> = addresses.iter().map(|a| a.clone().into()).collect();
+
         self.wallet
-            .sweep_multi(addresses, ratios)
+            .sweep_multi(&addresses, ratios)
             .await
             .context("Failed to perform sweep")?
             .into_iter()

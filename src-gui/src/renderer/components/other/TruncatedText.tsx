@@ -9,14 +9,16 @@ export default function TruncatedText({
   ellipsis?: string;
   truncateMiddle?: boolean;
 }) {
+  let finalChildren = children ?? "";
+
   const truncatedText =
-    children.length > limit
+  finalChildren.length > limit
       ? truncateMiddle
-        ? children.slice(0, Math.floor(limit / 2)) +
+        ? finalChildren.slice(0, Math.floor(limit / 2)) +
           ellipsis +
-          children.slice(children.length - Math.floor(limit / 2))
-        : children.slice(0, limit) + ellipsis
-      : children;
+          finalChildren.slice(finalChildren.length - Math.floor(limit / 2))
+        : finalChildren.slice(0, limit) + ellipsis
+      : finalChildren;
 
   return <span>{truncatedText}</span>;
 }
