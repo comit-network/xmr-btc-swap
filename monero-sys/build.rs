@@ -206,10 +206,14 @@ fn main() {
         );
 
         // Add search paths for clang runtime libraries
-        println !("cargo:rustc-link-search=native=/Library/Developer/CommandLineTools/usr/lib/clang/15.0.0/lib/darwin");
-        println !("cargo:rustc-link-search=native=/Library/Developer/CommandLineTools/usr/lib/clang/16.0.0/lib/darwin");
-        println !("cargo:rustc-link-search=native=/Library/Developer/CommandLineTools/usr/lib/clang/17.0.0/lib/darwin");
-        println !("cargo:rustc-link-search=native=/Library/Developer/CommandLineTools/usr/lib/clang/18.0.0/lib/darwin");
+        let resource_dir = std::process::Command::new("clang")
+            .arg("-print-resource-dir")
+            .output()
+            .expect("clang")
+            .stdout;
+        let resource_dir = String::from_utf8_lossy(&resource_dir).trim().to_owned();
+        println!("cargo:rustc-link-search=native={resource_dir}/lib/darwin");
+        println!("cargo:rustc-link-lib=static=clang_rt.osx");
     }
 
     // Link libwallet and libwallet_api statically
@@ -263,13 +267,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=protobuf");
 
     #[cfg(target_os = "macos")]
-    {
-        // Static archive is always present, dylib only on some versions.
-        println!("cargo:rustc-link-lib=static=clang_rt.osx");
-
-        // Minimum OS version you already add:
-        println!("cargo:rustc-link-arg=-mmacosx-version-min=11.0");
-    }
+    println!("cargo:rustc-link-arg=-mmacosx-version-min=11.0");
 
     // Build the CXX bridge
     let mut build = cxx_build::bridge("src/bridge.rs");
