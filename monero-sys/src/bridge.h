@@ -201,6 +201,15 @@ namespace Monero
     }
 
     /**
+     * Sign a message with the wallet's private key
+     */
+    inline std::unique_ptr<std::string> signMessage(Wallet &wallet, const std::string &message, const std::string &address, bool sign_with_view_key)
+    {
+        auto signature = wallet.signMessage(message, address, sign_with_view_key);
+        return std::make_unique<std::string>(signature);
+    }
+
+    /**
      * Get the seed of the wallet.
      */
     inline std::unique_ptr<std::string> walletSeed(const Wallet &wallet, const std::string &seed_offset)
