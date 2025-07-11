@@ -430,7 +430,7 @@ pub async fn main() -> Result<()> {
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
             let main_wallet = monero_wallet.main_wallet().await;
 
-            let seed = main_wallet.seed().await.context("Failed to get wallet seed")?;
+            let seed = main_wallet.seed().await;
             let creation_height = main_wallet.creation_height().await;
 
             println!("Seed          : {seed}");
