@@ -1,4 +1,5 @@
 use crate::bitcoin::{ExpiredTimelocks, Wallet};
+use crate::monero::BlockHeight;
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
@@ -31,6 +32,16 @@ pub async fn cancel(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
+        BobState::SwapSetupCompleted(state2) => {
+            // This is only useful if we **lost** the [`BtcLocked`] state (e.g due to a manual deletion of crash)
+            let state3 = state2.lock_btc().await?.0;
+            let assumed_tx_lock_id = state3.tx_lock_id();
+
+            tracing::warn!(%assumed_tx_lock_id, "We are trying to refund despite being in state SwapSetupCompleted. We have not locked the Bitcoin. We will attempt this but it is unlikely to work.");
+
+            // We do not know the block height, so we set it to 0
+            state3.cancel(BlockHeight { height: 0 })
+        }
         BobState::BtcLocked {
             state3,
             monero_wallet_restore_blockheight,
