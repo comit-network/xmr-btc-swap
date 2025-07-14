@@ -1,0 +1,24 @@
+[package]
+name = "swap-env"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true }
+time = "0.3"
+swap-serde = { path = "../swap-serde" }
+bitcoin = { workspace = true }
+monero = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+swap-fs = { path = "../swap-fs" }
+dialoguer = "0.11"
+config = { version = "0.14", default-features = false, features = ["toml"] }
+libp2p = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+rust_decimal = { workspace = true }
+url = { workspace = true }
+toml = "0.8"
+
+[lints]
+workspace = true

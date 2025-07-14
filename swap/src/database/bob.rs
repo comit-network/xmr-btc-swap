@@ -10,7 +10,7 @@ pub enum Bob {
     Started {
         #[serde(with = "::bitcoin::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
-        #[serde(with = "crate::bitcoin::address_serde")]
+        #[serde(with = "swap_serde::bitcoin::address_serde")]
         change_address: bitcoin::Address,
         tx_lock_fee: bitcoin::Amount,
     },

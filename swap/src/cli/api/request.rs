@@ -155,7 +155,7 @@ pub struct WithdrawBtcArgs {
     #[serde(default, with = "::bitcoin::amount::serde::as_sat::opt")]
     pub amount: Option<bitcoin::Amount>,
     #[typeshare(serialized_as = "string")]
-    #[serde(with = "crate::bitcoin::address_serde")]
+    #[serde(with = "swap_serde::bitcoin::address_serde")]
     pub address: bitcoin::Address,
 }
 

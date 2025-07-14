@@ -1,6 +1,26 @@
 [workspace]
 resolver = "2"
-members = ["electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "seed", "src-tauri", "swap"]
+members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-serde"]
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
+tracing = { version = "0.1", features = ["attributes"] }
+bitcoin = { version = "0.32", features = ["rand", "serde"] }
+monero = { version = "0.12", features = ["serde_support"] }
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+typeshare = "1.0"
+thiserror = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+rust_decimal = { version = "1", features = ["serde-float"] }
+rust_decimal_macros = "1"
+libp2p = { version = "0.53.2" }
+url = { version = "2", features = ["serde"] }
+hex = "0.4"
 
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51

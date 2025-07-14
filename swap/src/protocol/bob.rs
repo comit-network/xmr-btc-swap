@@ -6,7 +6,8 @@ use uuid::Uuid;
 use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::monero::MoneroAddressPool;
 use crate::protocol::Database;
-use crate::{bitcoin, cli, env, monero};
+use crate::{bitcoin, cli, monero};
+use swap_env::env;
 
 pub use self::state::*;
 pub use self::swap::{run, run_until};

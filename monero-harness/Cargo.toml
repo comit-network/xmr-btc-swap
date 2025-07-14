@@ -6,14 +6,14 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1"
-futures = "0.3"
-monero = "0.12"
+anyhow = { workspace = true }
+futures = { workspace = true }
+monero = { workspace = true }
 monero-rpc = { path = "../monero-rpc" }
 monero-sys = { path = "../monero-sys" }
-rand = "0.7"
-reqwest = "0.12.15"
+rand = { workspace = true }
+reqwest = { workspace = true }
 testcontainers = "0.15"
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "time", "macros"] }
-tracing = "0.1"
+tokio = { workspace = true, features = ["rt-multi-thread", "time", "macros"] }
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }

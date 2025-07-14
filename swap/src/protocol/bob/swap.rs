@@ -9,7 +9,8 @@ use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, 
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::state::*;
 use crate::protocol::{bob, Database};
-use crate::{bitcoin, env, monero};
+use crate::{bitcoin, monero};
+use swap_env::env;
 use anyhow::{bail, Context as AnyContext, Result};
 use std::sync::Arc;
 use std::time::Duration;

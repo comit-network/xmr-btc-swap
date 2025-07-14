@@ -1,5 +1,4 @@
 pub mod command;
-pub mod config;
 mod event_loop;
 mod network;
 mod rate;

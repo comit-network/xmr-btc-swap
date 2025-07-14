@@ -1,9 +1,8 @@
-use crate::asb;
-use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use serde::Serialize;
 use std::cmp::max;
 use std::time::Duration;
 use time::ext::NumericalStdDuration;
+use crate::config::Config as AsbConfig;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
 pub struct Config {
@@ -11,8 +10,8 @@ pub struct Config {
     pub bitcoin_lock_confirmed_timeout: Duration,
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
-    pub bitcoin_cancel_timelock: CancelTimelock,
-    pub bitcoin_punish_timelock: PunishTimelock,
+    pub bitcoin_cancel_timelock: u32,
+    pub bitcoin_punish_timelock: u32,
     pub bitcoin_network: bitcoin::Network,
     pub monero_avg_block_time: Duration,
     pub monero_finality_confirmations: u64,
@@ -20,7 +19,7 @@ pub struct Config {
     pub monero_lock_retry_timeout: Duration,
     // After this many confirmations we assume that the Monero transaction is safe from double spending
     pub monero_double_spend_safe_confirmations: u64,
-    #[serde(with = "monero_network")]
+    #[serde(with = "swap_serde::monero::network")]
     pub monero_network: monero::Network,
 }
 
@@ -54,8 +53,8 @@ impl GetConfig for Mainnet {
             bitcoin_lock_confirmed_timeout: 2.std_hours(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 10.std_minutes(),
-            bitcoin_cancel_timelock: CancelTimelock::new(72),
-            bitcoin_punish_timelock: PunishTimelock::new(144),
+            bitcoin_cancel_timelock: 72,
+            bitcoin_punish_timelock: 144,
             bitcoin_network: bitcoin::Network::Bitcoin,
             monero_avg_block_time: 2.std_minutes(),
             // If Alice cannot lock her Monero within this timeout,
@@ -75,8 +74,8 @@ impl GetConfig for Testnet {
             bitcoin_lock_confirmed_timeout: 1.std_hours(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 10.std_minutes(),
-            bitcoin_cancel_timelock: CancelTimelock::new(12),
-            bitcoin_punish_timelock: PunishTimelock::new(24),
+            bitcoin_cancel_timelock: 12,
+            bitcoin_punish_timelock: 24,
             bitcoin_network: bitcoin::Network::Testnet,
             monero_avg_block_time: 2.std_minutes(),
             monero_lock_retry_timeout: 10.std_minutes(),
@@ -94,8 +93,8 @@ impl GetConfig for Regtest {
             bitcoin_lock_confirmed_timeout: 5.std_minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.std_seconds(),
-            bitcoin_cancel_timelock: CancelTimelock::new(100),
-            bitcoin_punish_timelock: PunishTimelock::new(50),
+            bitcoin_cancel_timelock: 100,
+            bitcoin_punish_timelock: 50,
             bitcoin_network: bitcoin::Network::Regtest,
             monero_avg_block_time: 1.std_seconds(),
             monero_lock_retry_timeout: 1.std_minutes(),
@@ -110,7 +109,7 @@ fn sync_interval(avg_block_time: Duration) -> Duration {
     max(avg_block_time / 10, Duration::from_secs(1))
 }
 
-pub fn new(is_testnet: bool, asb_config: &asb::config::Config) -> Config {
+pub fn new(is_testnet: bool, asb_config: &AsbConfig) -> Config {
     let env_config = if is_testnet {
         Testnet::get_config()
     } else {
@@ -137,22 +136,7 @@ pub fn new(is_testnet: bool, asb_config: &asb::config::Config) -> Config {
     }
 }
 
-mod monero_network {
-    use crate::monero::Network;
-    use serde::Serializer;
 
-    pub fn serialize<S>(x: &monero::Network, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let str = match x {
-            Network::Mainnet => "mainnet",
-            Network::Stagenet => "stagenet",
-            Network::Testnet => "testnet",
-        };
-        s.serialize_str(str)
-    }
-}
 
 #[cfg(test)]
 mod tests {

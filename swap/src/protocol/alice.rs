@@ -1,6 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::env::Config;
+use swap_env::env::Config;
 use crate::protocol::Database;
 use crate::{asb, bitcoin, monero};
 use std::sync::Arc;

@@ -4,7 +4,7 @@ use crate::cli::api::request::{
     GetHistoryArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, WithdrawBtcArgs,
 };
 use crate::cli::api::Context;
-use crate::monero::monero_address;
+use swap_serde::monero::address;
 use crate::monero::{self, MoneroAddressPool};
 use anyhow::Result;
 use bitcoin::address::NetworkUnchecked;
@@ -69,7 +69,7 @@ where
             tor,
         } => {
             let monero_receive_pool: MoneroAddressPool =
-                monero_address::validate_is_testnet(monero_receive_address, is_testnet)?.into();
+                swap_serde::monero::address::validate_is_testnet(monero_receive_address, is_testnet)?.into();
 
             let bitcoin_change_address = bitcoin_change_address
                 .map(|address| bitcoin_address::validate(address, is_testnet))
@@ -354,7 +354,7 @@ enum CliCommand {
 
         #[structopt(long = "receive-address",
             help = "The monero address where you would like to receive monero",
-            parse(try_from_str = monero_address::parse)
+            parse(try_from_str = swap_serde::monero::address::parse)
         )]
         monero_receive_address: monero::Address,
 

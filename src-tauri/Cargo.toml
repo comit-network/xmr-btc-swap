@@ -15,11 +15,11 @@ crate-type = [ "lib",  "staticlib" ]
 tauri-build = { version = "^2.0.0", features = [ "config-json5" ] }
 
 [dependencies]
-anyhow = "1"
+anyhow = { workspace = true }
 monero-rpc-pool = { path = "../monero-rpc-pool" }
 rustls = { version = "0.23.26", default-features = false, features = ["ring"] }
-serde = { version = "1", features = [ "derive" ] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 swap = { path = "../swap", features = [ "tauri" ] }
 sysinfo = "=0.32.1"
 tauri = { version = "^2.0.0", features = [ "config-json5" ] }
@@ -30,8 +30,8 @@ tauri-plugin-process = "^2.0.0"
 tauri-plugin-shell = "^2.0.0"
 tauri-plugin-store = "^2.0.0"
 tauri-plugin-updater = "^2.0.0"
-tracing = "0.1"
-uuid = "1.16.0"
+tracing = { workspace = true }
+uuid = { workspace = true }
 zip = "4.0.0"
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]

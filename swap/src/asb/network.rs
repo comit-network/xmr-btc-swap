@@ -1,5 +1,5 @@
 use crate::asb::event_loop::LatestRate;
-use crate::env;
+use swap_env::env;
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::alice;

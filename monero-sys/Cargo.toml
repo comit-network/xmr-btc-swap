@@ -4,12 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.98"
+anyhow = { workspace = true }
 backoff = { version = "0.4.0", features = ["futures", "tokio"] }
 cxx = "1.0.137"
-monero = { version = "0.12", features = ["serde_support"] }
-tokio = { version = "1.44.2", features = ["sync", "time", "rt"] }
-tracing = "0.1.41"
+monero = { workspace = true }
+serde = { workspace = true }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "macros", "chrono"] }
+swap-serde = { path = "../swap-serde" }
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+tracing = { workspace = true }
+typeshare = { workspace = true }
+uuid = { workspace = true }
 
 [build-dependencies]
 cmake = "0.1.54"
@@ -17,12 +22,12 @@ cxx-build = "1.0.137"
 diffy = "0.4.2"
 
 [dev-dependencies]
-anyhow = "1.0.98"
-futures = "0.3.31"
+anyhow = { workspace = true }
+futures = { workspace = true }
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
 tempfile = "3.19.1"
 testcontainers = "0.15"
-tokio = { version = "1.44.2", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-uuid = { version = "1.16.0", features = ["v4"] }
+uuid = { workspace = true }

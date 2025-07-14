@@ -36,9 +36,9 @@ pub mod protocol {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockchainNetwork {
-    #[serde(with = "crate::bitcoin::network")]
+    #[serde(with = "swap_serde::bitcoin::network")]
     pub bitcoin: bitcoin::Network,
-    #[serde(with = "crate::monero::network")]
+    #[serde(with = "swap_serde::monero::network")]
     pub monero: monero::Network,
 }
 

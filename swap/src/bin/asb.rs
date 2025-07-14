@@ -24,7 +24,7 @@ use std::sync::Arc;
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
-use swap::asb::config::{
+use swap_env::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
@@ -444,8 +444,7 @@ pub async fn main() -> Result<()> {
 async fn init_bitcoin_wallet(
     config: &Config,
     seed: &Seed,
-    env_config: swap::env::Config,
-    sync: bool,
+    env_config: swap_env::env::Config,
 ) -> Result<bitcoin::Wallet> {
     tracing::debug!("Opening Bitcoin wallet");
     let wallet = bitcoin::wallet::WalletBuilder::default()
@@ -481,7 +480,7 @@ async fn init_bitcoin_wallet(
 
 async fn init_monero_wallet(
     config: &Config,
-    env_config: swap::env::Config,
+    env_config: swap_env::env::Config,
 ) -> Result<Arc<monero::Wallets>> {
     tracing::debug!("Initializing Monero wallets");
 

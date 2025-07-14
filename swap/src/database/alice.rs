@@ -1,7 +1,7 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::monero;
 use crate::monero::BlockHeight;
-use crate::monero::{monero_private_key, TransferProof};
+use crate::monero::TransferProof;
 use crate::protocol::alice;
 use crate::protocol::alice::AliceState;
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub enum Alice {
         monero_wallet_restore_blockheight: BlockHeight,
         transfer_proof: TransferProof,
         state3: alice::State3,
-        #[serde(with = "monero_private_key")]
+        #[serde(with = "swap_serde::monero::private_key")]
         spend_key: monero::PrivateKey,
     },
     Done(AliceEndState),

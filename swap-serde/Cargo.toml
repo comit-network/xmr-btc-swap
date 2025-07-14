@@ -1,0 +1,18 @@
+[package]
+name = "swap-serde"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true }
+monero = { workspace = true }
+bitcoin = { workspace = true }
+libp2p = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+hex = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

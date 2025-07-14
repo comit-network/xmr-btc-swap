@@ -3,7 +3,7 @@ pub use bob::Bob;
 pub use sqlite::SqliteDatabase;
 
 use crate::cli::api::tauri_bindings::TauriHandle;
-use crate::fs::ensure_directory_exists;
+use swap_fs::ensure_directory_exists;
 use crate::protocol::{Database, State};
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};

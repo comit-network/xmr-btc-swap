@@ -7,7 +7,8 @@ use crate::network::{
     cooperative_xmr_redeem_after_punish, encrypted_signature, quote, redial, transfer_proof,
 };
 use crate::protocol::bob::State2;
-use crate::{bitcoin, env};
+use crate::bitcoin;
+use swap_env::env;
 use anyhow::{anyhow, Error, Result};
 use libp2p::request_response::{
     InboundFailure, InboundRequestId, OutboundFailure, OutboundRequestId, ResponseChannel,

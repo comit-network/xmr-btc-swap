@@ -35,6 +35,12 @@ impl From<CancelTimelock> for u32 {
     }
 }
 
+impl From<u32> for CancelTimelock {
+    fn from(number_of_blocks: u32) -> Self {
+        Self(number_of_blocks)
+    }
+}
+
 impl CancelTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {
         Self(number_of_blocks)
@@ -83,6 +89,12 @@ pub struct PunishTimelock(u32);
 impl From<PunishTimelock> for u32 {
     fn from(punish_timelock: PunishTimelock) -> Self {
         punish_timelock.0
+    }
+}
+
+impl From<u32> for PunishTimelock {
+    fn from(number_of_blocks: u32) -> Self {
+        Self(number_of_blocks)
     }
 }
 

@@ -17,12 +17,9 @@ workspace = true
 
 [dependencies]
 std-shims = { git = "https://github.com/serai-dex/serai", version = "^0.1.1", default-features = false }
-
-thiserror = { version = "1", default-features = false, optional = true }
-
+thiserror = { workspace = true, optional = true }
 rand_core = { version = "0.6", default-features = false }
 zeroize = { version = "^1.5", default-features = false, features = ["zeroize_derive"] }
-
 curve25519-dalek = { version = "4", default-features = false, features = ["alloc", "zeroize"] }
 
 [dev-dependencies]
@@ -32,9 +29,7 @@ monero-primitives = { git = "https://github.com/serai-dex/serai", default-featur
 [features]
 std = [
   "std-shims/std",
-
   "thiserror",
-
   "zeroize/std",
   "rand_core/std",
 ]

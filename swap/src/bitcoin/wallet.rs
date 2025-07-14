@@ -441,7 +441,7 @@ impl Wallet {
         finality_confirmations: u32,
         target_block: u32,
         sync_interval: Duration,
-        env_config: crate::env::Config,
+        env_config: swap_env::env::Config,
         tauri_handle: Option<TauriHandle>,
     ) -> Result<Wallet<bdk_wallet::rusqlite::Connection, Client>> {
         // Construct the private key, directory and wallet file for the new (>= 1.0.0) bdk wallet
