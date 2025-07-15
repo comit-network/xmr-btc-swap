@@ -5,6 +5,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: preview-release
+  cancel-in-progress: true
+
 jobs:
   create_release:
     name: Create preview release

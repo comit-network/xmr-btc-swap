@@ -5,6 +5,10 @@ on:
   release:
     types: [created]
 
+concurrency:
+  group: build-gui-release-cb-${{ github.event.release.tag_name }}
+  cancel-in-progress: true
+
 env:
 # We build on an older version to support older glib versions
   UBUNTU: "ubuntu-24.04"
@@ -61,8 +65,9 @@ jobs:
             args: "--target x86_64-apple-darwin"
           - platform: "ubuntu-24.04"
             args: ""
-          - platform: "windows-latest"
-            args: ""
+          # Temporarily disabled Windows builds
+          # - platform: "windows-latest"
+          #   args: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4

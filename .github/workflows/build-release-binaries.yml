@@ -7,6 +7,10 @@ on:
 env:
   DOCKER_IMAGE_NAME: ghcr.io/unstoppableswap/asb
 
+concurrency:
+  group: build-release-${{ github.event.release.tag_name }}
+  cancel-in-progress: true
+
 jobs:
   build_binaries:
     name: Build
@@ -18,10 +22,11 @@ jobs:
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          - bin: swap
-            target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
-            archive_ext: tar
+          # Temporarily disabled armv7 Linux builds
+          # - bin: swap
+          #   target: armv7-unknown-linux-gnueabihf
+          #   os: ubuntu-latest
+          #   archive_ext: tar
           - bin: swap
             target: x86_64-apple-darwin
             os: macos-13
@@ -30,18 +35,20 @@ jobs:
             target: aarch64-apple-darwin
             os: macos-latest
             archive_ext: tar
-          - bin: swap
-            target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive_ext: zip
+          # Temporarily disabled Windows builds
+          # - bin: swap
+          #   target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   archive_ext: zip
           - bin: asb
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          - bin: asb
-            target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
-            archive_ext: tar
+          # Temporarily disabled armv7 Linux builds
+          # - bin: asb
+          #   target: armv7-unknown-linux-gnueabihf
+          #   os: ubuntu-latest
+          #   archive_ext: tar
           - bin: asb
             target: x86_64-apple-darwin
             os: macos-13
@@ -50,10 +57,11 @@ jobs:
             target: aarch64-apple-darwin
             os: macos-latest
             archive_ext: tar
-          - bin: asb
-            target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive_ext: zip
+          # Temporarily disabled Windows builds
+          # - bin: asb
+          #   target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   archive_ext: zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
