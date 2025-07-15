@@ -445,6 +445,7 @@ async fn init_bitcoin_wallet(
     config: &Config,
     seed: &Seed,
     env_config: swap_env::env::Config,
+    sync: bool,
 ) -> Result<bitcoin::Wallet> {
     tracing::debug!("Opening Bitcoin wallet");
     let wallet = bitcoin::wallet::WalletBuilder::default()

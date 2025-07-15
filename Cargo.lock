@@ -9861,7 +9861,6 @@ dependencies = [
  "monero",
  "rust_decimal",
  "serde",
- "serde_json",
  "swap-fs",
  "swap-serde",
  "thiserror 1.0.69",

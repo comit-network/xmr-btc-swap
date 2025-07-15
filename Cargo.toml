@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-serde"]
+members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "monero-seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-serde"]
 
 [workspace.dependencies]
 anyhow = "1"

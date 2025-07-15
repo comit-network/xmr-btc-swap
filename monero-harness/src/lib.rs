@@ -316,6 +316,7 @@ fn random_prefix() -> String {
     rand::thread_rng()
         .sample_iter(rand::distributions::Alphanumeric)
         .take(4)
+        .map(char::from)
         .collect()
 }
 
