@@ -10,7 +10,7 @@ cp ./target/debug/swap bdk/swap-current
 pushd bdk
 
 echo "download swap $VERSION"
-curl -L "https://github.com/UnstoppableSwap/core/releases/download/${VERSION}/swap_${VERSION}_Linux_x86_64.tar" | tar xv
+curl -L "https://github.com/eigenwallet/core/releases/download/${VERSION}/swap_${VERSION}_Linux_x86_64.tar" | tar xv
 
 echo "create testnet wallet with $VERSION"
 ./swap --testnet --data-base-dir . --debug balance || exit 1

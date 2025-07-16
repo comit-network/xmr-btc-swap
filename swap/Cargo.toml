@@ -97,7 +97,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = { git = "https://github.com/UnstoppableSwap/bitcoin-harness-rs", branch = "master" }
+bitcoin-harness = { git = "https://github.com/eigenwallet/bitcoin-harness-rs", branch = "master" }
 get-port = "3"
 mockito = "1.4"
 monero-harness = { path = "../monero-harness" }

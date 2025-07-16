@@ -12,7 +12,7 @@ It's also strongly recommended to run your own Monero and Bitcoin nodes.
 
 ## Docker Compose setup
 
-We maintain a Docker Compose configuration ([link](https://github.com/UnstoppableSwap/asb-docker-compose)) that automatically starts and manages these services:
+We maintain a Docker Compose configuration ([link](https://github.com/eigenwallet/asb-docker-compose)) that automatically starts and manages these services:
 
 - `asb` (the maker service, with built-in wallet functionality connecting directly to `monerod` and `electrs`)
 - `electrs` (a Bitcoin blockchain indexer, connecting to `bitcoind`)
@@ -29,7 +29,7 @@ If you want to setup for testnet, go into the `testnet` directory instead.
 All other steps remain the same.
 
 ```bash
-git clone https://github.com/UnstoppableSwap/asb-docker-compose.git
+git clone https://github.com/eigenwallet/asb-docker-compose.git
 cd asb-docker-compose/mainnet
 ```
 
@@ -48,7 +48,7 @@ We will prioritize the asb configuration file in this guide, because you probabl
 
 ### Usage and commands
 
-_This list is also available in the [repository](https://github.com/UnstoppableSwap/asb-docker-compose/), including variations for testnet._
+_This list is also available in the [repository](https://github.com/eigenwallet/asb-docker-compose/), including variations for testnet._
 
 First, make sure you're in the directory with the `docker-compose.yml` file:
 

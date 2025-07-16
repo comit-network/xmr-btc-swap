@@ -423,7 +423,7 @@ pub struct State3 {
     tx_punish_sig_bob: bitcoin::Signature,
     tx_cancel_sig_bob: bitcoin::Signature,
     /// This field was added in this pull request:
-    /// https://github.com/UnstoppableSwap/core/pull/344
+    /// https://github.com/eigenwallet/core/pull/344
     ///
     /// Previously this did not exist. To avoid deserialization failing for
     /// older swaps we default it to None.

@@ -3,7 +3,7 @@ import Logo from "./components/Logo";
 export default {
   logo: <Logo />,
   project: {
-    link: "https://github.com/UnstoppableSwap/core",
+    link: "https://github.com/eigenwallet/core",
   },
   head: (
     <>

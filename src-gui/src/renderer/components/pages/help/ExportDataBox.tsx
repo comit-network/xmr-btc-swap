@@ -100,7 +100,7 @@ function WalletDescriptorModal({
             <li>
               For more information on what to do with the descriptor, see our{" "}
               <Link
-                href="https://github.com/UnstoppableSwap/core/blob/master/dev-docs/asb/README.md#exporting-the-bitcoin-wallet-descriptor"
+                href="https://github.com/eigenwallet/core/blob/master/dev-docs/asb/README.md#exporting-the-bitcoin-wallet-descriptor"
                 target="_blank"
               >
                 documentation

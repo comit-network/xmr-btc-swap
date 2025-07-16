@@ -33,7 +33,7 @@ export default function NavigationFooter() {
       >
         <Tooltip title="Check out the GitHub repository">
           <span>
-            <LinkIconButton url="https://github.com/UnstoppableSwap/core">
+            <LinkIconButton url="https://github.com/eigenwallet/core">
               <GitHubIcon />
             </LinkIconButton>
           </span>

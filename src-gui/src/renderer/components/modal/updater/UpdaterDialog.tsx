@@ -17,7 +17,7 @@ import { check, Update, DownloadEvent } from "@tauri-apps/plugin-updater";
 import { useSnackbar } from "notistack";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-const GITHUB_RELEASES_URL = "https://github.com/UnstoppableSwap/core/releases";
+const GITHUB_RELEASES_URL = "https://github.com/eigenwallet/core/releases";
 const HOMEPAGE_URL = "https://unstoppableswap.net/";
 
 interface DownloadProgress {

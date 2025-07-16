@@ -1086,7 +1086,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.3.0"
-source = "git+https://github.com/UnstoppableSwap/bitcoin-harness-rs?branch=master#7a110c9f5e586a33cafe0015b9df0d94f2af9ddc"
+source = "git+https://github.com/eigenwallet/bitcoin-harness-rs?branch=master#7a110c9f5e586a33cafe0015b9df0d94f2af9ddc"
 dependencies = [
  "base64 0.12.3",
  "bitcoin 0.32.6",

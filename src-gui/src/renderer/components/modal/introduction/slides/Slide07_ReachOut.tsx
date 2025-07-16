@@ -22,7 +22,7 @@ export default function Slide02_ChooseAMaker(props: slideProps) {
           mt: 3,
         }}
       >
-        <LinkIconButton url="https://github.com/UnstoppableSwap/core">
+        <LinkIconButton url="https://github.com/eigenwallet/core">
           <GitHubIcon />
         </LinkIconButton>
         <LinkIconButton url="https://matrix.to/#/#unstoppableswap:matrix.org">

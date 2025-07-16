@@ -9,7 +9,7 @@ use tokio::{
 };
 use uuid::Uuid;
 
-const LATEST_RELEASE_URL: &str = "https://github.com/UnstoppableSwap/core/releases/latest";
+const LATEST_RELEASE_URL: &str = "https://github.com/eigenwallet/core/releases/latest";
 
 /// Check the latest release from GitHub and warn if we are not on the latest version.
 pub async fn warn_if_outdated(current_version: &str) -> anyhow::Result<()> {

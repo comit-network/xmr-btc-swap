@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import InfoBox from "renderer/components/pages/swap/swap/components/InfoBox";
 
 const GITHUB_ISSUE_URL =
-  "https://github.com/UnstoppableSwap/core/issues/new/choose";
+  "https://github.com/eigenwallet/core/issues/new/choose";
 const MATRIX_ROOM_URL = "https://matrix.to/#/#unstoppableswap:matrix.org";
 export const DISCORD_URL = "https://discord.gg/aqSyyJ35UW";
 
