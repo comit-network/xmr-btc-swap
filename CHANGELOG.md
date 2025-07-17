@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2025-07-17
+
 - ASB: Lowered the Monero lock retry timeout to 10minutes. Aftet that timeout we will start an early refund.
 
 ## [2.3.1] - 2025-06-25
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0-beta.2] - 2025-06-17
 
 - We now call Monero function directly (via FFI bindings) instead of using `monero-wallet-rpc`.
+
 - ASB: Since we don't communicate with `monero-wallet-rpc` anymore, the Monero wallet's will no longer be accessible by connecting to it. If you are using the asb-docker-compose setup, run this command to migrate the wallet files from the volume of the monero-wallet-rpc container to the volume of the asb container:
   ```bash
   # On testnet
@@ -32,7 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   # On mainnet
   cp /var/lib/docker/volumes/mainnet_mainnet_monero-wallet-rpc-data/_data/* /var/lib/docker/volumes/mainnet_mainnet_asb-data/_data/monero/wallets
   ```
+
 - ASB: The `wallet_url` option has been removed and replaced with the optional `daemon_url`, that specifies which Monero node the asb will connect to. If not specified, the asb will connect to a known public Monero node at random.
+
 - ASB: Add a `export-monero-wallet` command which gives the Monero wallet's seed and restore height. Export this seed into a wallet software of your own choosing to manage your Monero funds.
   The seed is a 25 word mnemonic. Example:
   ```bash
@@ -49,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | -------------------------- | -------------------------------- |
   | `asb logs \| my-script.sh` | `asb logs  2>&1 \| my-script.sh` |
   | `asb logs > output.txt`    | `asb logs > output.txt 2>&1`     |
+
 - GUI: Improved peer discovery: We can now connect to multiple rendezvous points at once. We also cache peers we have previously connected to locally and will attempt to connect to them again in the future, even if they aren't registered with a rendezvous point anymore.
+
 - ASB: We now retry for 6 hours to broadcast the early refund transaction. After that, we give up and Bob will have to wait for the timelock to expire then refund himself. If we detect that Bob has cancelled the swap, we will abort the swap on our side and let Bob refund himself.
 
 ## [2.0.3] - 2025-06-12
@@ -571,7 +578,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/2.0.3...HEAD
+[unreleased]: https://github.com/eigenwallet/core/compare/2.4.3...HEAD
+[2.4.3]: https://github.com/eigenwallet/core/compare/2.0.3...2.4.3
 [2.0.3]: https://github.com/UnstoppableSwap/core/compare/2.0.2...2.0.3
 [2.0.2]: https://github.com/UnstoppableSwap/core/compare/2.0.0...2.0.2
 [2.0.0]: https://github.com/UnstoppableSwap/core/compare/2.0.0-beta.2...2.0.0

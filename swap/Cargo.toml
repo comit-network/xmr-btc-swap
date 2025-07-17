@@ -64,12 +64,13 @@ serde_cbor = "0.11"
 serde_json = { workspace = true }
 serde_with = { version = "1", features = ["macros"] }
 sha2 = "0.10"
-swap-serde = { path = "../swap-serde" }
-swap-env = { path = "../swap-env" }
 sigma_fun = { version = "0.7", default-features = false, features = ["ed25519", "serde", "secp256k1", "alloc"] }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
 structopt = "0.3"
 strum = { version = "0.26", features = ["derive"] }
+swap-env = { path = "../swap-env" }
+swap-fs = { path = "../swap-fs" }
+swap-serde = { path = "../swap-serde" }
 tauri = { version = "2.0", features = ["config-json5"], optional = true, default-features = false }
 thiserror = { workspace = true }
 time = "0.3"
@@ -88,7 +89,6 @@ url = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 void = "1"
 zeroize = "1.8.1"
-swap-fs = { path = "../swap-fs" }
 
 [target.'cfg(not(windows))'.dependencies]
 tokio-tar = "0.3"
