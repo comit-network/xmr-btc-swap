@@ -9822,6 +9822,7 @@ dependencies = [
  "structopt",
  "strum 0.26.3",
  "swap-env",
+ "swap-feed",
  "swap-fs",
  "swap-serde",
  "tauri",
@@ -9867,6 +9868,26 @@ dependencies = [
  "time 0.3.41",
  "toml 0.8.23",
  "tracing",
+ "url",
+]
+
+[[package]]
+name = "swap-feed"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "backoff",
+ "bitcoin 0.32.6",
+ "futures",
+ "monero",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 

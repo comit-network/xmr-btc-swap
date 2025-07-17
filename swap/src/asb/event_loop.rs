@@ -1,4 +1,4 @@
-use crate::asb::{Behaviour, OutEvent, Rate};
+use crate::asb::{Behaviour, OutEvent};
 use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemRejectReason;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
 use crate::network::quote::BidQuote;
@@ -7,7 +7,8 @@ use crate::network::transfer_proof;
 use crate::protocol::alice::swap::has_already_processed_enc_sig;
 use crate::protocol::alice::{AliceState, ReservesMonero, State3, Swap};
 use crate::protocol::{Database, State};
-use crate::{bitcoin, kraken, monero};
+use crate::{bitcoin, monero};
+use swap_feed::{LatestRate};
 use swap_env::env;
 use anyhow::{anyhow, Context, Result};
 use futures::future;
@@ -18,9 +19,8 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use moka::future::Cache;
 use monero::Amount;
-use rust_decimal::Decimal;
 use std::collections::HashMap;
-use std::convert::{Infallible, TryInto};
+use std::convert::{TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
@@ -615,67 +615,6 @@ where
     }
 }
 
-pub trait LatestRate {
-    type Error: std::error::Error + Send + Sync + 'static;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
-}
-
-#[derive(Clone, Debug)]
-pub struct FixedRate(Rate);
-
-impl FixedRate {
-    pub const RATE: f64 = 0.01;
-
-    pub fn value(&self) -> Rate {
-        self.0
-    }
-}
-
-impl Default for FixedRate {
-    fn default() -> Self {
-        let ask = bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail");
-        let spread = Decimal::from(0u64);
-
-        Self(Rate::new(ask, spread))
-    }
-}
-
-impl LatestRate for FixedRate {
-    type Error = Infallible;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        Ok(self.value())
-    }
-}
-
-/// Produces [`Rate`]s based on [`PriceUpdate`]s from kraken and a configured
-/// spread.
-#[derive(Debug, Clone)]
-pub struct KrakenRate {
-    ask_spread: Decimal,
-    price_updates: kraken::PriceUpdates,
-}
-
-impl KrakenRate {
-    pub fn new(ask_spread: Decimal, price_updates: kraken::PriceUpdates) -> Self {
-        Self {
-            ask_spread,
-            price_updates,
-        }
-    }
-}
-
-impl LatestRate for KrakenRate {
-    type Error = kraken::Error;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        let update = self.price_updates.latest_update()?;
-        let rate = Rate::new(update.ask, self.ask_spread);
-
-        Ok(rate)
-    }
-}
 
 #[derive(Debug)]
 pub struct EventLoopHandle {

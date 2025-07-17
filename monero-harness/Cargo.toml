@@ -16,4 +16,4 @@ reqwest = { workspace = true }
 testcontainers = "0.15"
 tokio = { workspace = true, features = ["rt-multi-thread", "time", "macros"] }
 tracing = { workspace = true }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }
+tracing-subscriber = { workspace = true }

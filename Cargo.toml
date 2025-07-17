@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "monero-seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-serde"]
+members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "monero-seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-feed", "swap-serde"]
 
 [workspace.dependencies]
 anyhow = "1"
@@ -9,6 +9,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"] }
 futures = { version = "0.3", default-features = false, features = ["std"] }
 tracing = { version = "0.1", features = ["attributes"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "time", "tracing-log", "json"] }
 bitcoin = { version = "0.32", features = ["rand", "serde"] }
 monero = { version = "0.12", features = ["serde_support"] }
 rand = "0.8"

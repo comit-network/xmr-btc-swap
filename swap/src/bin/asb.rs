@@ -38,7 +38,8 @@ use swap::protocol::alice::swap::is_complete;
 use swap::protocol::alice::{run, AliceState};
 use swap::protocol::{Database, State};
 use swap::seed::Seed;
-use swap::{bitcoin, kraken, monero};
+use swap::{bitcoin, monero};
+use swap_feed;
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -194,7 +195,7 @@ pub async fn main() -> Result<()> {
             tracing::info!(%bitcoin_balance, "Bitcoin wallet balance");
 
             // Connect to Kraken
-            let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
+            let kraken_price_updates = swap_feed::connect_kraken(config.maker.price_ticker_ws_url.clone())?;
 
             let kraken_rate = KrakenRate::new(config.maker.ask_spread, kraken_price_updates);
             let namespace = XmrBtcNamespace::from_is_testnet(testnet);

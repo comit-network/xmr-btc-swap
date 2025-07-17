@@ -381,8 +381,8 @@ where
 
                         let unlocked = wallet_snapshot.unlocked_balance;
 
-                        let needed_balance = xmr + wallet_snapshot.lock_fee;
-                        if unlocked.as_piconero() < needed_balance.as_piconero() {
+                        let needed_balance = xmr + wallet_snapshot.lock_fee.into();
+                        if unlocked.as_piconero() < needed_balance.as_pico() {
                             tracing::warn!(
                                 unlocked_balance = %unlocked,
                                 needed_balance = %needed_balance,
@@ -399,14 +399,18 @@ where
 
                     let result = validate.await;
 
+                    let converted_result = match result {
+                        Ok(xmr) => Ok(xmr.into()),
+                        Err(e) => Err(e),
+                    };
                     swap_setup::write_cbor_message(
                         &mut substream,
-                        SpotPriceResponse::from_result_ref(&result),
+                        SpotPriceResponse::from_result_ref(&converted_result),
                     )
                     .await
                     .context("Failed to write spot price response")?;
 
-                    let xmr = result?;
+                    let xmr = converted_result?;
 
                     let state0 = State0::new(
                         request.btc,

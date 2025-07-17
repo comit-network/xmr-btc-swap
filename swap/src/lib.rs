@@ -21,7 +21,6 @@ pub mod bitcoin;
 pub mod cli;
 pub mod common;
 pub mod database;
-pub mod kraken;
 pub mod libp2p_ext;
 pub mod monero;
 mod monero_ext;

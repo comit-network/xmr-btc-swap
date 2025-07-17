@@ -1,0 +1,29 @@
+[package]
+name = "swap-feed"
+version = "0.1.0"
+authors = ["The COMIT guys <hello@comit.network>"]
+edition = "2021"
+description = "Price feed functionality for XMR/BTC atomic swaps"
+
+[lib]
+name = "swap_feed"
+
+[[bin]]
+name = "kraken_ticker"
+path = "src/bin/kraken_ticker.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+backoff = { version = "0.4", features = ["tokio"] }
+bitcoin = { workspace = true }
+futures = { workspace = true }
+monero = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { version = "0.15", features = ["rustls-tls"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }

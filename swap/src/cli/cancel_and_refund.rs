@@ -60,7 +60,6 @@ pub async fn cancel(
         BobState::BtcEarlyRefundPublished(state6) => state6,
 
         BobState::Started { .. }
-        | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }

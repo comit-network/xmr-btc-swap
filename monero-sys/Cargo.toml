@@ -29,5 +29,5 @@ quickcheck_macros = "1.0"
 tempfile = "3.19.1"
 testcontainers = "0.15"
 tokio = { workspace = true, features = ["full"] }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
 uuid = { workspace = true }

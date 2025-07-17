@@ -70,6 +70,7 @@ structopt = "0.3"
 strum = { version = "0.26", features = ["derive"] }
 swap-env = { path = "../swap-env" }
 swap-fs = { path = "../swap-fs" }
+swap-feed = { path = "../swap-feed" }
 swap-serde = { path = "../swap-serde" }
 tauri = { version = "2.0", features = ["config-json5"], optional = true, default-features = false }
 thiserror = { workspace = true }
@@ -82,7 +83,7 @@ tower = { version = "0.4.13", features = ["full"] }
 tower-http = { version = "0.3.4", features = ["full"] }
 tracing = { workspace = true }
 tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "time", "tracing-log", "json"] }
+tracing-subscriber = { workspace = true }
 typeshare = { workspace = true }
 unsigned-varint = { version = "0.8.0", features = ["codec", "asynchronous_codec"] }
 url = { workspace = true }
