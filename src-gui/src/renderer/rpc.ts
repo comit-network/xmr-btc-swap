@@ -56,7 +56,7 @@ import { discoveredMakersByRendezvous } from "store/features/makersSlice";
 import { CliLog } from "models/cliModel";
 import { logsToRawString, parseLogsFromString } from "utils/parseUtils";
 
-/// These are the official donation address for the UnstoppableSwap/core project
+/// These are the official donation address for the eigenwallet/core project
 const DONATION_ADDRESS_MAINNET =
   "49LEH26DJGuCyr8xzRAzWPUryzp7bpccC7Hie1DiwyfJEyUKvMFAethRLybDYrFdU1eHaMkKQpUPebY4WT3cSjEvThmpjPa";
 const DONATION_ADDRESS_STAGENET =

@@ -870,7 +870,7 @@ function DonationTipSetting() {
       <TableCell>
         <SettingLabel
           label="Tip to the developers"
-          tooltip="Support the development of UnstoppableSwap by donating a small percentage of your swaps. Donations go directly to paying for infrastructure costs and developers"
+          tooltip="Support the development of eigenwallet by donating a small percentage of your swaps. Donations go directly to paying for infrastructure costs and developers"
         />
       </TableCell>
       <TableCell>

@@ -25,7 +25,7 @@ npm manifest:
   {
     "name": "unstoppableswap-docs",
     "version": "1.0.0",
-    "description": "Documentation for the UnstoppableSwap GUI",
+    "description": "Documentation for the eigenwallet GUI",
     "main": "index.js",
     "license": "MIT",
     "scripts": {

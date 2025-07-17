@@ -1,6 +1,6 @@
 # Repo Overview
 
-This repository hosts the core of the UnstoppableSwap project. The code base is a Rust workspace with multiple crates and a Tauri based GUI.
+This repository hosts the core of the eigenwallet project. The code base is a Rust workspace with multiple crates and a Tauri based GUI.
 
 ## Important directories
 

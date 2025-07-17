@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# UnstoppableSwap Flatpak Build and Deploy Script
+# eigenwallet Flatpak Build and Deploy Script
 # Usage: ./flatpak-build.sh [--push] [--branch BRANCH] [--no-gpg]
 # Example: ./flatpak-build.sh --push --branch gh-pages
 
@@ -172,7 +172,7 @@ fi
 
 PAGES_URL="https://${GITHUB_USER}.github.io/${REPO_NAME}"
 
-echo "🏗️   Building Flatpak for UnstoppableSwap..."
+echo "🏗️   Building Flatpak for eigenwallet..."
 echo "📁  Repository: ${GITHUB_USER}/${REPO_NAME}"
 echo "🌐  Pages URL: ${PAGES_URL}"
 echo ""
@@ -322,12 +322,12 @@ flatpak build-bundle "${BUNDLE_ARGS[@]}" net.unstoppableswap.gui
 echo "📝  Generating .flatpakrepo file..."
 cat > "$REPO_DIR/unstoppableswap.flatpakrepo" << EOF
 [Flatpak Repo]
-Title=UnstoppableSwap
-Name=UnstoppableSwap
+Title=eigenwallet
+Name=eigenwallet
 Url=${PAGES_URL}/
 Homepage=https://github.com/${GITHUB_USER}/${REPO_NAME}
 Comment=Unstoppable cross-chain atomic swaps
-Description=Repository for UnstoppableSwap applications - providing secure and decentralized XMR-BTC atomic swaps
+Description=Repository for eigenwallet applications - providing secure and decentralized XMR-BTC atomic swaps
 Icon=${PAGES_URL}/icon.png
 SuggestRemoteName=unstoppableswap
 EOF
@@ -343,7 +343,7 @@ fi
 echo "📝  Generating .flatpakref file..."
 cat > "$REPO_DIR/net.unstoppableswap.gui.flatpakref" << EOF
 [Flatpak Ref]
-Title=UnstoppableSwap GUI
+Title=eigenwallet GUI
 Name=net.unstoppableswap.gui
 Branch=stable
 Url=${PAGES_URL}/

@@ -125,14 +125,17 @@ impl State {
 /// Initializes the Tauri state
 /// Sets the window title
 fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // Set the window title to include the product name and version
+    // Set the window title to include the window title and version
     let config = app.config();
     let title = format!(
         "{} (v{})",
         config
-            .product_name
-            .as_ref()
-            .expect("Product name to be set"),
+            .app
+            .windows
+            .first()
+            .expect("Window object to be set in config")
+            .title
+            .as_str(),
         config.version.as_ref().expect("Version to be set")
     );
 

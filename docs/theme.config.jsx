@@ -7,8 +7,8 @@ export default {
   },
   head: (
     <>
-      <title>UnstoppableSwap Docs</title>
-      <meta name="description" content="UnstoppableSwap Docs" />
+      <title>eigenwallet Docs</title>
+      <meta name="description" content="eigenwallet Docs" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <link rel="icon" href="/favicon.ico" sizes="any" />
       <link rel="icon" href="/icon.svg" type="image/svg+xml" />
