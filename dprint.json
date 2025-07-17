@@ -24,7 +24,8 @@
     ".git/**",
     "**/node_modules/**",
     "**/dist/**",
-    "seed/**"
+    "monero-seed/**",
+    "monero-sys/monero_c"
   ],
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.18.0.wasm",
