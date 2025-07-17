@@ -9,27 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.4.5] - 2025-07-17
 
-## [2.4.3] - 2025-07-17
+_Some of these CHANGELOG entires have beeb merged from 2.0.3 - 2.4.3 into this release because those releases were missing Github releases._
 
 - ASB: Lowered the Monero lock retry timeout to 10minutes. Aftet that timeout we will start an early refund.
-
-## [2.3.1] - 2025-06-25
-
 - GUI: Users can donate a small percentage of their swap to the projects donation address. Donations will be used to fund development. This is completely optional and **disabled** by default. Monero is used exclusively for donations, ensuring full anonymity for users. Donations are only ever send for successful swaps (not refunded ones). We clearly and transparently state where how much Monero is going before the user approves a swap.
-
-## [2.3.0-beta.2] - 2025-06-24
-
 - ASB + GUI + CLI: We now cache fee estimates for the Bitcoin wallet for up to 2 minutes. This improves the speed of fee estimation and reduces the number of requests to the Electrum servers.
-
-## [2.3.0-beta.1] - 2025-06-19
-
 - ASB + CLI + GUI: Introduce a load-balancing proxy for Monero RPC nodes that automatically discovers healthy nodes and routes requests to improve connection reliability.
 - ASB: Added `monero_node_pool` boolean option to ASB config. When enabled, the ASB uses the internal Monero RPC pool instead of connecting directly to a single daemon URL, providing improved reliability and automatic failover across multiple Monero nodes.
-
-## [2.2.0-beta.2] - 2025-06-17
-
 - We now call Monero function directly (via FFI bindings) instead of using `monero-wallet-rpc`.
-
 - ASB: Since we don't communicate with `monero-wallet-rpc` anymore, the Monero wallet's will no longer be accessible by connecting to it. If you are using the asb-docker-compose setup, run this command to migrate the wallet files from the volume of the monero-wallet-rpc container to the volume of the asb container:
   ```bash
   # On testnet
