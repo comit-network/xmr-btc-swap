@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: Docker image has moved to https://github.com/eigenwallet/core/pkgs/container/asb
+- ASB + GUI + CLI: We have renamed from _UnstoppableSwap_ to _eigenwallet_ ([why?](https://eigenwallet.org/rename.html)). We will slowly migrate the entire infrastructure to the new name.
+
 ## [2.4.5] - 2025-07-17
 
 _Some of these CHANGELOG entires have beeb merged from 2.0.3 - 2.4.3 into this release because those releases were missing Github releases._
