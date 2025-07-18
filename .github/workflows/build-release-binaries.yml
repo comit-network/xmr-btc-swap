@@ -5,7 +5,7 @@ on:
     types: [created]
 
 env:
-  DOCKER_IMAGE_NAME: ghcr.io/unstoppableswap/asb
+  DOCKER_IMAGE_NAME: ghcr.io/eigenwallet/asb
 
 concurrency:
   group: build-release-${{ github.event.release.tag_name }}
