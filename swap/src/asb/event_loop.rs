@@ -8,8 +8,6 @@ use crate::protocol::alice::swap::has_already_processed_enc_sig;
 use crate::protocol::alice::{AliceState, ReservesMonero, State3, Swap};
 use crate::protocol::{Database, State};
 use crate::{bitcoin, monero};
-use swap_feed::{LatestRate};
-use swap_env::env;
 use anyhow::{anyhow, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
@@ -20,10 +18,12 @@ use libp2p::{PeerId, Swarm};
 use moka::future::Cache;
 use monero::Amount;
 use std::collections::HashMap;
-use std::convert::{TryInto};
+use std::convert::TryInto;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
+use swap_env::env;
+use swap_feed::LatestRate;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -614,7 +614,6 @@ where
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct EventLoopHandle {

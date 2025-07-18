@@ -379,7 +379,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
     println!();
 
     Ok(Config {
-        data: Data { dir: data_dir},
+        data: Data { dir: data_dir },
         network: Network {
             listen: listen_addresses,
             rendezvous_point: rendezvous_points, // keeping the singular key name for backcompat

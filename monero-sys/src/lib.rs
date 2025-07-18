@@ -1639,7 +1639,9 @@ impl FfiWallet {
     /// Store the wallet state.
     fn store(&mut self, path: &str) {
         let_cxx_string!(path = path);
-        self.inner.pinned().store(&path)
+        self.inner
+            .pinned()
+            .store(&path)
             .context("Failed to store wallet: FFI call failed with exception")
             .expect("Shouldn't panic");
     }

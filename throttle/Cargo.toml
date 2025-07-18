@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 tracing = { workspace = true }
 
-
 [lib]
 path = "src/throttle.rs"
 

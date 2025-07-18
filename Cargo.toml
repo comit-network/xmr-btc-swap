@@ -1,16 +1,24 @@
 [workspace]
 resolver = "2"
-members = [ "electrum-pool", "monero-rpc", "monero-rpc-pool", "monero-sys", "monero-seed", "src-tauri", "swap", "swap-env", "swap-fs", "swap-feed", "swap-serde", "throttle"]
+members = [
+  "electrum-pool",
+  "monero-rpc",
+  "monero-rpc-pool",
+  "monero-seed",
+  "monero-sys",
+  "src-tauri",
+  "swap",
+  "swap-env",
+  "swap-feed",
+  "swap-fs",
+  "swap-serde",
+  "throttle",
+]
 
 [workspace.dependencies]
 anyhow = "1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"] }
-futures = { version = "0.3", default-features = false, features = ["std"] }
-tracing = { version = "0.1", features = ["attributes"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "time", "tracing-log", "json"] }
 bitcoin = { version = "0.32", features = ["rand", "serde"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 libp2p = { version = "0.53.2" }
 monero = { version = "0.12", features = ["serde_support"] }
@@ -18,7 +26,12 @@ rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 rust_decimal = { version = "1", features = ["serde-float"] }
 rust_decimal_macros = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
 thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tracing = { version = "0.1", features = ["attributes"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "time", "tracing-log", "json"] }
 typeshare = "1.0"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }

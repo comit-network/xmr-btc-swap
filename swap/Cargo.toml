@@ -72,9 +72,9 @@ swap-env = { path = "../swap-env" }
 swap-feed = { path = "../swap-feed" }
 swap-fs = { path = "../swap-fs" }
 swap-serde = { path = "../swap-serde" }
-throttle = { path = "../throttle" }
 tauri = { version = "2.0", features = ["config-json5"], optional = true, default-features = false }
 thiserror = { workspace = true }
+throttle = { path = "../throttle" }
 time = "0.3"
 tokio = { workspace = true, features = ["process", "fs", "net", "parking_lot", "rt"] }
 tokio-tungstenite = { version = "0.15", features = ["rustls-tls"] }

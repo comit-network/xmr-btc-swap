@@ -514,16 +514,15 @@ export async function sendMoneroTransaction(
     const response = await sendMonero(args);
 
     // Refresh balance and history after sending - but don't let this block the response
-    Promise.all([
-      getMoneroBalance(),
-      getMoneroHistory(),
-    ]).then(([newBalance, newHistory]) => {
-      store.dispatch(setBalance(newBalance));
-      store.dispatch(setHistory(newHistory));
-    }).catch(refreshErr => {
-      console.error("Failed to refresh wallet data after send:", refreshErr);
-      // Could emit a toast notification here
-    });
+    Promise.all([getMoneroBalance(), getMoneroHistory()])
+      .then(([newBalance, newHistory]) => {
+        store.dispatch(setBalance(newBalance));
+        store.dispatch(setHistory(newHistory));
+      })
+      .catch((refreshErr) => {
+        console.error("Failed to refresh wallet data after send:", refreshErr);
+        // Could emit a toast notification here
+      });
 
     return response;
   } catch (err) {

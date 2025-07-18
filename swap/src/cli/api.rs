@@ -507,7 +507,7 @@ impl ContextBuilder {
                 data_dir: data_dir.clone(),
                 log_dir: log_dir.clone(),
             },
-            swap_lock,  
+            swap_lock,
             tasks,
             tauri_handle: self.tauri_handle,
             tor_client: tor,
@@ -554,7 +554,7 @@ impl Context {
     pub fn cleanup(&self) -> Result<()> {
         // TODO: close all monero wallets
         // call store(..) on all wallets
-        
+
         // TODO: This doesn't work because "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
         // let monero_manager = self.monero_manager.clone();
         // tokio::spawn(async move {
@@ -802,7 +802,12 @@ async fn request_and_open_monero_wallet(
                     }
 
                     SeedChoice::Legacy => {
-                        let wallet = request_and_open_monero_wallet_legacy(legacy_data_dir, env_config, daemon).await?;
+                        let wallet = request_and_open_monero_wallet_legacy(
+                            legacy_data_dir,
+                            env_config,
+                            daemon,
+                        )
+                        .await?;
                         let seed = Seed::from_file_or_generate(legacy_data_dir)
                             .await
                             .context("Failed to extract seed from wallet")?;
@@ -812,7 +817,10 @@ async fn request_and_open_monero_wallet(
                 };
 
                 // Extract seed from the wallet
-                tracing::info!("Extracting seed from wallet directory: {}", legacy_data_dir.display());
+                tracing::info!(
+                    "Extracting seed from wallet directory: {}",
+                    legacy_data_dir.display()
+                );
                 let seed = Seed::from_monero_wallet(&wallet)
                     .await
                     .context("Failed to extract seed from wallet")?;
@@ -824,7 +832,8 @@ async fn request_and_open_monero_wallet(
         // If we don't have a tauri handle, we use the seed.pem file
         // This is used for the CLI to monitor the blockchain
         None => {
-            let wallet = request_and_open_monero_wallet_legacy(legacy_data_dir, env_config, daemon).await?;
+            let wallet =
+                request_and_open_monero_wallet_legacy(legacy_data_dir, env_config, daemon).await?;
             let seed = Seed::from_file_or_generate(legacy_data_dir)
                 .await
                 .context("Failed to extract seed from wallet")?;

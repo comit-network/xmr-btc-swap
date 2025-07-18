@@ -1,6 +1,9 @@
 import React from "react";
 import { Badge } from "@mui/material";
-import { useIsSwapRunning, useResumeableSwapsCountExcludingPunished } from "store/hooks";
+import {
+  useIsSwapRunning,
+  useResumeableSwapsCountExcludingPunished,
+} from "store/hooks";
 
 export default function UnfinishedSwapsBadge({
   children,
@@ -10,7 +13,9 @@ export default function UnfinishedSwapsBadge({
   const isSwapRunning = useIsSwapRunning();
   const resumableSwapsCount = useResumeableSwapsCountExcludingPunished();
 
-  const displayedResumableSwapsCount = isSwapRunning ? resumableSwapsCount - 1 : resumableSwapsCount;
+  const displayedResumableSwapsCount = isSwapRunning
+    ? resumableSwapsCount - 1
+    : resumableSwapsCount;
 
   if (displayedResumableSwapsCount > 0) {
     return (

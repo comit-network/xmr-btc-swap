@@ -177,8 +177,9 @@ mod tests {
             .sell_quote(bitcoin::Amount::ONE_BTC)
             .unwrap();
 
-        let xmr_factor =
-            xmr_no_spread.into().as_piconero_decimal() / xmr_with_spread.into().as_piconero_decimal() - ONE;
+        let xmr_factor = xmr_no_spread.into().as_piconero_decimal()
+            / xmr_with_spread.into().as_piconero_decimal()
+            - ONE;
 
         assert!(xmr_with_spread < xmr_no_spread);
         assert_eq!(xmr_factor.round_dp(8), TWO_PERCENT); // round to 8 decimal

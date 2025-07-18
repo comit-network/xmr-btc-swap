@@ -1,5 +1,3 @@
-use swap_feed::LatestRate;
-use swap_env::env;
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::alice;
@@ -19,6 +17,8 @@ use libp2p::swarm::NetworkBehaviour;
 use libp2p::{Multiaddr, PeerId};
 use std::task::Poll;
 use std::time::Duration;
+use swap_env::env;
+use swap_feed::LatestRate;
 use uuid::Uuid;
 
 pub mod transport {

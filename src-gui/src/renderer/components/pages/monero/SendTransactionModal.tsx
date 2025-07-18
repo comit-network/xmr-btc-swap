@@ -22,7 +22,8 @@ export default function SendTransactionModal({
   const pendingApprovals = usePendingSendMoneroApproval();
   const hasPendingApproval = pendingApprovals.length > 0;
 
-  const [successResponse, setSuccessResponse] = useState<SendMoneroResponse | null>(null);
+  const [successResponse, setSuccessResponse] =
+    useState<SendMoneroResponse | null>(null);
 
   const showSuccess = successResponse !== null;
 
@@ -42,13 +43,20 @@ export default function SendTransactionModal({
       }}
     >
       {!showSuccess && !hasPendingApproval && (
-        <SendTransactionContent balance={balance} onClose={onClose} onSuccess={setSuccessResponse} />
+        <SendTransactionContent
+          balance={balance}
+          onClose={onClose}
+          onSuccess={setSuccessResponse}
+        />
       )}
       {!showSuccess && hasPendingApproval && (
         <SendApprovalContent onClose={onClose} />
       )}
       {showSuccess && (
-        <SendSuccessContent onClose={onClose} successDetails={successResponse} />
+        <SendSuccessContent
+          onClose={onClose}
+          successDetails={successResponse}
+        />
       )}
     </Dialog>
   );

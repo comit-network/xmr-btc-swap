@@ -10,7 +10,7 @@ pub trait LatestRate {
 pub trait PriceFeed: Sized {
     type Error: std::error::Error + Send + Sync + 'static;
     type Update;
-    
+
     async fn connect(url: url::Url) -> Result<Self, Self::Error>;
     async fn next_update(&mut self) -> Result<Self::Update, Self::Error>;
 }
