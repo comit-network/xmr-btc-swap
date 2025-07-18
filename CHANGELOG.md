@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0-beta] - 2025-07-18
+
 - GUI: The GUI can now be used as a Monero wallet. You can open existing Monero wallet files that were created with `monero-wallet-cli` / `monero-wallet-rpc` / `monero-wallet-gui` / Feather Wallet. You can also generate new wallets or recover existing ones from a seed phrase. To change the restore height of a wallet, go to the "Wallet" tab and click on the "..." -> "Restore height" button. You can view your previous transactions, sync your wallet with the Blockchain and send Monero.
 - GUI: The internal Bitcoin wallet and the p2p identitiy is now tied directly to the Monero wallet. The Bitcoin wallet and p2p identity is derived from the entropy of the Monero seed. The `seed.pem` file has no purpose for the GUI anymore and is only used for the CLI / ASB or when using the legacy mode of the GUI.
 - GUI: The data directory has been split into multiple subdirectories. Each Monero wallet has its own data directory in `identities/<wallet-primary-address>`. That directory is used to store the swap history, the wallet cache for the Bitcoin wallet and the Tor client cache. When opening the GUI you can either select a Monero wallet to open or you can click the "No Wallet (Legacy)" button to view swaps that were started with older versions of the GUI or to get access to the Bitcoin wallet that was used in previous versions of the GUI.
@@ -582,7 +584,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/eigenwallet/core/compare/2.5.6...HEAD
+[unreleased]: https://github.com/eigenwallet/core/compare/3.0.0-beta...HEAD
+[3.0.0-beta]: https://github.com/eigenwallet/core/compare/2.5.6...3.0.0-beta
 [2.5.6]: https://github.com/eigenwallet/core/compare/2.4.5...2.5.6
 [2.4.5]: https://github.com/eigenwallet/core/compare/2.4.3...2.4.5
 [2.4.3]: https://github.com/eigenwallet/core/compare/2.0.3...2.4.3
