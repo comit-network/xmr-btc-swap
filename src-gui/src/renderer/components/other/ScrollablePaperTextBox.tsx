@@ -81,7 +81,7 @@ export default function ScrollablePaperTextBox({
           gap: "0.5rem",
         }}
       >
-        <VList ref={virtuaEl} style={{ height: MIN_HEIGHT, width: "100%" }}>
+        <VList ref={virtuaEl} style={{ height: "100vh", width: "100%" }}>
           {rows}
         </VList>
       </Box>

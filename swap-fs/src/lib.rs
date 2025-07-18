@@ -20,6 +20,17 @@ pub fn system_data_dir() -> Result<PathBuf> {
         .context("Could not generate default system data-dir dir path")
 }
 
+pub fn system_data_dir_eigenwallet(testnet: bool) -> Result<PathBuf> {
+    let application_directory = match testnet {
+        true => "eigenwallet-testnet",
+        false => "eigenwallet",
+    };
+
+    ProjectDirs::from("", "", application_directory)
+        .map(|proj_dirs| proj_dirs.data_dir().to_path_buf())
+        .context("Could not generate default system data-dir dir path")
+}
+
 pub fn ensure_directory_exists(file: &Path) -> Result<(), std::io::Error> {
     if let Some(path) = file.parent() {
         if !path.exists() {

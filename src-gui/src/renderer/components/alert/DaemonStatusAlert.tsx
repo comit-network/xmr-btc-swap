@@ -186,18 +186,11 @@ export default function DaemonStatusAlert() {
   const contextStatus = useAppSelector((s) => s.rpc.status);
   const navigate = useNavigate();
 
-  if (
-    contextStatus === null ||
-    contextStatus === TauriContextStatusEvent.NotInitialized
-  ) {
-    return (
-      <LoadingSpinnerAlert severity="warning">
-        Checking for available remote nodes
-      </LoadingSpinnerAlert>
-    );
-  }
-
   switch (contextStatus) {
+    case null:
+      return null;
+    case TauriContextStatusEvent.NotInitialized:
+      return null;
     case TauriContextStatusEvent.Initializing:
       return null;
     case TauriContextStatusEvent.Available:

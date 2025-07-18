@@ -481,7 +481,6 @@ pub struct NotThreeWitnesses(usize);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use swap_env::env::{GetConfig, Regtest};
     use crate::monero::TransferProof;
     use crate::protocol::{alice, bob};
     use bitcoin::secp256k1;
@@ -490,6 +489,7 @@ mod tests {
     use monero::PrivateKey;
     use rand::rngs::OsRng;
     use std::matches;
+    use swap_env::env::{GetConfig, Regtest};
     use uuid::Uuid;
 
     #[test]

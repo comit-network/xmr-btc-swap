@@ -1,8 +1,8 @@
+use crate::config::Config as AsbConfig;
 use serde::Serialize;
 use std::cmp::max;
 use std::time::Duration;
 use time::ext::NumericalStdDuration;
-use crate::config::Config as AsbConfig;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
 pub struct Config {
@@ -135,8 +135,6 @@ pub fn new(is_testnet: bool, asb_config: &AsbConfig) -> Config {
         env_config
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

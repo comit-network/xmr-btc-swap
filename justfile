@@ -26,7 +26,7 @@ test-ffi-address:
 
 # Start the Tauri app
 tauri:
-	cd src-tauri && cargo tauri dev --no-watch -- -- --testnet
+	cd src-tauri && cargo tauri dev --no-watch --verbose -- -- --testnet
 
 tauri-mainnet:
 	cd src-tauri && cargo tauri dev --no-watch

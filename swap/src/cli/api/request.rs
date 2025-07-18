@@ -1,6 +1,9 @@
 use super::tauri_bindings::TauriHandle;
 use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock};
-use crate::cli::api::tauri_bindings::{SelectMakerDetails, TauriEmitter, TauriSwapProgressEvent};
+use crate::cli::api::tauri_bindings::{
+    ApprovalRequestType, SelectMakerDetails, SendMoneroDetails, TauriEmitter,
+    TauriSwapProgressEvent,
+};
 use crate::cli::api::Context;
 use crate::cli::list_sellers::{list_sellers_init, QuoteWithAddress, UnreachableSeller};
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
@@ -30,6 +33,7 @@ use serde_json::json;
 use std::convert::TryInto;
 use std::future::Future;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -417,7 +421,7 @@ impl Request for GetLogsArgs {
     type Response = GetLogsResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        let dir = self.logs_dir.unwrap_or(ctx.config.data_dir.join("logs"));
+        let dir = self.logs_dir.unwrap_or(ctx.config.log_dir.clone());
         let logs = get_logs(dir, self.swap_id, self.redact).await?;
 
         for msg in &logs {
@@ -453,6 +457,32 @@ impl Request for RedactArgs {
 
 #[typeshare]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetRestoreHeightArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetRestoreHeightResponse {
+    #[typeshare(serialized_as = "number")]
+    pub height: u64,
+}
+
+impl Request for GetRestoreHeightArgs {
+    type Response = GetRestoreHeightResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet.main_wallet().await;
+        let height = wallet.get_restore_height().await?;
+
+        Ok(GetRestoreHeightResponse { height })
+    }
+}
+
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GetMoneroAddressesArgs;
 
 #[typeshare]
@@ -468,6 +498,282 @@ impl Request for GetMoneroAddressesArgs {
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
         let addresses = ctx.db.get_monero_addresses().await?;
         Ok(GetMoneroAddressesResponse { addresses })
+    }
+}
+
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetMoneroHistoryArgs;
+
+#[typeshare]
+#[derive(Serialize, Clone, Deserialize, Debug)]
+pub struct GetMoneroHistoryResponse {
+    pub transactions: Vec<monero_sys::TransactionInfo>,
+}
+
+impl Request for GetMoneroHistoryArgs {
+    type Response = GetMoneroHistoryResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet.main_wallet().await;
+
+        let transactions = wallet.history().await;
+        Ok(GetMoneroHistoryResponse { transactions })
+    }
+}
+
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetMoneroMainAddressArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetMoneroMainAddressResponse {
+    #[typeshare(serialized_as = "String")]
+    pub address: monero::Address,
+}
+
+impl Request for GetMoneroMainAddressArgs {
+    type Response = GetMoneroMainAddressResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet.main_wallet().await;
+        let address = wallet.main_address().await;
+        Ok(GetMoneroMainAddressResponse { address })
+    }
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Date {
+    #[typeshare(serialized_as = "number")]
+    pub year: u16,
+    #[typeshare(serialized_as = "number")]
+    pub month: u8,
+    #[typeshare(serialized_as = "number")]
+    pub day: u8,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", content = "height")]
+pub enum SetRestoreHeightArgs {
+    #[typeshare(serialized_as = "number")]
+    Height(u32),
+    #[typeshare(serialized_as = "object")]
+    Date(Date),
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SetRestoreHeightResponse {
+    pub success: bool,
+}
+
+impl Request for SetRestoreHeightArgs {
+    type Response = SetRestoreHeightResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet.main_wallet().await;
+
+        let height = match self {
+            SetRestoreHeightArgs::Height(height) => height as u64,
+            SetRestoreHeightArgs::Date(date) => {
+                let year: u16 = date.year;
+                let month: u8 = date.month;
+                let day: u8 = date.day;
+
+                // Validate ranges
+                if month < 1 || month > 12 {
+                    bail!("Month must be between 1 and 12");
+                }
+                if day < 1 || day > 31 {
+                    bail!("Day must be between 1 and 31");
+                }
+
+                tracing::info!(
+                    "Getting blockchain height for date: {}-{}-{}",
+                    year,
+                    month,
+                    day
+                );
+
+                let height = wallet
+                    .get_blockchain_height_by_date(year, month, day)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to get blockchain height for date {}-{}-{}",
+                            year, month, day
+                        )
+                    })?;
+                tracing::info!(
+                    "Blockchain height for date {}-{}-{}: {}",
+                    year,
+                    month,
+                    day,
+                    height
+                );
+
+                height
+            }
+        };
+
+        wallet.set_restore_height(height).await?;
+
+        wallet.pause_refresh().await;
+        wallet.stop().await;
+        tracing::debug!("Background refresh stopped");
+
+        wallet.rescan_blockchain_async().await;
+        wallet.start_refresh().await;
+        tracing::info!("Rescanning blockchain from height {} completed", height);
+
+        Ok(SetRestoreHeightResponse { success: true })
+    }
+}
+
+// New request type for Monero balance
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetMoneroBalanceArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GetMoneroBalanceResponse {
+    #[typeshare(serialized_as = "string")]
+    pub total_balance: crate::monero::Amount,
+    #[typeshare(serialized_as = "string")]
+    pub unlocked_balance: crate::monero::Amount,
+}
+
+impl Request for GetMoneroBalanceArgs {
+    type Response = GetMoneroBalanceResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet_manager = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet_manager.main_wallet().await;
+
+        let total_balance = wallet.total_balance().await;
+        let unlocked_balance = wallet.unlocked_balance().await;
+
+        Ok(GetMoneroBalanceResponse {
+            total_balance: crate::monero::Amount::from_piconero(total_balance.as_pico()),
+            unlocked_balance: crate::monero::Amount::from_piconero(unlocked_balance.as_pico()),
+        })
+    }
+}
+
+#[typeshare]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SendMoneroArgs {
+    #[typeshare(serialized_as = "String")]
+    pub address: String,
+    pub amount: SendMoneroAmount,
+}
+
+#[typeshare]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "amount")]
+pub enum SendMoneroAmount {
+    Sweep,
+    Specific(crate::monero::Amount),
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SendMoneroResponse {
+    pub tx_hash: String,
+    pub address: String,
+    pub amount_sent: crate::monero::Amount,
+    pub fee: crate::monero::Amount,
+}
+
+impl Request for SendMoneroArgs {
+    type Response = SendMoneroResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet_manager = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet_manager.main_wallet().await;
+
+        // Parse the address
+        let address = monero::Address::from_str(&self.address)
+            .map_err(|e| anyhow::anyhow!("Invalid Monero address: {}", e))?;
+
+        let tauri_handle = ctx
+            .tauri_handle()
+            .context("Tauri needs to be available to approve transactions")?;
+
+        // This is a closure that will be called by the monero-sys library to get approval for the transaction
+        // It sends an approval request to the frontend and returns true if the user approves the transaction
+        let approval_callback: Arc<
+            dyn Fn(
+                    String,
+                    ::monero::Amount,
+                    ::monero::Amount,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+                + Send
+                + Sync,
+        > = std::sync::Arc::new(
+            move |_txid: String, amount: ::monero::Amount, fee: ::monero::Amount| {
+                let tauri_handle = tauri_handle.clone();
+
+                Box::pin(async move {
+                    let details = SendMoneroDetails {
+                        address: address.to_string(),
+                        amount: amount.into(),
+                        fee: fee.into(),
+                    };
+
+                    tauri_handle
+                        .request_approval::<bool>(
+                            ApprovalRequestType::SendMonero(details),
+                            Some(60 * 5),
+                        )
+                        .await
+                        .unwrap_or(false)
+                })
+            },
+        );
+
+        let amount = match self.amount {
+            SendMoneroAmount::Sweep => None,
+            SendMoneroAmount::Specific(amount) => Some(amount.into()),
+        };
+
+        // This is the actual call to the monero-sys library to send the transaction
+        // monero-sys will call the approval callback after it has constructed and signed the transaction
+        // once the user approves, the transaction is published
+        let (receipt, amount_sent, fee) = wallet
+            .transfer_with_approval(&address, amount, approval_callback)
+            .await?
+            .context("Transaction was not approved by user")?;
+
+        Ok(SendMoneroResponse {
+            tx_hash: receipt.txid,
+            address: address.to_string(),
+            amount_sent: amount_sent.into(),
+            fee: fee.into(),
+        })
     }
 }
 
@@ -1248,23 +1554,6 @@ pub async fn get_current_swap(context: Arc<Context>) -> Result<GetCurrentSwapRes
     Ok(GetCurrentSwapResponse { swap_id })
 }
 
-pub async fn resolve_approval_request(
-    resolve_approval: ResolveApprovalArgs,
-    ctx: Arc<Context>,
-) -> Result<ResolveApprovalResponse> {
-    let request_id = Uuid::parse_str(&resolve_approval.request_id).context("Invalid request ID")?;
-
-    if let Some(handle) = ctx.tauri_handle.clone() {
-        handle
-            .resolve_approval(request_id, resolve_approval.accept)
-            .await?;
-    } else {
-        bail!("Cannot resolve approval without a Tauri handle");
-    }
-
-    Ok(ResolveApprovalResponse { success: true })
-}
-
 pub async fn fetch_quotes_task(
     rendezvous_points: Vec<Multiaddr>,
     namespace: XmrBtcNamespace,
@@ -1639,6 +1928,18 @@ pub struct ResolveApprovalResponse {
 }
 
 #[typeshare]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RejectApprovalArgs {
+    pub request_id: String,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RejectApprovalResponse {
+    pub success: bool,
+}
+
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckSeedArgs {
     pub seed: String,
@@ -1655,6 +1956,42 @@ impl CheckSeedArgs {
         let seed = MoneroSeed::from_string(Language::English, Zeroizing::new(self.seed));
         Ok(CheckSeedResponse {
             available: seed.is_ok(),
+        })
+    }
+}
+
+// New request type for Monero sync progress
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetMoneroSyncProgressArgs;
+
+#[typeshare]
+#[derive(Serialize, Clone, Deserialize, Debug)]
+pub struct GetMoneroSyncProgressResponse {
+    #[typeshare(serialized_as = "number")]
+    pub current_block: u64,
+    #[typeshare(serialized_as = "number")]
+    pub target_block: u64,
+    #[typeshare(serialized_as = "number")]
+    pub progress_percentage: f32,
+}
+
+impl Request for GetMoneroSyncProgressArgs {
+    type Response = GetMoneroSyncProgressResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let wallet_manager = ctx
+            .monero_manager
+            .as_ref()
+            .context("Monero wallet manager not available")?;
+        let wallet = wallet_manager.main_wallet().await;
+
+        let sync_progress = wallet.call(|wallet| wallet.sync_progress()).await;
+
+        Ok(GetMoneroSyncProgressResponse {
+            current_block: sync_progress.current_block,
+            target_block: sync_progress.target_block,
+            progress_percentage: sync_progress.percentage(),
         })
     }
 }

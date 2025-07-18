@@ -11,11 +11,16 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+fn display_node(node: &(String, String, i64)) -> String {
+    format!("{}://{}:{}", node.0, node.1, node.2)
+}
+
 #[derive(Debug, Clone)]
 enum HandlerError {
     NoNodes,
     PoolError(String),
     RequestError(String),
+    JsonRpcError(String),
     AllRequestsFailed(Vec<(String, String)>),
 }
 
@@ -25,6 +30,7 @@ impl std::fmt::Display for HandlerError {
             HandlerError::NoNodes => write!(f, "No nodes available"),
             HandlerError::PoolError(msg) => write!(f, "Pool error: {}", msg),
             HandlerError::RequestError(msg) => write!(f, "Request error: {}", msg),
+            HandlerError::JsonRpcError(msg) => write!(f, "JSON-RPC error: {}", msg),
             HandlerError::AllRequestsFailed(errors) => {
                 write!(f, "All requests failed: [")?;
                 for (i, (node, error)) in errors.iter().enumerate() {
@@ -60,17 +66,13 @@ fn extract_jsonrpc_method(body: &[u8]) -> Option<String> {
 }
 
 async fn raw_http_request(
+    client: &reqwest::Client,
     node_url: (String, String, i64),
     path: &str,
     method: &str,
     headers: &HeaderMap,
     body: Option<&[u8]>,
 ) -> Result<Response, HandlerError> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
-
     let (scheme, host, port) = &node_url;
     let url = format!("{}://{}:{}{}", scheme, host, port, path);
 
@@ -172,6 +174,7 @@ async fn record_failure(state: &AppState, scheme: &str, host: &str, port: i64) {
 }
 
 async fn single_raw_request(
+    client: &reqwest::Client,
     node_url: (String, String, i64),
     path: &str,
     method: &str,
@@ -180,7 +183,7 @@ async fn single_raw_request(
 ) -> Result<(Response, (String, String, i64), f64), HandlerError> {
     let start_time = Instant::now();
 
-    match raw_http_request(node_url.clone(), path, method, headers, body).await {
+    match raw_http_request(client, node_url.clone(), path, method, headers, body).await {
         Ok(response) => {
             let elapsed = start_time.elapsed();
             let latency_ms = elapsed.as_millis() as f64;
@@ -195,7 +198,7 @@ async fn single_raw_request(
                         .map_err(|e| HandlerError::RequestError(format!("{:#?}", e)))?;
 
                     if is_jsonrpc_error(&body_bytes) {
-                        return Err(HandlerError::RequestError("JSON-RPC error".to_string()));
+                        return Err(HandlerError::JsonRpcError("JSON-RPC error".to_string()));
                     }
 
                     // Reconstruct response with the body we consumed
@@ -225,6 +228,7 @@ async fn sequential_requests(
     body: Option<&[u8]>,
 ) -> Result<Response, HandlerError> {
     const POOL_SIZE: usize = 20;
+    const MAX_JSONRPC_ERRORS: usize = 3;
 
     // Extract JSON-RPC method for better logging
     let jsonrpc_method = if path == "/json_rpc" {
@@ -238,7 +242,7 @@ async fn sequential_requests(
     };
 
     let mut tried_nodes = 0;
-    let mut collected_errors: Vec<(String, String)> = Vec::new();
+    let mut collected_errors: Vec<((String, String, i64), HandlerError)> = Vec::new();
 
     // Get the pool of nodes
     let available_pool = {
@@ -283,7 +287,16 @@ async fn sequential_requests(
             ),
         }
 
-        match single_raw_request(node.clone(), path, method, headers, body).await {
+        match single_raw_request(
+            &state.http_client,
+            node.clone(),
+            path,
+            method,
+            headers,
+            body,
+        )
+        .await
+        {
             Ok((response, winning_node, latency_ms)) => {
                 let (scheme, host, port) = &winning_node;
                 let winning_node_display = format!("{}://{}:{}", scheme, host, port);
@@ -304,24 +317,61 @@ async fn sequential_requests(
                 return Ok(response);
             }
             Err(e) => {
-                collected_errors.push((node_display.clone(), e.to_string()));
+                collected_errors.push((node.clone(), e.clone()));
 
                 debug!(
-                    "Request failed with node {} with error {} - trying next node...",
+                    "Request failed with node {}: {} - checking if we should fail fast...",
                     node_display, e
                 );
 
-                record_failure(state, &node.0, &node.1, node.2).await;
+                // Count JSON-RPC errors by checking through all collected errors (type-safe)
+                let jsonrpc_error_count = collected_errors
+                    .iter()
+                    .filter(|(_, error)| matches!(error, HandlerError::JsonRpcError(_)))
+                    .count();
+
+                // Fail fast after MAX_JSONRPC_ERRORS JSON-RPC errors
+                if jsonrpc_error_count >= MAX_JSONRPC_ERRORS {
+                    match &jsonrpc_method {
+                        Some(rpc_method) => error!(
+                            "Failing fast after {} JSON-RPC errors for {} request (JSON-RPC: {}). These are likely request-specific issues that won't resolve on other servers.",
+                            jsonrpc_error_count, method, rpc_method
+                        ),
+                        None => error!(
+                            "Failing fast after {} JSON-RPC errors for {} request. These are likely request-specific issues that won't resolve on other servers.",
+                            jsonrpc_error_count, method
+                        ),
+                    }
+
+                    // Record all non-JSON-RPC errors as failures
+                    for (node, error) in collected_errors.iter() {
+                        if !matches!(error, HandlerError::JsonRpcError(_)) {
+                            record_failure(state, &node.0, &node.1, node.2).await;
+                        }
+                    }
+
+                    return Err(HandlerError::AllRequestsFailed(
+                        collected_errors
+                            .into_iter()
+                            .map(|(node, error)| (display_node(&node), error.to_string()))
+                            .collect(),
+                    ));
+                }
 
                 continue;
             }
         }
     }
 
+    // Record failures for all nodes that were tried
+    for (node, _) in collected_errors.iter() {
+        record_failure(state, &node.0, &node.1, node.2).await;
+    }
+
     // Log detailed error information
     let detailed_errors: Vec<String> = collected_errors
         .iter()
-        .map(|(node, error)| format!("{}: {}", node, error))
+        .map(|(node, error)| format!("{}: {}", display_node(node), error))
         .collect();
 
     match &jsonrpc_method {
@@ -340,7 +390,12 @@ async fn sequential_requests(
         ),
     }
 
-    Err(HandlerError::AllRequestsFailed(collected_errors))
+    Err(HandlerError::AllRequestsFailed(
+        collected_errors
+            .into_iter()
+            .map(|(node, error)| (display_node(&node), error.to_string()))
+            .collect(),
+    ))
 }
 
 /// Forward a request to the node pool, returning either a successful response or a simple
@@ -396,6 +451,15 @@ async fn proxy_request(
                         "error": "Request error",
                         "details": {
                             "type": "RequestError",
+                            "message": msg
+                        }
+                    })
+                }
+                HandlerError::JsonRpcError(msg) => {
+                    json!({
+                        "error": "JSON-RPC error",
+                        "details": {
+                            "type": "JsonRpcError",
                             "message": msg
                         }
                     })

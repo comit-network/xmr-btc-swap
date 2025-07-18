@@ -16,6 +16,7 @@ type Props = {
   content: string;
   displayCopyIcon?: boolean;
   enableQrCode?: boolean;
+  light?: boolean;
 };
 
 function QRCodeModal({ open, onClose, content }: ModalProps) {
@@ -57,6 +58,7 @@ export default function ActionableMonospaceTextBox({
   content,
   displayCopyIcon = true,
   enableQrCode = true,
+  light = false,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [qrCodeOpen, setQrCodeOpen] = useState(false);
@@ -88,7 +90,7 @@ export default function ActionableMonospaceTextBox({
           }}
         >
           <Box sx={{ flexGrow: 1 }} onClick={handleCopy}>
-            <MonospaceTextBox>
+            <MonospaceTextBox light={light}>
               {content}
               {displayCopyIcon && (
                 <IconButton

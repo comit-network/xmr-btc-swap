@@ -22,6 +22,7 @@ export default function DebugPage() {
           }}
         >
           <CliLogsBox
+            minHeight="min(20rem, 70vh)"
             logs={logs}
             label="Logs relevant to the swap (only current session)"
           />

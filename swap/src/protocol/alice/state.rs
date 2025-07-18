@@ -2,7 +2,6 @@ use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
     TxEarlyRefund, TxPunish, TxRedeem, TxRefund, Txid,
 };
-use swap_env::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
 use crate::monero::BlockHeight;
 use crate::monero::TransferProof;
@@ -15,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use std::sync::Arc;
+use swap_env::env::Config;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]

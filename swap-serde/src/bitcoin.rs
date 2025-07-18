@@ -1,5 +1,5 @@
+use bitcoin::Network;
 use serde::{Deserialize, Serialize};
-use bitcoin::{Network};
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "Network")]

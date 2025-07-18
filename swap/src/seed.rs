@@ -1,7 +1,5 @@
-use crate::cli::api::tauri_bindings::{SeedChoice, TauriEmitter, TauriHandle};
-use swap_fs::ensure_directory_exists;
 use ::bitcoin::bip32::Xpriv as ExtendedPrivKey;
-use anyhow::{Context, Result};
+use anyhow::{Context as AnyContext, Result};
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
 use bitcoin::secp256k1::{self, SecretKey};
@@ -14,6 +12,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use swap_fs::ensure_directory_exists;
 use zeroize::Zeroizing;
 
 pub const SEED_LENGTH: usize = 32;
@@ -32,13 +31,25 @@ impl Seed {
         Ok(Seed(bytes))
     }
 
+    /// Extract seed from a Monero wallet
+    pub async fn from_monero_wallet(wallet: &crate::monero::Wallet) -> Result<Self, Error> {
+        let mnemonic = wallet.seed().await.context("Failed to get wallet seed")?;
+
+        let monero_seed =
+            MoneroSeed::from_string(Language::English, Zeroizing::new(mnemonic.clone())).map_err(
+                |e| anyhow::anyhow!("Failed to parse seed from wallet (Error: {:?})", e),
+            )?;
+
+        Ok(Seed(*monero_seed.entropy()))
+    }
+
     pub fn derive_extended_private_key(
         &self,
         network: bitcoin::Network,
     ) -> Result<ExtendedPrivKey> {
         let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
         let private_key = ExtendedPrivKey::new_master(network, &seed)
-            .context("Failed to create new master extended private key")?;
+            .with_context(|| "Failed to create new master extended private key")?;
 
         Ok(private_key)
     }
@@ -52,7 +63,7 @@ impl Seed {
     ) -> Result<bdk::bitcoin::util::bip32::ExtendedPrivKey> {
         let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
         let private_key = bdk::bitcoin::util::bip32::ExtendedPrivKey::new_master(network, &seed)
-            .context("Failed to create new master extended private key")?;
+            .with_context(|| "Failed to create new master extended private key")?;
 
         Ok(private_key)
     }
@@ -63,57 +74,27 @@ impl Seed {
         identity::Keypair::ed25519_from_bytes(bytes).expect("we always pass 32 bytes")
     }
 
-    pub async fn from_file_or_generate(
-        data_dir: &Path,
-        tauri_handle: Option<TauriHandle>,
-    ) -> Result<Self> {
+    /// Create seed from a Monero wallet mnemonic string
+    pub fn from_mnemonic(mnemonic: String) -> Result<Self, Error> {
+        let monero_seed = MoneroSeed::from_string(Language::English, Zeroizing::new(mnemonic))
+            .with_context(|| "Failed to parse mnemonic")?;
+        Ok(Seed(*monero_seed.entropy()))
+    }
+
+    pub async fn from_file_or_generate(data_dir: &Path) -> Result<Self> {
         let file_path_buf = data_dir.join("seed.pem");
         let file_path = Path::new(&file_path_buf);
 
         if file_path.exists() {
-            return Self::from_file(file_path).context("Couldn't get seed from file");
+            return Self::from_file(file_path).with_context(|| "Couldn't get seed from file");
         }
 
         tracing::debug!("No seed file found, creating at {}", file_path.display());
 
-        // In debug mode, we allow the user to enter a seed manually.
-        #[cfg(debug_assertions)]
-        {
-            let new_seed = match tauri_handle {
-                Some(tauri_handle) => {
-                    let seed_choice = tauri_handle.request_seed_selection().await?;
-                    let seed_entered = match seed_choice {
-                        SeedChoice::RandomSeed => Seed::random()?,
-                        SeedChoice::FromSeed { seed } => {
-                            println!("seed: {}", seed);
-                            let monero_seed =
-                                MoneroSeed::from_string(Language::English, Zeroizing::new(seed))
-                                    .unwrap();
-                            Seed(*monero_seed.entropy())
-                        }
-                    };
+        let random_seed = Seed::random()?;
 
-                    //TODO: Send error type to front end
-
-                    seed_entered
-                }
-                None => {
-                    let random_seed = Seed::random()?;
-                    random_seed
-                }
-            };
-
-            new_seed.write_to(file_path.to_path_buf())?;
-            Ok(new_seed)
-        }
-
-        // In release mode, we generate a random seed.
-        #[cfg(not(debug_assertions))]
-        {
-            let new_seed = Seed::random()?;
-            new_seed.write_to(file_path.to_path_buf())?;
-            Ok(new_seed)
-        }
+        random_seed.write_to(file_path.to_path_buf())?;
+        Ok(random_seed)
     }
 
     /// Derive a new seed using the given scope.
@@ -210,6 +191,8 @@ pub enum Error {
     Rand(#[from] rand::Error),
     #[error("no default path")]
     NoDefaultPath,
+    #[error("Monero wallet error: {0}")]
+    MoneroWallet(#[from] anyhow::Error),
 }
 
 #[cfg(test)]

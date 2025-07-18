@@ -24,9 +24,6 @@ use std::sync::Arc;
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
-use swap_env::config::{
-    initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
-};
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::common::tor::init_tor_client;
 use swap::common::tracing_util::Format;
@@ -40,6 +37,9 @@ use swap::protocol::{Database, State};
 use swap::seed::Seed;
 use swap::{bitcoin, monero};
 use swap_feed;
+use swap_env::config::{
+    initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
+};
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -133,7 +133,7 @@ pub async fn main() -> Result<()> {
         ));
     }
 
-    let seed = Seed::from_file_or_generate(&config.data.dir, None)
+    let seed = Seed::from_file_or_generate(&config.data.dir)
         .await
         .expect("Could not retrieve/initialize seed");
 
@@ -431,7 +431,7 @@ pub async fn main() -> Result<()> {
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
             let main_wallet = monero_wallet.main_wallet().await;
 
-            let seed = main_wallet.seed().await;
+            let seed = main_wallet.seed().await?;
             let creation_height = main_wallet.creation_height().await;
 
             println!("Seed          : {seed}");
@@ -474,7 +474,9 @@ async fn init_bitcoin_wallet(
     if sync {
         wallet.sync().await?;
     } else {
-        tracing::info!("Skipping Bitcoin wallet sync because we are only using it for receiving funds");
+        tracing::info!(
+            "Skipping Bitcoin wallet sync because we are only using it for receiving funds"
+        );
     }
 
     Ok(wallet)
@@ -527,6 +529,7 @@ async fn init_monero_wallet(
         daemon,
         env_config.monero_network,
         false,
+        None,
         None,
     )
     .await

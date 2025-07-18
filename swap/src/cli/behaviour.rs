@@ -1,3 +1,4 @@
+use crate::bitcoin;
 use crate::monero::{Scalar, TransferProof};
 use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemRejectReason;
 use crate::network::quote::BidQuote;
@@ -7,8 +8,6 @@ use crate::network::{
     cooperative_xmr_redeem_after_punish, encrypted_signature, quote, redial, transfer_proof,
 };
 use crate::protocol::bob::State2;
-use crate::bitcoin;
-use swap_env::env;
 use anyhow::{anyhow, Error, Result};
 use libp2p::request_response::{
     InboundFailure, InboundRequestId, OutboundFailure, OutboundRequestId, ResponseChannel,
@@ -17,6 +16,7 @@ use libp2p::swarm::NetworkBehaviour;
 use libp2p::{identify, identity, ping, PeerId};
 use std::sync::Arc;
 use std::time::Duration;
+use swap_env::env;
 
 #[derive(Debug)]
 pub enum OutEvent {

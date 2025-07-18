@@ -21,7 +21,6 @@ rustls = { version = "0.23.26", default-features = false, features = ["ring"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 swap = { path = "../swap", features = [ "tauri" ] }
-sysinfo = "=0.32.1"
 tauri = { version = "^2.0.0", features = [ "config-json5" ] }
 tauri-plugin-clipboard-manager = "^2.0.0"
 tauri-plugin-dialog = "2.2.2"

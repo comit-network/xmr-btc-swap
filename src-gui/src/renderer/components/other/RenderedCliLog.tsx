@@ -63,11 +63,13 @@ export default function CliLogsBox({
   logs,
   topRightButton = null,
   autoScroll = false,
+  minHeight,
 }: {
   label: string;
   logs: (CliLog | string)[];
   topRightButton?: ReactNode;
   autoScroll?: boolean;
+  minHeight?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -82,6 +84,7 @@ export default function CliLogsBox({
 
   return (
     <ScrollablePaperTextBox
+      minHeight={minHeight}
       title={label}
       copyValue={logsToRawString(logs)}
       searchQuery={searchQuery}

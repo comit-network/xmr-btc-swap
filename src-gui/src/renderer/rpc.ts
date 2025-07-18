@@ -31,16 +31,31 @@ import {
   RedactResponse,
   GetCurrentSwapResponse,
   LabeledMoneroAddress,
-  GetPendingApprovalsArgs,
+  GetMoneroHistoryResponse,
+  GetMoneroMainAddressResponse,
+  GetMoneroBalanceResponse,
+  SendMoneroArgs,
+  SendMoneroResponse,
+  GetMoneroSyncProgressResponse,
   GetPendingApprovalsResponse,
+  RejectApprovalArgs,
+  RejectApprovalResponse,
+  SetRestoreHeightArgs,
+  SetRestoreHeightResponse,
+  GetRestoreHeightResponse,
 } from "models/tauriModel";
 import {
   rpcSetBalance,
   rpcSetSwapInfo,
   approvalRequestsReplaced,
 } from "store/features/rpcSlice";
+import {
+  setMainAddress,
+  setBalance,
+  setSyncProgress,
+  setHistory,
+} from "store/features/walletSlice";
 import { store } from "./store/storeRenderer";
-import { Maker } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
@@ -417,6 +432,129 @@ export async function getMoneroAddresses(): Promise<GetMoneroAddressesResponse> 
   return await invokeNoArgs<GetMoneroAddressesResponse>("get_monero_addresses");
 }
 
+export async function getRestoreHeight(): Promise<GetRestoreHeightResponse> {
+  return await invokeNoArgs<GetRestoreHeightResponse>("get_restore_height");
+}
+
+export async function setMoneroRestoreHeight(
+  height: number | Date,
+): Promise<SetRestoreHeightResponse> {
+  const args: SetRestoreHeightArgs =
+    typeof height === "number"
+      ? { type: "Height", height: height }
+      : {
+          type: "Date",
+          height: {
+            year: height.getFullYear(),
+            month: height.getMonth() + 1, // JavaScript months are 0-indexed, but we want 1-indexed
+            day: height.getDate(),
+          },
+        };
+
+  return await invoke<SetRestoreHeightArgs, SetRestoreHeightResponse>(
+    "set_monero_restore_height",
+    args,
+  );
+}
+
+export async function getMoneroHistory(): Promise<GetMoneroHistoryResponse> {
+  return await invokeNoArgs<GetMoneroHistoryResponse>("get_monero_history");
+}
+
+export async function getMoneroMainAddress(): Promise<GetMoneroMainAddressResponse> {
+  return await invokeNoArgs<GetMoneroMainAddressResponse>(
+    "get_monero_main_address",
+  );
+}
+
+export async function getMoneroBalance(): Promise<GetMoneroBalanceResponse> {
+  return await invokeNoArgs<GetMoneroBalanceResponse>("get_monero_balance");
+}
+
+export async function sendMonero(
+  args: SendMoneroArgs,
+): Promise<SendMoneroResponse> {
+  return await invoke<SendMoneroArgs, SendMoneroResponse>("send_monero", args);
+}
+
+export async function getMoneroSyncProgress(): Promise<GetMoneroSyncProgressResponse> {
+  return await invokeNoArgs<GetMoneroSyncProgressResponse>(
+    "get_monero_sync_progress",
+  );
+}
+
+// Wallet management functions that handle Redux dispatching
+export async function initializeMoneroWallet() {
+  try {
+    const [
+      addressResponse,
+      balanceResponse,
+      syncProgressResponse,
+      historyResponse,
+    ] = await Promise.all([
+      getMoneroMainAddress(),
+      getMoneroBalance(),
+      getMoneroSyncProgress(),
+      getMoneroHistory(),
+    ]);
+
+    store.dispatch(setMainAddress(addressResponse.address));
+    store.dispatch(setBalance(balanceResponse));
+    store.dispatch(setSyncProgress(syncProgressResponse));
+    store.dispatch(setHistory(historyResponse));
+  } catch (err) {
+    console.error("Failed to fetch Monero wallet data:", err);
+  }
+}
+
+export async function sendMoneroTransaction(
+  args: SendMoneroArgs,
+): Promise<SendMoneroResponse> {
+  try {
+    const response = await sendMonero(args);
+
+    // Refresh balance and history after sending - but don't let this block the response
+    Promise.all([
+      getMoneroBalance(),
+      getMoneroHistory(),
+    ]).then(([newBalance, newHistory]) => {
+      store.dispatch(setBalance(newBalance));
+      store.dispatch(setHistory(newHistory));
+    }).catch(refreshErr => {
+      console.error("Failed to refresh wallet data after send:", refreshErr);
+      // Could emit a toast notification here
+    });
+
+    return response;
+  } catch (err) {
+    console.error("Failed to send Monero:", err);
+    throw err; // ✅ Re-throw so caller can handle appropriately
+  }
+}
+
+async function refreshWalletDataAfterTransaction() {
+  try {
+    const [newBalance, newHistory] = await Promise.all([
+      getMoneroBalance(),
+      getMoneroHistory(),
+    ]);
+    store.dispatch(setBalance(newBalance));
+    store.dispatch(setHistory(newHistory));
+  } catch (err) {
+    console.error("Failed to refresh wallet data after transaction:", err);
+    // Maybe show a non-blocking notification to user
+  }
+}
+
+export async function updateMoneroSyncProgress() {
+  try {
+    const response = await getMoneroSyncProgress();
+    store.dispatch(setSyncProgress(response));
+  } catch (err) {
+    console.error("Failed to fetch sync progress:", err);
+  }
+}
+
 export async function getDataDir(): Promise<string> {
   const testnet = isTestnet();
   return await invoke<GetDataDirArgs, string>("get_data_dir", {
@@ -424,20 +562,35 @@ export async function getDataDir(): Promise<string> {
   });
 }
 
-export async function resolveApproval(
+export async function resolveApproval<T>(
   requestId: string,
-  accept: object,
+  accept: T,
 ): Promise<void> {
   try {
     await invoke<ResolveApprovalArgs, ResolveApprovalResponse>(
       "resolve_approval_request",
-      { request_id: requestId, accept },
+      { request_id: requestId, accept: accept as object },
     );
-  } catch (error) {
-    // Refresh approval list when resolve fails to keep UI in sync
+  } finally {
+    // Always refresh the approval list
     await refreshApprovals();
-    throw error;
+
+    // Refresh the approval list a few miliseconds later to again
+    // Just to make sure :)
+    setTimeout(() => {
+      refreshApprovals();
+    }, 200);
   }
+}
+
+export async function rejectApproval<T>(
+  requestId: string,
+  reject: T,
+): Promise<void> {
+  await invoke<RejectApprovalArgs, RejectApprovalResponse>(
+    "reject_approval_request",
+    { request_id: requestId },
+  );
 }
 
 export async function refreshApprovals(): Promise<void> {

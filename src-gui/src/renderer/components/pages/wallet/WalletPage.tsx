@@ -11,7 +11,6 @@ export default function WalletPage() {
         gap: "1rem",
       }}
     >
-      <Typography variant="h3">Wallet</Typography>
       <Alert severity="info">
         You do not have to deposit money before starting a swap. Instead, you
         will be greeted with a deposit address after you initiate one.

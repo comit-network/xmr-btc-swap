@@ -4,21 +4,21 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { workspace = true }
-time = "0.3"
-swap-serde = { path = "../swap-serde" }
-bitcoin = { workspace = true }
-monero = { workspace = true }
 anyhow = { workspace = true }
-tracing = { workspace = true }
-swap-fs = { path = "../swap-fs" }
-dialoguer = "0.11"
+bitcoin = { workspace = true }
 config = { version = "0.14", default-features = false, features = ["toml"] }
+dialoguer = "0.11"
 libp2p = { workspace = true, features = ["serde"] }
-thiserror = { workspace = true }
+monero = { workspace = true }
 rust_decimal = { workspace = true }
-url = { workspace = true }
+serde = { workspace = true }
+swap-fs = { path = "../swap-fs" }
+swap-serde = { path = "../swap-serde" }
+thiserror = { workspace = true }
+time = "0.3"
 toml = "0.8"
+tracing = { workspace = true }
+url = { workspace = true }
 
 [lints]
 workspace = true

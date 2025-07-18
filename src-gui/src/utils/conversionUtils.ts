@@ -15,6 +15,10 @@ export function piconerosToXmr(piconeros: number): number {
   return piconeros / 1000000000000;
 }
 
+export function xmrToPiconeros(xmr: number): number {
+  return Math.ceil(xmr * 1000000000000);
+}
+
 export function isXmrAddressValid(address: string, stagenet: boolean) {
   const re = stagenet
     ? "^(?:[57][0-9A-Za-z]{94}|[57][0-9A-Za-z]{105})$"

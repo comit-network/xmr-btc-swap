@@ -43,7 +43,11 @@ export default function SwapLogFileOpenButton({
         <Dialog open onClose={() => setLogs(null)} fullWidth maxWidth="lg">
           <DialogTitle>Logs of swap {swapId}</DialogTitle>
           <DialogContent>
-            <CliLogsBox logs={logs} label="Logs relevant to the swap" />
+            <CliLogsBox
+              minHeight="min(20rem, 70vh)"
+              logs={logs}
+              label="Logs relevant to the swap"
+            />
           </DialogContent>
           <DialogActions>
             <Button

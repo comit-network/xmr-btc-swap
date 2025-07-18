@@ -5,14 +5,19 @@
 //!  - wait for transactions to be confirmed
 //!  - send money from one wallet to another.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
+use throttle::{throttle, Throttle};
 use anyhow::{Context, Result};
 use monero::{Address, Network};
-pub use monero_sys::{Daemon, WalletHandle as Wallet};
+use monero_sys::WalletEventListener;
+pub use monero_sys::{Daemon, WalletHandle as Wallet, WalletHandleListener};
 use uuid::Uuid;
 
-use crate::cli::api::tauri_bindings::TauriHandle;
+use crate::cli::api::{
+    request::{GetMoneroBalanceResponse, GetMoneroHistoryResponse, GetMoneroSyncProgressResponse},
+    tauri_bindings::{MoneroWalletUpdate, TauriEmitter, TauriEvent, TauriHandle},
+};
 
 use super::{BlockHeight, TransferProof, TxHash};
 
@@ -34,6 +39,8 @@ pub struct Wallets {
     /// waiting for a transaction to be confirmed.
     #[expect(dead_code)]
     tauri_handle: Option<TauriHandle>,
+    /// Database for tracking wallet usage history.
+    wallet_database: Option<Arc<monero_sys::Database>>,
 }
 
 /// A request to watch for a transfer.
@@ -55,6 +62,174 @@ pub struct TransferRequest {
     pub amount: monero::Amount,
 }
 
+struct TauriWalletListener {
+    // one throttle wrapper per expensive update
+    balance_throttle: Throttle<()>,
+    history_throttle: Throttle<()>,
+    sync_throttle: Throttle<()>,
+    save_throttle: Throttle<()>,
+}
+
+impl TauriWalletListener {
+    const BALANCE_UPDATE_THROTTLE: Duration = Duration::from_millis(2 * 1000);
+    const HISTORY_UPDATE_THROTTLE: Duration = Duration::from_millis(2 * 1000);
+    const SYNC_UPDATE_THROTTLE: Duration = Duration::from_millis(2 * 1000);
+    const SAVE_UPDATE_THROTTLE: Duration = Duration::from_millis(60 * 1000);
+
+    pub async fn new(tauri_handle: TauriHandle, wallet: Arc<Wallet>) -> Self {
+        let rt_handle = tokio::runtime::Handle::current();
+
+        let balance_job = {
+            let wallet = wallet.clone();
+            let tauri = tauri_handle.clone();
+            let rt = rt_handle.clone();
+            move |()| {
+                let wallet = wallet.clone();
+                let tauri = tauri.clone();
+                let rt = rt.clone();
+                rt.spawn(async move {
+                    let response = GetMoneroBalanceResponse {
+                        total_balance: wallet.total_balance().await.into(),
+                        unlocked_balance: wallet.unlocked_balance().await.into(),
+                    };
+                    tauri.emit_unified_event(TauriEvent::MoneroWalletUpdate(
+                        MoneroWalletUpdate::BalanceChange(response),
+                    ));
+                });
+            }
+        };
+
+        let history_job = {
+            let wallet = wallet.clone();
+            let tauri = tauri_handle.clone();
+            let rt = rt_handle.clone();
+            move |()| {
+                let wallet = wallet.clone();
+                let tauri = tauri.clone();
+                let rt = rt.clone();
+                rt.spawn(async move {
+                    let transactions = wallet.history().await;
+                    let response = GetMoneroHistoryResponse { transactions };
+
+                    tauri.emit_unified_event(TauriEvent::MoneroWalletUpdate(
+                        MoneroWalletUpdate::HistoryUpdate(response),
+                    ));
+                });
+            }
+        };
+
+        let sync_job = {
+            let wallet = wallet.clone();
+            let tauri = tauri_handle.clone();
+            let rt = rt_handle.clone();
+            move |()| {
+                let wallet = wallet.clone();
+                let tauri = tauri.clone();
+                let rt = rt.clone();
+                rt.spawn(async move {
+                    let sync_progress = wallet.sync_progress().await;
+
+                    let progress_percentage = sync_progress.percentage();
+
+                    let response = GetMoneroSyncProgressResponse {
+                        current_block: sync_progress.current_block,
+                        target_block: sync_progress.target_block,
+                        progress_percentage: progress_percentage,
+                    };
+
+                    tauri.emit_unified_event(TauriEvent::MoneroWalletUpdate(
+                        MoneroWalletUpdate::SyncProgress(response),
+                    ));
+                });
+            }
+        };
+
+        let save_job = {
+            let wallet = wallet.clone();
+            let rt = rt_handle.clone();
+            move |()| {
+                let wallet = wallet.clone();
+                let rt = rt.clone();
+                rt.spawn(async move {
+                    wallet.store(None).await;
+                });
+            }
+        };
+
+        Self {
+            balance_throttle: throttle(balance_job, Self::BALANCE_UPDATE_THROTTLE),
+            history_throttle: throttle(history_job, Self::HISTORY_UPDATE_THROTTLE),
+            sync_throttle: throttle(sync_job, Self::SYNC_UPDATE_THROTTLE),
+            save_throttle: throttle(save_job, Self::SAVE_UPDATE_THROTTLE),
+        }
+    }
+
+    fn send_balance_update(&self) {
+        self.balance_throttle.call(());
+    }
+
+    fn send_history_update(&self) {
+        self.history_throttle.call(());
+    }
+
+    fn send_sync_progress(&self) {
+        self.sync_throttle.call(());
+    }
+
+    fn save_wallet(&self) {
+        self.save_throttle.call(());
+    }
+}
+
+impl WalletEventListener for TauriWalletListener {
+    fn on_money_spent(&self, _txid: &str, _amount: u64) {
+        self.send_balance_update();
+        self.send_history_update();
+        self.save_wallet();
+    }
+
+    fn on_money_received(&self, _txid: &str, _amount: u64) {
+        self.send_balance_update();
+        self.send_history_update();
+        self.save_wallet();
+    }
+
+    fn on_unconfirmed_money_received(&self, _txid: &str, _amount: u64) {
+        self.send_balance_update();
+        self.send_history_update();
+        self.save_wallet();
+    }
+
+    fn on_new_block(&self, _height: u64) {
+        // We send an update here because a new might mean that funds have been unlocked
+        // because a UTXO reached 10 confirmations.
+        self.send_sync_progress();
+    }
+
+    fn on_updated(&self) {
+        self.send_balance_update();
+    }
+
+    fn on_refreshed(&self) {
+        //self.wallet.start_refresh_thread();
+        self.send_balance_update();
+        self.send_history_update();
+        self.save_wallet();
+    }
+
+    fn on_reorg(&self, _height: u64, _blocks_detached: u64, _transfers_detached: usize) {
+        // We send an update here because a reorg might mean that a UTXO has been double spent
+        // or that a UTXO has been confirmed is now unconfirmed.
+        self.send_balance_update();
+    }
+
+    fn on_pool_tx_removed(&self, _txid: &str) {
+        // We send an update here because a pool tx removed might mean that our unconfirmed
+        // balance has gone down because a UTXO has been removed from the pool.
+        self.send_balance_update();
+    }
+}
+
 impl Wallets {
     /// Create a new `Wallets` instance.
     /// Wallets will be opened on the specified network, connected to the specified daemon
@@ -69,6 +244,7 @@ impl Wallets {
         network: Network,
         regtest: bool,
         tauri_handle: Option<TauriHandle>,
+        wallet_database: Option<Arc<monero_sys::Database>>,
     ) -> Result<Self> {
         let main_wallet = Wallet::open_or_create(
             wallet_dir.join(&main_wallet_name).display().to_string(),
@@ -85,6 +261,20 @@ impl Wallets {
 
         let main_wallet = Arc::new(main_wallet);
 
+        if let Some(tauri_handle) = tauri_handle.clone() {
+            let tauri_wallet_listener =
+                TauriWalletListener::new(tauri_handle, main_wallet.clone()).await;
+
+            let handle_listener = WalletHandleListener::new(main_wallet.clone());
+
+            main_wallet
+                .call(move |wallet| {
+                    wallet.add_listener(Box::new(tauri_wallet_listener));
+                    wallet.add_listener(Box::new(handle_listener));
+                })
+                .await;
+        }
+
         let wallets = Self {
             wallet_dir,
             network,
@@ -92,7 +282,60 @@ impl Wallets {
             main_wallet,
             regtest,
             tauri_handle,
+            wallet_database,
         };
+
+        // Record wallet access in database
+        let wallet_path = wallets.main_wallet.path().await;
+        let _ = wallets.record_wallet_access(&wallet_path).await;
+
+        Ok(wallets)
+    }
+
+    /// Create a new `Wallets` instance with an existing wallet as the main wallet.
+    /// This is used when we want to use a user-selected wallet instead of creating a new one.
+    pub async fn new_with_existing_wallet(
+        wallet_dir: PathBuf,
+        daemon: Daemon,
+        network: Network,
+        regtest: bool,
+        tauri_handle: Option<TauriHandle>,
+        existing_wallet: Wallet,
+        wallet_database: Option<Arc<monero_sys::Database>>,
+    ) -> Result<Self> {
+        if regtest {
+            existing_wallet.unsafe_prepare_for_regtest().await;
+        }
+
+        let main_wallet = Arc::new(existing_wallet);
+
+        if let Some(tauri_handle) = tauri_handle.clone() {
+            let tauri_wallet_listener =
+                TauriWalletListener::new(tauri_handle, main_wallet.clone()).await;
+
+            let handle_listener = WalletHandleListener::new(main_wallet.clone());
+
+            main_wallet
+                .call(move |wallet| {
+                    wallet.add_listener(Box::new(tauri_wallet_listener));
+                    wallet.add_listener(Box::new(handle_listener));
+                })
+                .await;
+        }
+
+        let wallets = Self {
+            wallet_dir,
+            network,
+            daemon,
+            main_wallet,
+            regtest,
+            tauri_handle,
+            wallet_database,
+        };
+
+        // Record wallet access in database
+        let wallet_path = wallets.main_wallet.path().await;
+        let _ = wallets.record_wallet_access(&wallet_path).await;
 
         Ok(wallets)
     }
@@ -215,6 +458,24 @@ impl Wallets {
                 .await
                 .context("Failed to get blockchain height")?,
         })
+    }
+
+    /// Get the last 5 recently used wallets
+    pub async fn get_recent_wallets(&self) -> Result<Vec<String>> {
+        if let Some(db) = &self.wallet_database {
+            let recent_wallets = db.get_recent_wallets(5).await?;
+            Ok(recent_wallets.into_iter().map(|w| w.wallet_path).collect())
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    /// Record that a wallet was accessed
+    pub async fn record_wallet_access(&self, wallet_path: &str) -> Result<()> {
+        if let Some(db) = &self.wallet_database {
+            db.record_wallet_access(wallet_path).await?;
+        }
+        Ok(())
     }
 }
 

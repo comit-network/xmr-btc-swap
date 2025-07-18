@@ -1,5 +1,5 @@
+import React, { ReactNode } from "react";
 import { Box, Link, Typography } from "@mui/material";
-import { ReactNode } from "react";
 import InfoBox from "./InfoBox";
 import TruncatedText from "renderer/components/other/TruncatedText";
 

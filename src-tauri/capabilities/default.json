@@ -13,6 +13,8 @@
     "cli:allow-cli-matches",
     "updater:default",
     "process:allow-restart",
-    "opener:default"
+    "opener:default",
+    "dialog:allow-open",
+    "dialog:default"
   ]
 }

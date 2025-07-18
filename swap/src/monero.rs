@@ -20,15 +20,6 @@ use typeshare::typeshare;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
-#[derive(Serialize, Deserialize)]
-#[serde(remote = "Network")]
-#[allow(non_camel_case_types)]
-pub enum network {
-    Mainnet,
-    Stagenet,
-    Testnet,
-}
-
 /// A Monero block height.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockHeight {
@@ -266,7 +257,11 @@ impl LabeledMoneroAddress {
         })
     }
 
-    pub fn with_address(address: monero::Address, percentage: Decimal, label: String) -> Result<Self> {
+    pub fn with_address(
+        address: monero::Address,
+        percentage: Decimal,
+        label: String,
+    ) -> Result<Self> {
         Self::new(address, percentage, label)
     }
 
@@ -365,18 +360,22 @@ impl MoneroAddressPool {
 
         const TOLERANCE: f64 = 1e-6;
 
-        if (sum - Decimal::ONE).abs() > Decimal::from_f64(TOLERANCE).unwrap() {
+        if (sum - Decimal::ONE).abs()
+            > Decimal::from_f64(TOLERANCE).expect("TOLERANCE constant should be a valid f64")
+        {
             bail!("Address pool percentages do not sum to 1");
         }
 
         Ok(())
     }
 
-    /// Returns 
+    /// Returns a vector of addresses with the empty addresses filled with the given primary address
     pub fn fill_empty_addresses(&self, primary_address: monero::Address) -> Vec<monero::Address> {
-        self.0.iter().map(|address| address.address().unwrap_or(primary_address)).collect()
+        self.0
+            .iter()
+            .map(|address| address.address().unwrap_or(primary_address))
+            .collect()
     }
-
 }
 
 impl From<::monero::Address> for MoneroAddressPool {

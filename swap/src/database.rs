@@ -3,13 +3,13 @@ pub use bob::Bob;
 pub use sqlite::SqliteDatabase;
 
 use crate::cli::api::tauri_bindings::TauriHandle;
-use swap_fs::ensure_directory_exists;
 use crate::protocol::{Database, State};
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::Path;
 use std::sync::Arc;
+use swap_fs::ensure_directory_exists;
 
 mod alice;
 mod bob;

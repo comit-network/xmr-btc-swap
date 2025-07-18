@@ -163,7 +163,11 @@ impl Database for SqliteDatabase {
         let addresses = row
             .iter()
             .map(|row| -> Result<LabeledMoneroAddress> {
-                let address: Option<monero::Address> = row.address.clone().map(|address| address.parse()).transpose()?;
+                let address: Option<monero::Address> = row
+                    .address
+                    .clone()
+                    .map(|address| address.parse())
+                    .transpose()?;
                 let percentage = Decimal::from_f64(row.percentage).expect("Invalid percentage");
                 let label = row.label.clone();
 
@@ -180,9 +184,10 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>> {
-        let rows = sqlx::query!("SELECT DISTINCT address FROM monero_addresses WHERE address IS NOT NULL")
-            .fetch_all(&self.pool)
-            .await?;
+        let rows =
+            sqlx::query!("SELECT DISTINCT address FROM monero_addresses WHERE address IS NOT NULL")
+                .fetch_all(&self.pool)
+                .await?;
 
         let addresses = rows
             .iter()
@@ -544,10 +549,18 @@ mod tests {
         let labeled_addresses = vec![
             LabeledMoneroAddress::with_address(address1, Decimal::new(5, 1), "Primary".to_string())
                 .map_err(|e| anyhow!(e))?, // 0.5
-            LabeledMoneroAddress::with_address(address2, Decimal::new(3, 1), "Secondary".to_string())
-                .map_err(|e| anyhow!(e))?, // 0.3
-            LabeledMoneroAddress::with_address(address3, Decimal::new(2, 1), "Tertiary".to_string())
-                .map_err(|e| anyhow!(e))?, // 0.2
+            LabeledMoneroAddress::with_address(
+                address2,
+                Decimal::new(3, 1),
+                "Secondary".to_string(),
+            )
+            .map_err(|e| anyhow!(e))?, // 0.3
+            LabeledMoneroAddress::with_address(
+                address3,
+                Decimal::new(2, 1),
+                "Tertiary".to_string(),
+            )
+            .map_err(|e| anyhow!(e))?, // 0.2
         ];
 
         let address_pool = MoneroAddressPool::new(labeled_addresses);

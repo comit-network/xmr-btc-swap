@@ -24,9 +24,16 @@ import {
   listSellersAtRendezvousPoint,
   refreshApprovals,
   updateAllNodeStatuses,
+  fetchAndUpdateBackgroundItems,
+  fetchAndUpdateApprovalItems,
 } from "./rpc";
 import { store } from "./store/storeRenderer";
 import { exhaustiveGuard } from "utils/typescriptUtils";
+import {
+  setBalance,
+  setHistory,
+  setSyncProgress,
+} from "store/features/walletSlice";
 
 const TAURI_UNIFIED_EVENT_CHANNEL_NAME = "tauri-unified-event";
 
@@ -45,7 +52,7 @@ const UPDATE_RATE_INTERVAL = 5 * 60 * 1_000;
 // Fetch all conversations every 10 minutes
 const FETCH_CONVERSATIONS_INTERVAL = 10 * 60 * 1_000;
 
-// Fetch pending approvals every 10 seconds
+// Fetch pending approvals every 2 seconds
 const FETCH_PENDING_APPROVALS_INTERVAL = 2 * 1_000;
 
 function setIntervalImmediate(callback: () => void, interval: number): void {
@@ -135,6 +142,19 @@ export async function setupBackgroundTasks(): Promise<void> {
 
       case "PoolStatusUpdate":
         store.dispatch(poolStatusReceived(eventData));
+        break;
+
+      case "MoneroWalletUpdate":
+        console.log("MoneroWalletUpdate", eventData);
+        if (eventData.type === "BalanceChange") {
+          store.dispatch(setBalance(eventData.content));
+        }
+        if (eventData.type === "HistoryUpdate") {
+          store.dispatch(setHistory(eventData.content));
+        }
+        if (eventData.type === "SyncProgress") {
+          store.dispatch(setSyncProgress(eventData.content));
+        }
         break;
 
       default:

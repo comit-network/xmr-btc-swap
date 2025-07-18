@@ -68,7 +68,11 @@ where
             tor,
         } => {
             let monero_receive_pool: MoneroAddressPool =
-                swap_serde::monero::address::validate_is_testnet(monero_receive_address, is_testnet)?.into();
+                swap_serde::monero::address::validate_is_testnet(
+                    monero_receive_address,
+                    is_testnet,
+                )?
+                .into();
 
             let bitcoin_change_address = bitcoin_change_address
                 .map(|address| bitcoin_address::validate(address, is_testnet))

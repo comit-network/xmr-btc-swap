@@ -23,7 +23,7 @@ type MoneroAddressTextFieldProps = TextFieldProps & {
   address: string;
   onAddressChange: (address: string) => void;
   onAddressValidityChange: (valid: boolean) => void;
-  helperText: string;
+  helperText?: string;
 };
 
 export default function MoneroAddressTextField({

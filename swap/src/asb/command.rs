@@ -1,7 +1,4 @@
-use swap_env::config::GetDefaults;
 use crate::bitcoin::{bitcoin_address, Amount};
-use swap_env::env;
-use swap_env::env::GetConfig;
 use anyhow::Result;
 use bitcoin::address::NetworkUnchecked;
 use bitcoin::Address;
@@ -9,6 +6,9 @@ use serde::Serialize;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use swap_env::config::GetDefaults;
+use swap_env::env;
+use swap_env::env::GetConfig;
 use uuid::Uuid;
 
 pub fn parse_args<I, T>(raw_args: I) -> Result<Arguments>
@@ -402,7 +402,9 @@ mod tests {
 
     #[test]
     fn ensure_start_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "start"];
@@ -420,7 +422,9 @@ mod tests {
 
     #[test]
     fn ensure_history_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "history"];
@@ -440,7 +444,9 @@ mod tests {
 
     #[test]
     fn ensure_balance_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "balance"];
@@ -458,7 +464,9 @@ mod tests {
 
     #[test]
     fn ensure_withdraw_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
         let raw_ars = vec![
             BINARY_NAME,
@@ -484,7 +492,9 @@ mod tests {
 
     #[test]
     fn ensure_cancel_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
@@ -510,7 +520,9 @@ mod tests {
 
     #[test]
     fn ensure_refund_command_mappin_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
@@ -536,7 +548,9 @@ mod tests {
 
     #[test]
     fn ensure_punish_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
@@ -562,7 +576,9 @@ mod tests {
 
     #[test]
     fn ensure_safely_abort_command_mapping_mainnet() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
@@ -588,7 +604,9 @@ mod tests {
 
     #[test]
     fn ensure_start_command_mapping_for_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "start"];
@@ -606,7 +624,9 @@ mod tests {
 
     #[test]
     fn ensure_history_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "history"];
@@ -626,7 +646,9 @@ mod tests {
 
     #[test]
     fn ensure_balance_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "balance"];
@@ -644,7 +666,9 @@ mod tests {
 
     #[test]
     fn ensure_export_monero_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "export-monero-wallet"];
@@ -663,7 +687,9 @@ mod tests {
 
     #[test]
     fn ensure_withdraw_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
@@ -690,7 +716,9 @@ mod tests {
     }
     #[test]
     fn ensure_cancel_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
@@ -717,7 +745,9 @@ mod tests {
 
     #[test]
     fn ensure_refund_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
@@ -744,7 +774,9 @@ mod tests {
 
     #[test]
     fn ensure_punish_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
@@ -771,7 +803,9 @@ mod tests {
 
     #[test]
     fn ensure_safely_abort_command_mapping_testnet() {
-        let default_testnet_conf_path = env::Testnet::get_config_file_defaults().unwrap().config_path;
+        let default_testnet_conf_path = env::Testnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
@@ -798,7 +832,9 @@ mod tests {
 
     #[test]
     fn ensure_disable_timestamp_mapping() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--disable-timestamp", "start"];
@@ -816,7 +852,9 @@ mod tests {
 
     #[test]
     fn ensure_trace_mapping() {
-        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults().unwrap().config_path;
+        let default_mainnet_conf_path = env::Mainnet::get_config_file_defaults()
+            .unwrap()
+            .config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--trace", "start"];

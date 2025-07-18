@@ -54,10 +54,11 @@ pub mod ffi {
         /// A pending transaction.
         type PendingTransaction;
 
-        /// A wallet listener.
-        ///
-        /// Can be attached to a wallet and will get notified upon specific events.
-        type WalletListener;
+        /// A struct containing transaction history.
+        type TransactionHistory;
+
+        /// A struct containing a single transaction.
+        type TransactionInfo;
 
         /// Get the wallet manager.
         fn getWalletManager() -> Result<*mut WalletManager>;
@@ -100,6 +101,8 @@ pub mod ffi {
             seed_offset: &CxxString,
         ) -> Result<*mut Wallet>;
 
+        type WalletListener;
+
         ///virtual Wallet * openWallet(const std::string &path, const std::string &password, NetworkType nettype, uint64_t kdf_rounds = 1, WalletListener * listener = nullptr) = 0;
         unsafe fn openWallet(
             self: Pin<&mut WalletManager>,
@@ -117,8 +120,20 @@ pub mod ffi {
             store: bool,
         ) -> Result<bool>;
 
+        /// Store the wallet state.
+        fn store(self: Pin<&mut Wallet>, path: &CxxString) -> Result<bool>;
+
         /// Check whether a wallet exists at the given path.
         fn walletExists(self: Pin<&mut WalletManager>, path: &CxxString) -> Result<bool>;
+
+        /// Verify the password for a wallet at the given path.
+        fn verifyWalletPassword(
+            self: &WalletManager,
+            keys_file_name: &CxxString,
+            password: &CxxString,
+            no_spend_key: bool,
+            kdf_rounds: u64,
+        ) -> Result<bool>;
 
         /// Set the address of the remote node ("daemon").
         fn setDaemonAddress(self: Pin<&mut WalletManager>, address: &CxxString) -> Result<()>;
@@ -160,6 +175,9 @@ pub mod ffi {
         /// Get the seed of the wallet.
         fn walletSeed(wallet: &Wallet, seed_offset: &CxxString) -> Result<UniquePtr<CxxString>>;
 
+        /// Set the seed language of the wallet.
+        fn setSeedLanguage(self: Pin<&mut Wallet>, language: &CxxString) -> Result<()>;
+
         /// Get the wallet creation height.
         fn getRefreshFromBlockHeight(self: &Wallet) -> Result<u64>;
 
@@ -181,6 +199,9 @@ pub mod ffi {
         /// Get the current blockchain height.
         fn blockChainHeight(self: &Wallet) -> Result<u64>;
 
+        /// Set a listener to the wallet.
+        unsafe fn setListener(self: Pin<&mut Wallet>, listener: *mut WalletListener) -> Result<()>;
+
         /// Get the daemon's blockchain height.
         fn daemonBlockChainTargetHeight(self: &Wallet) -> Result<u64>;
 
@@ -198,6 +219,17 @@ pub mod ffi {
 
         /// Force a specific restore height.
         fn setRefreshFromBlockHeight(self: Pin<&mut Wallet>, height: u64) -> Result<()>;
+
+        fn getBlockchainHeightByDate(self: &Wallet, year: u16, month: u8, day: u8) -> Result<u64>;
+
+        /// Rescan the blockchain asynchronously.
+        fn rescanBlockchainAsync(self: Pin<&mut Wallet>);
+
+        /// Pause the background refresh.
+        fn pauseRefresh(self: Pin<&mut Wallet>);
+
+        /// Stop the background refresh once (doesn't stop background refresh thread).
+        fn stop(self: Pin<&mut Wallet>);
 
         /// Set whether to allow mismatched daemon versions.
         fn setAllowMismatchedDaemonVersion(
@@ -255,6 +287,12 @@ pub mod ffi {
             tx: &PendingTransaction,
         ) -> Result<UniquePtr<CxxVector<CxxString>>>;
 
+        /// Get the fee of a pending transaction.
+        fn pendingTransactionFee(tx: &PendingTransaction) -> Result<u64>;
+
+        /// Get the amount of a pending transaction.
+        fn pendingTransactionAmount(tx: &PendingTransaction) -> Result<u64>;
+
         /// Get the transaction key (r) for a given txid.
         fn walletGetTxKey(wallet: &Wallet, txid: &CxxString) -> Result<UniquePtr<CxxString>>;
 
@@ -270,6 +308,36 @@ pub mod ffi {
             self: Pin<&mut Wallet>,
             tx: *mut PendingTransaction,
         ) -> Result<()>;
+
+        /// Get the transaction history.
+        fn history(self: Pin<&mut Wallet>) -> Result<*mut TransactionHistory>;
+
+        /// Get the transaction history count.
+        fn count(self: &TransactionHistory) -> i32;
+
+        /// Get a transaction from the history by index.
+        fn transaction(self: &TransactionHistory, index: i32) -> *mut TransactionInfo;
+
+        /// Refresh the transaction history so it contains the latest transactions.
+        fn refresh(self: Pin<&mut TransactionHistory>) -> Result<()>;
+
+        /// Get the amount of the transaction.
+        fn amount(self: &TransactionInfo) -> u64;
+
+        /// Get the fee of the transaction.
+        fn fee(self: &TransactionInfo) -> u64;
+
+        /// Get the confirmations of the transaction.
+        fn confirmations(self: &TransactionInfo) -> u64;
+
+        /// Get the direction of the transaction.
+        fn direction(self: &TransactionInfo) -> i32;
+
+        /// Get the hash of the transaction.
+        fn transactionInfoHash(tx_info: &TransactionInfo) -> UniquePtr<CxxString>;
+
+        /// Get the timestamp of the transaction.
+        fn transactionInfoTimestamp(tx_info: &TransactionInfo) -> u64;
 
         /// Sign a message with the wallet's private key.
         fn signMessage(
@@ -332,6 +400,214 @@ pub mod log {
         fn install_log_callback(span_name: &CxxString) -> Result<()>;
         fn uninstall_log_callback() -> Result<()>;
     }
+}
+
+/// Wallet listener bridge using cxx's virtual table approach
+#[cxx::bridge(namespace = "wallet_listener")]
+pub mod wallet_listener {
+    extern "Rust" {
+        // Opaque Rust type owned by C++
+        type WalletListenerBox;
+
+        // Callback methods invoked from C++
+        fn money_spent(listener: &mut WalletListenerBox, txid: &CxxString, amount: u64);
+        fn money_received(listener: &mut WalletListenerBox, txid: &CxxString, amount: u64);
+        fn unconfirmed_money_received(
+            listener: &mut WalletListenerBox,
+            txid: &CxxString,
+            amount: u64,
+        );
+        fn new_block(listener: &mut WalletListenerBox, height: u64);
+        fn updated(listener: &mut WalletListenerBox);
+        fn refreshed(listener: &mut WalletListenerBox);
+        fn on_reorg(
+            listener: &mut WalletListenerBox,
+            height: u64,
+            blocks_detached: u64,
+            transfers_detached: usize,
+        );
+        fn pool_tx_removed(listener: &mut WalletListenerBox, txid: &CxxString);
+    }
+
+    unsafe extern "C++" {
+        include!("wallet/api/wallet2_api.h");
+        include!("bridge.h");
+
+        // The C++ WalletListener type lives in the Monero namespace.
+        #[namespace = "Monero"]
+        #[rust_name = "MoneroWalletListener"]
+        type WalletListener;
+
+        // Functions implemented in bridge.h that create / destroy the adapter.
+        #[namespace = "wallet_listener"]
+        fn create_rust_listener_adapter(
+            listener: Box<WalletListenerBox>,
+        ) -> *mut MoneroWalletListener;
+        #[namespace = "wallet_listener"]
+        unsafe fn destroy_rust_listener_adapter(ptr: *mut MoneroWalletListener);
+    }
+}
+
+// Callback functions called from C++ - these bridge the C++ callbacks to Rust trait methods
+pub fn money_spent(listener: &mut WalletListenerBox, txid: &CxxString, amount: u64) {
+    listener.on_money_spent(&txid.to_string(), amount);
+}
+
+pub fn money_received(listener: &mut WalletListenerBox, txid: &CxxString, amount: u64) {
+    listener.on_money_received(&txid.to_string(), amount);
+}
+
+pub fn unconfirmed_money_received(listener: &mut WalletListenerBox, txid: &CxxString, amount: u64) {
+    listener.on_unconfirmed_money_received(&txid.to_string(), amount);
+}
+
+pub fn new_block(listener: &mut WalletListenerBox, height: u64) {
+    listener.on_new_block(height);
+}
+
+pub fn updated(listener: &mut WalletListenerBox) {
+    listener.on_updated();
+}
+
+pub fn refreshed(listener: &mut WalletListenerBox) {
+    listener.on_refreshed();
+}
+
+pub fn on_reorg(
+    listener: &mut WalletListenerBox,
+    height: u64,
+    blocks_detached: u64,
+    transfers_detached: usize,
+) {
+    listener.on_reorg(height, blocks_detached, transfers_detached);
+}
+
+pub fn pool_tx_removed(listener: &mut WalletListenerBox, txid: &CxxString) {
+    listener.on_pool_tx_removed(&txid.to_string());
+}
+
+/// Trait for wallet event listeners - allows custom callback implementations
+pub trait WalletEventListener: Send + Sync {
+    fn on_money_spent(&self, txid: &str, amount: u64);
+    fn on_money_received(&self, txid: &str, amount: u64);
+    fn on_unconfirmed_money_received(&self, txid: &str, amount: u64);
+    fn on_new_block(&self, height: u64);
+    fn on_updated(&self);
+    fn on_refreshed(&self);
+    fn on_reorg(&self, height: u64, blocks_detached: u64, transfers_detached: usize);
+    fn on_pool_tx_removed(&self, txid: &str);
+}
+
+/// A wrapper around Box<dyn WalletEventListener> because CXX doesn't support trait objects (yet).
+pub struct WalletListenerBox {
+    inner: Box<dyn WalletEventListener>,
+}
+
+impl WalletListenerBox {
+    /// Create a new wrapper around any WalletEventListener implementation
+    pub fn new(listener: Box<dyn WalletEventListener>) -> Self {
+        WalletListenerBox { inner: listener }
+    }
+
+    /// Create a new boxed wrapper around any WalletEventListener implementation
+    pub fn new_boxed(listener: Box<dyn WalletEventListener>) -> Box<Self> {
+        Box::new(Self::new(listener))
+    }
+}
+
+impl WalletEventListener for WalletListenerBox {
+    fn on_money_spent(&self, txid: &str, amount: u64) {
+        self.inner.on_money_spent(txid, amount);
+    }
+
+    fn on_money_received(&self, txid: &str, amount: u64) {
+        self.inner.on_money_received(txid, amount);
+    }
+
+    fn on_unconfirmed_money_received(&self, txid: &str, amount: u64) {
+        self.inner.on_unconfirmed_money_received(txid, amount);
+    }
+
+    fn on_new_block(&self, height: u64) {
+        self.inner.on_new_block(height);
+    }
+
+    fn on_updated(&self) {
+        self.inner.on_updated();
+    }
+
+    fn on_refreshed(&self) {
+        self.inner.on_refreshed();
+    }
+
+    fn on_reorg(&self, height: u64, blocks_detached: u64, transfers_detached: usize) {
+        self.inner
+            .on_reorg(height, blocks_detached, transfers_detached);
+    }
+
+    fn on_pool_tx_removed(&self, txid: &str) {
+        self.inner.on_pool_tx_removed(txid);
+    }
+}
+
+/// Listener implementation that logs all wallet events using tracing with filename context.
+pub struct TraceListener {
+    /// The wallet filename for logging context
+    pub filename: String,
+}
+
+impl TraceListener {
+    /// Creates a new TraceListener with a filename for logging context.
+    pub fn new(filename: String) -> Self {
+        TraceListener { filename }
+    }
+}
+
+impl WalletEventListener for TraceListener {
+    fn on_money_spent(&self, txid: &str, amount: u64) {
+        tracing::info!(
+            wallet = self.filename,
+            "Money spent: {} XMR in transaction {}",
+            amount as f64 / 1e12,
+            txid
+        );
+    }
+
+    fn on_money_received(&self, txid: &str, amount: u64) {
+        tracing::info!(
+            wallet = self.filename,
+            "Money received: {} XMR in transaction {}",
+            amount as f64 / 1e12,
+            txid
+        );
+    }
+
+    fn on_unconfirmed_money_received(&self, txid: &str, amount: u64) {
+        tracing::info!(
+            wallet = self.filename,
+            "Unconfirmed money received: {} XMR in transaction {}",
+            amount as f64 / 1e12,
+            txid
+        );
+    }
+
+    fn on_new_block(&self, _height: u64) {}
+
+    fn on_updated(&self) {}
+
+    fn on_refreshed(&self) {}
+
+    fn on_reorg(&self, height: u64, blocks_detached: u64, transfers_detached: usize) {
+        tracing::warn!(
+            wallet = self.filename,
+            "Blockchain reorganization at height {}: {} blocks detached, {} transfers detached",
+            height,
+            blocks_detached,
+            transfers_detached
+        );
+    }
+
+    fn on_pool_tx_removed(&self, _txid: &str) {}
 }
 
 /// This is the actual rust function that forwards the c++ log messages to tracing.

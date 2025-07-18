@@ -16,7 +16,7 @@ export default function FundsLeftInWalletAlert() {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => navigate("/wallet")}
+            onClick={() => navigate("/bitcoin-wallet")}
           >
             View
           </Button>

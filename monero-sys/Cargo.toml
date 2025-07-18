@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 backoff = { version = "0.4.0", features = ["futures", "tokio"] }
+chrono = { version = "0.4", features = ["serde"] }
 cxx = "1.0.137"
 monero = { workspace = true }
 serde = { workspace = true }

@@ -17,7 +17,7 @@ impl Database {
             info!("Created application data directory: {}", data_dir.display());
         }
 
-        let db_path = data_dir.join("nodes_v2.db");
+        let db_path = data_dir.join("nodes_v3.db");
 
         info!("Using database at {}", db_path.display());
 

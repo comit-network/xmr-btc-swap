@@ -14,8 +14,8 @@ export default function InitPage() {
     useState(false);
 
   // We force this to true for now because the internal wallet is not really accessible from the GUI yet
-  const [useExternalRedeemAddress, _setUseExternalRedeemAddress] =
-    useState(true); 
+  const [useExternalRedeemAddress, setUseExternalRedeemAddress] =
+    useState(true);
 
   const [redeemAddressValid, setRedeemAddressValid] = useState(false);
   const [refundAddressValid, setRefundAddressValid] = useState(false);
@@ -40,14 +40,35 @@ export default function InitPage() {
         }}
       >
         <Paper variant="outlined" style={{}}>
-          <MoneroAddressTextField
-            label="Monero redeem address"
-            address={redeemAddress}
-            onAddressChange={setRedeemAddress}
-            onAddressValidityChange={setRedeemAddressValid}
-            fullWidth
-            helperText="The monero will be sent to this address"
-          />
+          <Tabs
+            value={useExternalRedeemAddress ? 1 : 0}
+            indicatorColor="primary"
+            variant="fullWidth"
+            onChange={(_, newValue) =>
+              setUseExternalRedeemAddress(newValue === 1)
+            }
+          >
+            <Tab label="Redeem to internal Monero wallet" value={0} />
+            <Tab label="Redeem to external Monero address" value={1} />
+          </Tabs>
+          <Box style={{ padding: "16px" }}>
+            {useExternalRedeemAddress ? (
+              <MoneroAddressTextField
+                label="External Monero redeem address"
+                address={redeemAddress}
+                onAddressChange={setRedeemAddress}
+                onAddressValidityChange={setRedeemAddressValid}
+                helperText="The monero will be sent to this address if the swap is successful."
+                fullWidth
+              />
+            ) : (
+              <Typography variant="caption">
+                The Monero will be sent to the internal Monero wallet of the
+                GUI. You can then withdraw them from there or use them for
+                another swap directly.
+              </Typography>
+            )}
+          </Box>
         </Paper>
 
         <Paper variant="outlined" style={{}}>

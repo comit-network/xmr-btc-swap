@@ -2,7 +2,6 @@ use crate::network::swap_setup::{protocol, BlockchainNetwork, SpotPriceError, Sp
 use crate::protocol::bob::{State0, State2};
 use crate::protocol::{Message1, Message3};
 use crate::{bitcoin, cli, monero};
-use swap_env::env;
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::AsyncWriteExt;
@@ -17,6 +16,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
+use swap_env::env;
 use uuid::Uuid;
 
 use super::{read_cbor_message, write_cbor_message, SpotPriceRequest};

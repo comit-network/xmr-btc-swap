@@ -16,7 +16,9 @@
  *     - CXX doesn't support static methods as yet, so we define free functions here that
  *       simply call the appropriate static methods.
  *     - CXX also doesn't support returning strings by value from C++ to Rust, so we wrap
- *       those in a unique_ptr.
+ *       those in a unique_ptr/shared_ptr.
+ *       ATTENTION: unique_ptr will delete the object on drop,
+ *       verify that you actually OWN the object before wrapping it in a unique_ptr. Use shared_ptr otherwise
  *     - CXX doesn't support optional arguments, so we make thin wrapper functions that either
  *       take the argument or not.
  *
@@ -57,6 +59,26 @@ namespace Monero
     {
         auto addr = wallet.address(account_index, address_index);
         return std::make_unique<std::string>(addr);
+    }
+    
+    inline void rescanBlockchainAsync(Wallet &wallet)
+    {
+        wallet.rescanBlockchainAsync();
+    }
+
+    inline void pauseRefresh(Wallet &wallet)
+    {
+        wallet.pauseRefresh();
+    }
+
+    inline void stop(Wallet &wallet)
+    {
+        wallet.stop();
+    }
+
+    inline void startRefresh(Wallet &wallet)
+    {
+        wallet.startRefresh();
     }
 
     /**
@@ -223,6 +245,16 @@ namespace Monero
         return std::make_unique<std::vector<std::string>>(tx.txid());
     }
 
+    inline uint64_t pendingTransactionFee(const PendingTransaction &tx)
+    {
+        return tx.fee();
+    }
+
+    inline uint64_t pendingTransactionAmount(const PendingTransaction &tx)
+    {
+        return tx.amount();
+    }
+
     inline std::unique_ptr<std::string> walletFilename(const Wallet &wallet)
     {
         return std::make_unique<std::string>(wallet.filename());
@@ -234,6 +266,156 @@ namespace Monero
     {
         v.push_back(s);
     }
+
+    /**
+     * Get the hash of a transaction from TransactionInfo.
+     */
+    inline std::unique_ptr<std::string> transactionInfoHash(const TransactionInfo &tx_info)
+    {
+        return std::make_unique<std::string>(tx_info.hash());
+    }
+
+    /**
+     * Get the timestamp of a transaction from TransactionInfo.
+     */
+    inline uint64_t transactionInfoTimestamp(const TransactionInfo &tx_info)
+    {
+        return static_cast<uint64_t>(tx_info.timestamp());
+    }
+
+    // bridge.h
+#pragma once
+#include <string>
+#include <cstdint>
+#include "wallet/api/wallet2_api.h"
+
+
+using CB_StringU64                = uintptr_t;
+using CB_U64                      = uintptr_t;
+using CB_Void                     = uintptr_t;
+using CB_Reorg                    = uintptr_t;
+using CB_String                   = uintptr_t;
+using CB_GetPassword              = uintptr_t;
+
+class FunctionBasedListener final : public Monero::WalletListener {
+public:
+    FunctionBasedListener(
+        CB_StringU64                      on_spent,
+        CB_StringU64                      on_received,
+        CB_StringU64                      on_unconfirmed_received,
+        CB_U64                            on_new_block,
+        CB_Void                           on_updated,
+        CB_Void                           on_refreshed,
+        CB_Reorg                          on_reorg,
+        CB_String                         on_pool_tx_removed,
+        CB_GetPassword                    on_get_password)
+        : 
+          on_spent_(on_spent),
+          on_received_(on_received),
+          on_unconfirmed_received_(on_unconfirmed_received),
+          on_new_block_(on_new_block),
+          on_updated_(on_updated),
+          on_refreshed_(on_refreshed),
+          on_reorg_(on_reorg),
+          on_pool_tx_removed_(on_pool_tx_removed),
+          on_get_password_(on_get_password) {}
+
+    void moneySpent(const std::string& txid, uint64_t amt) override { 
+        if (on_spent_) {
+            auto* spent = reinterpret_cast<void(*)(const std::string&, uint64_t)>(on_spent_);
+            spent(txid, amt); 
+        }
+    }
+
+    void moneyReceived(const std::string& txid, uint64_t amt) override
+        { if (on_received_) {
+            auto* received = reinterpret_cast<void(*)(const std::string&, uint64_t)>(on_received_);
+            received(txid, amt); 
+        }
+    }
+
+    void unconfirmedMoneyReceived(const std::string& txid, uint64_t amt) override
+        { if (on_unconfirmed_received_) {
+            auto* unconfirmed_received = reinterpret_cast<void(*)(const std::string&, uint64_t)>(on_unconfirmed_received_);
+            unconfirmed_received(txid, amt); 
+        }
+    }
+
+    void newBlock(uint64_t h) override
+        { if (on_new_block_) {
+            auto* new_block = reinterpret_cast<void(*)(uint64_t)>(on_new_block_);
+            new_block(h); 
+        }
+    }
+
+    void updated() override
+        {
+            if (on_updated_) {
+            auto* updated = reinterpret_cast<void(*)()>(on_updated_);
+            updated(); 
+        }
+    }
+
+    void refreshed() override
+        { if (on_refreshed_) {
+            auto* refreshed = reinterpret_cast<void(*)()>(on_refreshed_);
+            refreshed(); 
+        }
+    }
+
+    void onReorg(uint64_t h, uint64_t d, size_t t) override
+        { if (on_reorg_) {
+            auto* reorg = reinterpret_cast<void(*)(uint64_t, uint64_t, size_t)>(on_reorg_);
+            reorg(h, d, t); 
+        }
+    }
+
+    void onPoolTxRemoved(const std::string& txid) override
+        { if (on_pool_tx_removed_) {
+            auto* pool_tx_removed = reinterpret_cast<void(*)(const std::string&)>(on_pool_tx_removed_);
+            pool_tx_removed(txid); 
+        }
+    }
+
+    optional<std::string> onGetPassword(const char* reason) override {
+        if (on_get_password_) {
+            auto* get_password = reinterpret_cast<const char*(*)(const std::string&)>(on_get_password_);
+            return std::string(get_password(reason));
+        }
+        return optional<std::string>();
+    }
+
+private:
+    CB_StringU64       on_spent_;
+    CB_StringU64       on_received_;
+    CB_StringU64       on_unconfirmed_received_;
+    CB_U64             on_new_block_;
+    CB_Void            on_updated_;
+    CB_Void            on_refreshed_;
+    CB_Reorg           on_reorg_;
+    CB_String          on_pool_tx_removed_;
+    CB_GetPassword     on_get_password_;
+};
+
+extern "C" {
+    WalletListener* create_listener(
+        CB_StringU64 on_spent,
+        CB_StringU64 on_received,
+        CB_StringU64 on_unconfirmed_received,
+        CB_U64       on_new_block,
+        CB_Void      on_updated,
+        CB_Void      on_refreshed,
+        CB_Reorg     on_reorg,
+        CB_String    on_pool_tx_removed,
+        CB_GetPassword on_get_password)
+    {
+        return new FunctionBasedListener(
+            on_spent,on_received,on_unconfirmed_received,on_new_block,
+            on_updated,on_refreshed,on_reorg,on_pool_tx_removed,on_get_password);
+    }
+
+    void destroy_listener(FunctionBasedListener* p) { delete p; }
+}
 }
 
 #include "easylogging++.h"
@@ -359,3 +541,64 @@ using StringMap = std::map<String, String>;
 using StringVec = std::vector<String>;
 
 static std::pair<StringMap, StringVec> _monero_sys_pair_instantiation;
+
+namespace Monero {
+
+// Adapter class that forwards Monero::WalletListener callbacks to Rust
+class RustListenerAdapter final : public Monero::WalletListener {
+public:
+    explicit RustListenerAdapter(rust::Box<wallet_listener::WalletListenerBox> listener)
+        : inner_(std::move(listener)) {}
+
+    // --- Required overrides ------------------------------------------------
+    void moneySpent(const std::string &txid, uint64_t amount) override {
+        wallet_listener::money_spent(*inner_, txid, amount);
+    }
+
+    void moneyReceived(const std::string &txid, uint64_t amount) override {
+        wallet_listener::money_received(*inner_, txid, amount);
+    }
+
+    void unconfirmedMoneyReceived(const std::string &txid, uint64_t amount) override {
+        wallet_listener::unconfirmed_money_received(*inner_, txid, amount);
+    }
+
+    void newBlock(uint64_t height) override {
+        wallet_listener::new_block(*inner_, height);
+    }
+
+    void updated() override {
+        wallet_listener::updated(*inner_);
+    }
+
+    void refreshed() override {
+        wallet_listener::refreshed(*inner_);
+    }
+
+    void onReorg(std::uint64_t height, std::uint64_t blocks_detached, std::size_t transfers_detached) override {
+        wallet_listener::on_reorg(*inner_, height, blocks_detached, transfers_detached);
+    }
+
+    optional<std::string> onGetPassword(const char * /*reason*/) override {
+        return optional<std::string>(); // Not implemented
+    }
+
+    void onPoolTxRemoved(const std::string &txid) override {
+        wallet_listener::pool_tx_removed(*inner_, txid);
+    }
+
+private:
+    rust::Box<wallet_listener::WalletListenerBox> inner_;
+};
+
+} // namespace Monero
+
+namespace wallet_listener {
+    Monero::WalletListener* create_rust_listener_adapter(rust::Box<WalletListenerBox> listener) {
+        return new Monero::RustListenerAdapter(std::move(listener));
+    }
+
+    void destroy_rust_listener_adapter(Monero::WalletListener* ptr) {
+        delete ptr;
+    }
+}

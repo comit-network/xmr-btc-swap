@@ -1,4 +1,4 @@
-use monero::{Network, Amount};
+use monero::{Amount, Network};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize)]
@@ -11,6 +11,7 @@ pub enum network {
 }
 
 pub mod private_key {
+    use hex;
     use monero::consensus::{Decodable, Encodable};
     use monero::PrivateKey;
     use serde::de::Visitor;
@@ -18,7 +19,6 @@ pub mod private_key {
     use serde::{de, Deserializer, Serializer};
     use std::fmt;
     use std::io::Cursor;
-    use hex;
 
     struct BytesVisitor;
 

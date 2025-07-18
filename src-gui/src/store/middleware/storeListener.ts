@@ -6,6 +6,7 @@ import {
   updateAllNodeStatuses,
   fetchSellersAtPresetRendezvousPoints,
   getSwapInfo,
+  initializeMoneroWallet,
 } from "renderer/rpc";
 import logger from "utils/logger";
 import { contextStatusEventReceived } from "store/features/rpcSlice";
@@ -69,6 +70,7 @@ export function createMainListeners() {
           checkBitcoinBalance(),
           getAllSwapInfos(),
           fetchSellersAtPresetRendezvousPoints(),
+          initializeMoneroWallet(),
         ]);
       }
     },

@@ -39,6 +39,7 @@ use proxy::{proxy_handler, stats_handler};
 #[derive(Clone)]
 pub struct AppState {
     pub node_pool: Arc<NodePool>,
+    pub http_client: reqwest::Client,
 }
 
 /// Manages background tasks for the RPC pool
@@ -57,6 +58,12 @@ impl Drop for PoolHandle {
 pub struct ServerInfo {
     pub port: u16,
     pub host: String,
+}
+
+impl Into<String> for ServerInfo {
+    fn into(self) -> String {
+        format!("http://{}:{}", self.host, self.port)
+    }
 }
 
 async fn create_app_with_receiver(
@@ -97,7 +104,20 @@ async fn create_app_with_receiver(
         status_update_handle,
     };
 
-    let app_state = AppState { node_pool };
+    // Create shared HTTP client with connection pooling and keep-alive
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .danger_accept_invalid_certs(true)
+        .pool_max_idle_per_host(10)
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .tcp_keepalive(std::time::Duration::from_secs(60))
+        .build()
+        .expect("Failed to create HTTP client");
+
+    let app_state = AppState {
+        node_pool,
+        http_client,
+    };
 
     // Build the app
     let app = Router::new()

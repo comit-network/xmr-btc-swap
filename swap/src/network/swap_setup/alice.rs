@@ -6,7 +6,6 @@ use crate::network::swap_setup::{
 use crate::protocol::alice::{State0, State3};
 use crate::protocol::{Message0, Message2, Message4};
 use crate::{asb, bitcoin, monero};
-use swap_env::env;
 use anyhow::{anyhow, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::AsyncWriteExt;
@@ -20,6 +19,7 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::task::Poll;
 use std::time::{Duration, Instant};
+use swap_env::env;
 use uuid::Uuid;
 
 #[derive(Debug)]
