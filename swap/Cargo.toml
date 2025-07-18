@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "2.4.5"
+version = "2.5.6"
 authors = ["The COMIT guys <hello@comit.network>"]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -69,8 +69,8 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
 structopt = "0.3"
 strum = { version = "0.26", features = ["derive"] }
 swap-env = { path = "../swap-env" }
-swap-fs = { path = "../swap-fs" }
 swap-feed = { path = "../swap-feed" }
+swap-fs = { path = "../swap-fs" }
 swap-serde = { path = "../swap-serde" }
 tauri = { version = "2.0", features = ["config-json5"], optional = true, default-features = false }
 thiserror = { workspace = true }
