@@ -555,13 +555,14 @@ impl Context {
         // TODO: close all monero wallets
         // call store(..) on all wallets
         
-        let monero_manager = self.monero_manager.clone();
-        tokio::spawn(async move {
-            if let Some(monero_manager) = monero_manager {
-                let wallet = monero_manager.main_wallet().await;
-                wallet.store(None).await;
-            }
-        });
+        // TODO: This doesn't work because "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
+        // let monero_manager = self.monero_manager.clone();
+        // tokio::spawn(async move {
+        //     if let Some(monero_manager) = monero_manager {
+        //         let wallet = monero_manager.main_wallet().await;
+        //         wallet.store(None).await;
+        //     }
+        // });
 
         Ok(())
     }
