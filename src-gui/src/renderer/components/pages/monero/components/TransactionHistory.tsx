@@ -1,25 +1,8 @@
-import {
-  Typography,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
-  Tooltip,
-  Stack,
-} from "@mui/material";
-import { OpenInNew as OpenInNewIcon } from "@mui/icons-material";
-import { open } from "@tauri-apps/plugin-shell";
-import { PiconeroAmount } from "../../../other/Units";
-import { getMoneroTxExplorerUrl } from "../../../../../utils/conversionUtils";
-import { isTestnet } from "store/config";
+import { Typography, Box, Paper } from "@mui/material";
 import { TransactionInfo } from "models/tauriModel";
+import _ from "lodash";
+import dayjs from "dayjs";
+import TransactionItem from "./TransactionItem";
 
 interface TransactionHistoryProps {
   history?: {
@@ -27,76 +10,52 @@ interface TransactionHistoryProps {
   };
 }
 
+interface TransactionGroup {
+  date: string;
+  displayDate: string;
+  transactions: TransactionInfo[];
+}
+
 // Component for displaying transaction history
 export default function TransactionHistory({
   history,
 }: TransactionHistoryProps) {
   if (!history || !history.transactions || history.transactions.length === 0) {
-    return <Typography variant="h5">Transaction History</Typography>;
+    return <Typography variant="h5">Transactions</Typography>;
   }
 
-  return (
-    <>
-      <Typography variant="h5">Transaction History</Typography>
+  const transactions = history.transactions;
 
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Amount</TableCell>
-              <TableCell>Fee</TableCell>
-              <TableCell align="right">Confirmations</TableCell>
-              <TableCell align="center">Explorer</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {[...history.transactions]
-              .sort((a, b) => a.confirmations - b.confirmations)
-              .map((tx, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <PiconeroAmount amount={tx.amount} />
-                      <Chip
-                        label={tx.direction === "In" ? "Received" : "Sent"}
-                        color={tx.direction === "In" ? "success" : "default"}
-                        size="small"
-                      />
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <PiconeroAmount amount={tx.fee} />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Chip
-                      label={tx.confirmations}
-                      color={tx.confirmations >= 10 ? "success" : "warning"}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    {tx.tx_hash && (
-                      <Tooltip title="View on block explorer">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            const url = getMoneroTxExplorerUrl(
-                              tx.tx_hash,
-                              isTestnet(),
-                            );
-                            open(url);
-                          }}
-                        >
-                          <OpenInNewIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                </TableRow>
+  // Group transactions by date using dayjs and lodash
+  const transactionGroups: TransactionGroup[] = _(transactions)
+    .groupBy((tx) => dayjs(tx.timestamp * 1000).format("YYYY-MM-DD")) // Convert Unix timestamp to date string
+    .map((txs, dateKey) => ({
+      date: dateKey,
+      displayDate: dayjs(dateKey).format("MMMM D, YYYY"), // Human-readable format
+      transactions: _.orderBy(txs, ["timestamp"], ["desc"]), // Sort transactions within group by newest first
+    }))
+    .orderBy(["date"], ["desc"]) // Sort groups by newest date first
+    .value();
+
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ mb: 2 }}>
+        Transactions
+      </Typography>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {transactionGroups.map((group) => (
+          <Box key={group.date}>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+              {group.displayDate}
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {group.transactions.map((tx) => (
+                <TransactionItem key={tx.tx_hash} transaction={tx} />
               ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    </Box>
   );
 }

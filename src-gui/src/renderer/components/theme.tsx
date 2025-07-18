@@ -18,6 +18,17 @@ declare module "@mui/material/Button" {
   }
 }
 
+// Extend the palette to include custom color properties
+declare module "@mui/material/styles" {
+  interface PaletteColor {
+    tint?: string;
+  }
+
+  interface PaletteColorOptions {
+    tint?: string;
+  }
+}
+
 export enum Theme {
   Light = "light",
   Dark = "dark",
@@ -93,6 +104,19 @@ const baseTheme: ThemeOptions = {
             },
           }),
         },
+        {
+          props: { size: "tiny" },
+          style: {
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            padding: "4px 8px",
+            minHeight: "24px",
+            minWidth: "auto",
+            lineHeight: 1.2,
+            textTransform: "none",
+            borderRadius: "4px",
+          },
+        },
       ],
     },
     MuiChip: {
@@ -142,6 +166,14 @@ const darkTheme = createTheme({
       main: "#f4511e", // Monero orange
     },
     secondary: indigo,
+    error: {
+      main: "#f44336",
+      tint: "#e58686",
+    },
+    success: {
+      main: "#4caf50",
+      tint: "#70c491",
+    },
   },
 });
 
@@ -153,6 +185,14 @@ const lightTheme = createTheme({
       main: "#f4511e", // Monero orange
     },
     secondary: indigo,
+    error: {
+      main: "#f44336",
+      tint: "#ff5252",
+    },
+    success: {
+      main: "#4caf50",
+      tint: "#4caf50",
+    },
   },
 });
 

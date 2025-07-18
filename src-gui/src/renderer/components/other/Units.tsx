@@ -1,4 +1,4 @@
-import { Tooltip } from "@mui/material";
+import { Box, SxProps, Tooltip, Typography } from "@mui/material";
 import { useAppSelector, useSettings } from "store/hooks";
 import { getMarkup, piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 
@@ -10,12 +10,18 @@ export function AmountWithUnit({
   fixedPrecision,
   exchangeRate,
   parenthesisText = null,
+  labelStyles,
+  amountStyles,
+  disableTooltip = false,
 }: {
   amount: Amount;
   unit: string;
   fixedPrecision: number;
   exchangeRate?: Amount;
   parenthesisText?: string;
+  labelStyles?: SxProps;
+  amountStyles?: SxProps;
+  disableTooltip?: boolean;
 }) {
   const [fetchFiatPrices, fiatCurrency] = useSettings((settings) => [
     settings.fetchFiatPrices,
@@ -29,12 +35,25 @@ export function AmountWithUnit({
       ? `≈ ${(exchangeRate * amount).toFixed(2)} ${fiatCurrency}`
       : "";
 
+  const content = (
+    <span>
+      <Box sx={{ display: "inline", ...amountStyles }}>
+        {amount != null ? amount.toFixed(fixedPrecision) : "?"}
+      </Box>{" "}
+      <Box sx={{ display: "inline", ...labelStyles }}>
+        {unit}
+        {parenthesisText != null ? ` (${parenthesisText})` : null}
+      </Box>
+    </span>
+  );
+
+  if (disableTooltip) {
+    return content;
+  }
+
   return (
     <Tooltip arrow title={title}>
-      <span>
-        {amount != null ? amount.toFixed(fixedPrecision) : "?"} {unit}
-        {parenthesisText != null ? ` (${parenthesisText})` : null}
-      </span>
+      {content}
     </Tooltip>
   );
 }
@@ -89,9 +108,15 @@ export function BitcoinAmount({ amount }: { amount: Amount }) {
 export function MoneroAmount({
   amount,
   fixedPrecision = 4,
+  labelStyles,
+  amountStyles,
+  disableTooltip = false,
 }: {
   amount: Amount;
   fixedPrecision?: number;
+  labelStyles?: SxProps;
+  amountStyles?: SxProps;
+  disableTooltip?: boolean;
 }) {
   const xmrRate = useAppSelector((state) => state.rates.xmrPrice);
 
@@ -101,6 +126,9 @@ export function MoneroAmount({
       unit="XMR"
       fixedPrecision={fixedPrecision}
       exchangeRate={xmrRate}
+      labelStyles={labelStyles}
+      amountStyles={amountStyles}
+      disableTooltip={disableTooltip}
     />
   );
 }
@@ -164,14 +192,23 @@ export function SatsAmount({ amount }: { amount: Amount }) {
 export function PiconeroAmount({
   amount,
   fixedPrecision = 8,
+  labelStyles,
+  amountStyles,
+  disableTooltip = false,
 }: {
   amount: Amount;
   fixedPrecision?: number;
+  labelStyles?: SxProps;
+  amountStyles?: SxProps;
+  disableTooltip?: boolean;
 }) {
   return (
     <MoneroAmount
       amount={amount == null ? null : piconerosToXmr(amount)}
       fixedPrecision={fixedPrecision}
+      labelStyles={labelStyles}
+      amountStyles={amountStyles}
+      disableTooltip={disableTooltip}
     />
   );
 }

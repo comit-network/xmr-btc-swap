@@ -72,6 +72,7 @@ export default function WalletOverview({
           <PiconeroAmount
             amount={parseFloat(balance.unlocked_balance)}
             fixedPrecision={4}
+            disableTooltip
           />
         </Typography>
         <Typography
