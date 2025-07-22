@@ -1,7 +1,7 @@
 > [!CAUTION]
 > # THIS REPO IS UNMAINTAINED <br>PLEASE USE [UNSTOPPABLESWAP]([url](https://github.com/UnstoppableSwap/core)) INSTEAD
 
-**This repository is unmaintained**. The original developers (@comit-network) have moved on to other projects. Community volunteers are continuing development at [UnstoppableSwap/core](https://github.com/UnstoppableSwap/core), which includes a graphical user interface. Please note that the fork has introduced network-level breaking changes, making it incompatible with peers running this repository - you will not be able to initiate swaps with them.
+**This repository is unmaintained**. The original developers (@comit-network) have moved on to other projects. Community volunteers are continuing development at [UnstoppableSwap/core](https://github.com/eigenwallet/core), which includes a graphical user interface. Please note that the fork has introduced network-level breaking changes, making it incompatible with peers running this repository - you will not be able to initiate swaps with them.
 
 # XMR to BTC Atomic Swap
 
