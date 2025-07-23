@@ -82,7 +82,7 @@ export function useFeedback() {
 
     try {
       if (inputState.isDaemonLogsRedacted) {
-        redactLogs(store.getState().rpc?.logs)
+        redactLogs(store.getState().logs?.state.logs)
           .then((redactedLogs) => {
             setLogsState((prev) => ({
               ...prev,
@@ -98,7 +98,7 @@ export function useFeedback() {
       } else {
         setLogsState((prev) => ({
           ...prev,
-          daemonLogs: store.getState().rpc?.logs,
+          daemonLogs: store.getState().logs?.state.logs,
         }));
         setError(null);
       }

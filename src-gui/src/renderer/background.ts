@@ -2,12 +2,12 @@ import { listen } from "@tauri-apps/api/event";
 import { TauriContextStatusEvent, TauriEvent } from "models/tauriModel";
 import {
   contextStatusEventReceived,
-  receivedCliLog,
   rpcSetBalance,
   timelockChangeEventReceived,
   approvalEventReceived,
   backgroundProgressEventReceived,
 } from "store/features/rpcSlice";
+import { receivedCliLog } from "store/features/logsSlice";
 import { poolStatusReceived } from "store/features/poolSlice";
 import { swapProgressEventReceived } from "store/features/swapSlice";
 import logger from "utils/logger";
@@ -24,8 +24,6 @@ import {
   listSellersAtRendezvousPoint,
   refreshApprovals,
   updateAllNodeStatuses,
-  fetchAndUpdateBackgroundItems,
-  fetchAndUpdateApprovalItems,
 } from "./rpc";
 import { store } from "./store/storeRenderer";
 import { exhaustiveGuard } from "utils/typescriptUtils";

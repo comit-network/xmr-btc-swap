@@ -14,7 +14,7 @@ export default function ExportLogsButton({
 }: ExportLogsButtonProps) {
   async function handleExportLogs() {
     const swapLogs = await getLogsOfSwap(swap_id, false);
-    const daemonLogs = store.getState().rpc?.logs;
+    const daemonLogs = store.getState().logs?.state.logs;
 
     const logContent = {
       swap_logs: logsToRawString(swapLogs.logs),

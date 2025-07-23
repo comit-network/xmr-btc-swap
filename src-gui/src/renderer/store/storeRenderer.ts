@@ -17,7 +17,7 @@ import { LazyStore } from "@tauri-apps/plugin-store";
 const rootPersistConfig = {
   key: "gui-global-state-store",
   storage: sessionStorage,
-  blacklist: ["settings", "conversations"],
+  blacklist: ["settings", "conversations", "logs"],
 };
 
 // Use Tauri's store plugin for persistent settings

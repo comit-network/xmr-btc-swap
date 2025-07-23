@@ -8,6 +8,7 @@ import nodesSlice from "./features/nodesSlice";
 import conversationsSlice from "./features/conversationsSlice";
 import poolSlice from "./features/poolSlice";
 import walletSlice from "./features/walletSlice";
+import logsSlice from "./features/logsSlice";
 
 export const reducers = {
   swap: swapReducer,
@@ -20,4 +21,5 @@ export const reducers = {
   conversations: conversationsSlice,
   pool: poolSlice,
   wallet: walletSlice,
+  logs: logsSlice,
 };

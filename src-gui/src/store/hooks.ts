@@ -137,7 +137,7 @@ export function useActiveSwapInfo(): GetSwapInfoResponseExt | null {
 
 export function useActiveSwapLogs() {
   const swapId = useActiveSwapId();
-  const logs = useAppSelector((s) => s.rpc.logs);
+  const logs = useAppSelector((s) => s.logs.state.logs);
 
   return useMemo(
     () => logs.filter((log) => isCliLogRelatedToSwap(log, swapId)),

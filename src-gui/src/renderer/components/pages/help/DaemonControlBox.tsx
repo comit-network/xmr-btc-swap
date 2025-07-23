@@ -12,7 +12,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { TauriContextStatusEvent } from "models/tauriModel";
 
 export default function DaemonControlBox() {
-  const logs = useAppSelector((s) => s.rpc.logs);
+  const logs = useAppSelector((s) => s.logs.state.logs);
 
   // The daemon can be manually started if it has failed or if it has not been started yet
   const canContextBeManuallyStarted = useAppSelector(
