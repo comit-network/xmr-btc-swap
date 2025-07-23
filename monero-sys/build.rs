@@ -21,11 +21,18 @@ macro_rules! embedded_patch {
 }
 
 /// Embedded patches applied at compile time
-const EMBEDDED_PATCHES: &[EmbeddedPatch] = &[embedded_patch!(
-    "wallet2_api_allow_subtract_from_fee",
-    "Adds subtract_fee_from_outputs parameter to wallet2_api transaction creation methods",
-    "patches/wallet2_api_allow_subtract_from_fee.patch"
-)];
+const EMBEDDED_PATCHES: &[EmbeddedPatch] = &[
+    embedded_patch!(
+        "wallet2_api_allow_subtract_from_fee",
+        "Adds subtract_fee_from_outputs parameter to wallet2_api transaction creation methods",
+        "patches/wallet2_api_allow_subtract_from_fee.patch"
+    ),
+    embedded_patch!(
+        "0002-store-crash-fix",
+        "Fixes corrupted wallet cache when storing while refreshing",
+        "patches/0002-store-crash-fix.patch"
+    ),
+];
 
 fn main() {
     let is_github_actions: bool = std::env::var("GITHUB_ACTIONS").is_ok();

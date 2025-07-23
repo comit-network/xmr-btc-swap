@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Fix issue where the Monero wallet cache would be corrupted when the wallet was stored while it was refreshing.
+
 ## [3.0.0-beta] - 2025-07-18
 
 - GUI: The GUI can now be used as a Monero wallet. You can open existing Monero wallet files that were created with `monero-wallet-cli` / `monero-wallet-rpc` / `monero-wallet-gui` / Feather Wallet. You can also generate new wallets or recover existing ones from a seed phrase. To change the restore height of a wallet, go to the "Wallet" tab and click on the "..." -> "Restore height" button. You can view your previous transactions, sync your wallet with the Blockchain and send Monero.
