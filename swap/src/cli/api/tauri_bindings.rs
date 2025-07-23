@@ -9,6 +9,7 @@ use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin::Txid;
+use ::bitcoin::address::NetworkUnchecked;
 use monero_rpc_pool::pool::PoolStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -111,6 +112,14 @@ pub enum SeedChoice {
 pub struct SeedSelectionDetails {
     /// List of recently used wallet paths
     pub recent_wallets: Vec<String>,
+}
+
+#[typeshare]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SelectOfferApprovalRequest {
+    #[typeshare(serialized_as = "Option<string>")]
+    pub bitcoin_change_address: Option<bitcoin::Address<NetworkUnchecked>>,
+    pub monero_receive_pool: MoneroAddressPool,
 }
 
 #[typeshare]
@@ -431,7 +440,7 @@ pub trait TauriEmitter {
         &self,
         details: SelectMakerDetails,
         timeout_secs: u64,
-    ) -> Result<bool>;
+    ) -> Result<Option<SelectOfferApprovalRequest>>;
 
     async fn request_seed_selection(&self) -> Result<SeedChoice>;
 
@@ -526,14 +535,14 @@ impl TauriEmitter for TauriHandle {
         &self,
         details: SelectMakerDetails,
         timeout_secs: u64,
-    ) -> Result<bool> {
+    ) -> Result<Option<SelectOfferApprovalRequest>> {
         Ok(self
             .request_approval(
                 ApprovalRequestType::SelectMaker(details),
                 Some(timeout_secs),
             )
             .await
-            .unwrap_or(false))
+            .unwrap_or(None))
     }
 
     async fn request_seed_selection(&self) -> Result<SeedChoice> {
@@ -611,7 +620,7 @@ impl TauriEmitter for Option<TauriHandle> {
         &self,
         details: SelectMakerDetails,
         timeout_secs: u64,
-    ) -> Result<bool> {
+    ) -> Result<Option<SelectOfferApprovalRequest>> {
         match self {
             Some(tauri) => tauri.request_maker_selection(details, timeout_secs).await,
             None => bail!("No Tauri handle available"),

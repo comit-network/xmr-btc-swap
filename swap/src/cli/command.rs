@@ -62,23 +62,9 @@ where
         CliCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
-            bitcoin_change_address,
             monero,
-            monero_receive_address,
             tor,
         } => {
-            let monero_receive_pool: MoneroAddressPool =
-                swap_serde::monero::address::validate_is_testnet(
-                    monero_receive_address,
-                    is_testnet,
-                )?
-                .into();
-
-            let bitcoin_change_address = bitcoin_change_address
-                .map(|address| bitcoin_address::validate(address, is_testnet))
-                .transpose()?
-                .map(|address| address.into_unchecked());
-
             let context = Arc::new(
                 ContextBuilder::new(is_testnet)
                     .with_tor(tor.enable_tor)
@@ -93,9 +79,7 @@ where
 
             BuyXmrArgs {
                 rendezvous_points: vec![],
-                sellers: vec![seller],
-                bitcoin_change_address,
-                monero_receive_pool,
+                sellers: vec![seller]
             }
             .request(context.clone())
             .await?;
@@ -345,21 +329,21 @@ enum CliCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
 
-        #[structopt(
-            long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to. If omitted they will be sent to the internal wallet.",
-            parse(try_from_str = bitcoin_address::parse)
-        )]
-        bitcoin_change_address: Option<bitcoin::Address<NetworkUnchecked>>,
+        // #[structopt(
+        //     long = "change-address",
+        //     help = "The bitcoin address where any form of change or excess funds should be sent to. If omitted they will be sent to the internal wallet.",
+        //     parse(try_from_str = bitcoin_address::parse)
+        // )]
+        // bitcoin_change_address: Option<bitcoin::Address<NetworkUnchecked>>,
 
         #[structopt(flatten)]
         monero: Monero,
 
-        #[structopt(long = "receive-address",
-            help = "The monero address where you would like to receive monero",
-            parse(try_from_str = swap_serde::monero::address::parse)
-        )]
-        monero_receive_address: monero::Address,
+        // #[structopt(long = "receive-address",
+        //     help = "The monero address where you would like to receive monero",
+        //     parse(try_from_str = swap_serde::monero::address::parse)
+        // )]
+        // monero_receive_address: monero::Address,
 
         #[structopt(flatten)]
         tor: Tor,
