@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0-beta.2] - 2025-07-27
+
 - GUI: Fix issue where the Monero wallet cache would be corrupted when the wallet was stored while it was refreshing.
 
 ## [3.0.0-beta] - 2025-07-18
@@ -586,7 +588,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/eigenwallet/core/compare/3.0.0-beta...HEAD
+[unreleased]: https://github.com/eigenwallet/core/compare/3.0.0-beta.2...HEAD
+[3.0.0-beta.2]: https://github.com/eigenwallet/core/compare/3.0.0-beta...3.0.0-beta.2
 [3.0.0-beta]: https://github.com/eigenwallet/core/compare/2.5.6...3.0.0-beta
 [2.5.6]: https://github.com/eigenwallet/core/compare/2.4.5...2.5.6
 [2.4.5]: https://github.com/eigenwallet/core/compare/2.4.3...2.4.5
