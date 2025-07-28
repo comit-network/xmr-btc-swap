@@ -9,7 +9,7 @@ description = "XMR/BTC trustless atomic swaps."
 name = "swap"
 
 [features]
-tauri = ["dep:tauri"]
+tauri = ["dep:tauri", "dep:dfx-swiss-sdk"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -33,6 +33,7 @@ conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.6"
 derive_builder = "0.20.2"
+dfx-swiss-sdk = { git = "https://github.com/eigenwallet/dfx-swiss-rs", subdir = "dfx-swiss-sdk", optional = true }
 dialoguer = "0.11"
 ecdsa_fun = { version = "0.10", default-features = false, features = ["libsecp_compat", "serde", "adaptor"] }
 ed25519-dalek = "1"

@@ -25,50 +25,12 @@ import SendTransactionModal from "../SendTransactionModal";
 import { useNavigate } from "react-router-dom";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import SetRestoreHeightModal from "../SetRestoreHeightModal";
+import DfxButton from "./DFXWidget";
 
 interface WalletActionButtonsProps {
   balance: {
     unlocked_balance: string;
   };
-}
-
-function RestoreHeightDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [restoreHeight, setRestoreHeight] = useState(0);
-
-  const handleRestoreHeight = async () => {
-    await setMoneroRestoreHeight(restoreHeight);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Restore Height</DialogTitle>
-      <DialogContent>
-        <TextField
-          label="Restore Height"
-          type="number"
-          value={restoreHeight}
-          onChange={(e) => setRestoreHeight(Number(e.target.value))}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <PromiseInvokeButton
-          onInvoke={handleRestoreHeight}
-          displayErrorSnackbar={true}
-          variant="contained"
-        >
-          Restore
-        </PromiseInvokeButton>
-      </DialogActions>
-    </Dialog>
-  );
 }
 
 export default function WalletActionButtons({
@@ -121,6 +83,7 @@ export default function WalletActionButtons({
           variant="button"
           clickable
         />
+        <DfxButton />
 
         <IconButton onClick={handleMenuClick}>
           <MoreHorizIcon />

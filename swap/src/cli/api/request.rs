@@ -594,7 +594,6 @@ impl Request for SetRestoreHeightArgs {
                 let year: u16 = date.year;
                 let month: u8 = date.month;
                 let day: u8 = date.day;
-
                 // Validate ranges
                 if month < 1 || month > 12 {
                     bail!("Month must be between 1 and 12");
@@ -632,7 +631,6 @@ impl Request for SetRestoreHeightArgs {
         };
 
         wallet.set_restore_height(height).await?;
-
         wallet.pause_refresh().await;
         wallet.stop().await;
         tracing::debug!("Background refresh stopped");
@@ -2000,4 +1998,11 @@ impl Request for GetMoneroSyncProgressArgs {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetPendingApprovalsResponse {
     pub approvals: Vec<crate::cli::api::tauri_bindings::ApprovalRequest>,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DfxAuthenticateResponse {
+    pub access_token: String,
+    pub kyc_url: String,
 }

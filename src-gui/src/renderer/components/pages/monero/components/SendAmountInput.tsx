@@ -60,7 +60,6 @@ export default function SendAmountInput({
 
   const handleMaxAmount = () => {
     if (disabled) return;
-
     if (onMaxToggled) {
       onMaxToggled();
     } else if (onMaxClicked) {

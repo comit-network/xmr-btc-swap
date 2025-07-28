@@ -61,7 +61,6 @@ export default function SendTransactionContent({
 
   const handleMaxToggled = () => {
     if (isSending) return;
-
     if (isMaxSelected) {
       // Disable MAX mode - restore previous amount
       setIsMaxSelected(false);
@@ -76,7 +75,6 @@ export default function SendTransactionContent({
 
   const handleAmountChange = (newAmount: string) => {
     if (isSending) return;
-
     if (newAmount !== "<MAX>") {
       setIsMaxSelected(false);
     }

@@ -8,13 +8,14 @@ use swap::cli::{
         request::{
             BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
             CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse, CheckSeedArgs,
-            CheckSeedResponse, ExportBitcoinWalletArgs, GetCurrentSwapArgs, GetDataDirArgs,
-            GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs, GetMoneroBalanceArgs,
-            GetMoneroHistoryArgs, GetMoneroMainAddressArgs, GetMoneroSyncProgressArgs,
-            GetPendingApprovalsResponse, GetRestoreHeightArgs, GetSwapInfoArgs,
-            GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, RedactArgs,
-            RejectApprovalArgs, RejectApprovalResponse, ResolveApprovalArgs, ResumeSwapArgs,
-            SendMoneroArgs, SetRestoreHeightArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            CheckSeedResponse, DfxAuthenticateResponse, ExportBitcoinWalletArgs,
+            GetCurrentSwapArgs, GetDataDirArgs, GetHistoryArgs, GetLogsArgs,
+            GetMoneroAddressesArgs, GetMoneroBalanceArgs, GetMoneroHistoryArgs,
+            GetMoneroMainAddressArgs, GetMoneroSyncProgressArgs, GetPendingApprovalsResponse,
+            GetRestoreHeightArgs, GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs,
+            MoneroRecoveryArgs, RedactArgs, RejectApprovalArgs, RejectApprovalResponse,
+            ResolveApprovalArgs, ResumeSwapArgs, SendMoneroArgs, SetRestoreHeightArgs,
+            SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
@@ -209,7 +210,8 @@ pub fn run() {
             get_pending_approvals,
             set_monero_restore_height,
             reject_approval_request,
-            get_restore_height
+            get_restore_height,
+            dfx_authenticate,
         ])
         .setup(setup)
         .build(tauri::generate_context!())
@@ -460,4 +462,93 @@ async fn initialize_context(
             Err(e.to_string())
         }
     }
+}
+
+#[tauri::command]
+async fn dfx_authenticate(
+    state: tauri::State<'_, State>,
+) -> Result<DfxAuthenticateResponse, String> {
+    use dfx_swiss_sdk::{DfxClient, SignRequest};
+    use tokio::sync::{mpsc, oneshot};
+    use tokio_util::task::AbortOnDropHandle;
+
+    let context = state.try_get_context()?;
+
+    // Get the monero wallet manager
+    let monero_manager = context
+        .monero_manager
+        .as_ref()
+        .ok_or("Monero wallet manager not available for DFX authentication")?;
+
+    let wallet = monero_manager.main_wallet().await;
+    let address = wallet.main_address().await.to_string();
+
+    // Create channel for authentication
+    let (auth_tx, mut auth_rx) = mpsc::channel::<(SignRequest, oneshot::Sender<String>)>(10);
+
+    // Create DFX client
+    let mut client = DfxClient::new(address, Some("https://api.dfx.swiss".to_string()), auth_tx);
+
+    // Start signing task with AbortOnDropHandle
+    let signing_task = tokio::spawn(async move {
+        tracing::info!("DFX signing service started and listening for requests");
+
+        while let Some((sign_request, response_tx)) = auth_rx.recv().await {
+            tracing::debug!(
+                message = %sign_request.message,
+                blockchains = ?sign_request.blockchains,
+                "Received DFX signing request"
+            );
+
+            // Sign the message using the main Monero wallet
+            let signature = match wallet
+                .sign_message(&sign_request.message, None, false)
+                .await
+            {
+                Ok(sig) => {
+                    tracing::debug!(
+                        signature_preview = %&sig[..std::cmp::min(50, sig.len())],
+                        "Message signed successfully for DFX"
+                    );
+                    sig
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to sign message for DFX");
+                    continue;
+                }
+            };
+
+            // Send signature back to DFX client
+            if let Err(_) = response_tx.send(signature) {
+                tracing::warn!("Failed to send signature response through channel to DFX client");
+            }
+        }
+
+        tracing::info!("DFX signing service stopped");
+    });
+
+    // Create AbortOnDropHandle so the task gets cleaned up
+    let _abort_handle = AbortOnDropHandle::new(signing_task);
+
+    // Authenticate with DFX
+    tracing::info!("Starting DFX authentication...");
+    client
+        .authenticate()
+        .await
+        .map_err(|e| format!("Failed to authenticate with DFX: {}", e))?;
+
+    let access_token = client
+        .access_token
+        .as_ref()
+        .ok_or("No access token available after authentication")?
+        .clone();
+
+    let kyc_url = format!("https://app.dfx.swiss/buy?session={}", access_token);
+
+    tracing::info!("DFX authentication completed successfully");
+
+    Ok(DfxAuthenticateResponse {
+        access_token,
+        kyc_url,
+    })
 }
