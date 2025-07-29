@@ -42,7 +42,7 @@ pub fn init(
         "libp2p_core",
         "libp2p_tcp",
         "libp2p_noise",
-        "libp2p_community_tor",
+        "libp2p_tor",
         // Specific libp2p module targets that appear in logs
         "libp2p_core::transport",
         "libp2p_core::transport::choice",

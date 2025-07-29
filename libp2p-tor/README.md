@@ -1,6 +1,6 @@
 [![Continuous integration](https://github.com/umgefahren/libp2p-tor/actions/workflows/ci.yml/badge.svg)](https://github.com/umgefahren/libp2p-tor/actions/workflows/ci.yml)
-[![docs.rs](https://img.shields.io/docsrs/libp2p-community-tor?style=flat-square)](https://docs.rs/libp2p-community-tor/latest)
-[![Crates.io](https://img.shields.io/crates/v/libp2p-community-tor?style=flat-square)](https://crates.io/crates/libp2p-community-tor)
+[![docs.rs](https://img.shields.io/docsrs/libp2p-tor?style=flat-square)](https://docs.rs/libp2p-tor/latest)
+[![Crates.io](https://img.shields.io/crates/v/libp2p-tor?style=flat-square)](https://crates.io/crates/libp2p-tor)
 
 # libp2p Tor
 
@@ -26,7 +26,7 @@ are dealing with.
 ### Add to your dependencies
 
 ```bash
-cargo add libp2p-community-tor
+cargo add libp2p-tor
 ```
 
 This crate uses tokio with rustls for its runtime and TLS implementation.
@@ -39,7 +39,7 @@ No other combinations are supported.
 
 ```rust
 let address = "/dns/www.torproject.org/tcp/1000".parse()?;
-let mut transport = libp2p_community_tor::TorTransport::bootstrapped().await?;
+let mut transport = libp2p_tor::TorTransport::bootstrapped().await?;
 // we have achieved tor connection
 let _conn = transport.dial(address)?.await?;
 ```

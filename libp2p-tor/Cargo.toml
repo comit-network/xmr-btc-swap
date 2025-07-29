@@ -1,5 +1,5 @@
 [package]
-name = "libp2p-community-tor"
+name = "libp2p-tor"
 version = "0.5.0"
 authors = ["umgefahren <hannes@umgefahren.xyz>"]
 edition = "2021"

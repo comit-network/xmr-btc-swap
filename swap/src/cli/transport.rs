@@ -8,7 +8,7 @@ use libp2p::core::transport::{Boxed, OptionalTransport};
 use libp2p::dns;
 use libp2p::tcp;
 use libp2p::{identity, PeerId, Transport};
-use libp2p_community_tor::{AddressConversion, TorTransport};
+use libp2p_tor::{AddressConversion, TorTransport};
 use tor_rtcompat::tokio::TokioRustlsRuntime;
 
 /// Creates the libp2p transport for the swap CLI.
@@ -27,7 +27,7 @@ pub fn new(
     let tcp_with_dns = dns::tokio::Transport::system(tcp)?;
 
     let maybe_tor_transport: OptionalTransport<TorTransport> = match maybe_tor_client {
-        Some(client) => OptionalTransport::some(libp2p_community_tor::TorTransport::from_client(
+        Some(client) => OptionalTransport::some(libp2p_tor::TorTransport::from_client(
             client,
             AddressConversion::IpAndDns,
         )),

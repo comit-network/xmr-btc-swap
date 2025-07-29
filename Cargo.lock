@@ -5314,7 +5314,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "libp2p-community-tor"
+name = "libp2p-tor"
 version = "0.5.0"
 dependencies = [
  "anyhow",
@@ -10169,7 +10169,7 @@ dependencies = [
  "get-port",
  "hex",
  "libp2p",
- "libp2p-community-tor",
+ "libp2p-tor",
  "mockito",
  "moka",
  "monero",

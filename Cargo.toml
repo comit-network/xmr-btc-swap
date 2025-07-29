@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   "electrum-pool",
-  "libp2p-community-tor",
+  "libp2p-tor",
   "monero-rpc",
   "monero-rpc-pool",
   "monero-seed",

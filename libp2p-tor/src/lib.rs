@@ -43,7 +43,7 @@
 //! use libp2p::core::Transport;
 //! # async fn test_func() -> Result<(), Box<dyn std::error::Error>> {
 //! let address = "/dns/www.torproject.org/tcp/1000".parse()?;
-//! let mut transport = libp2p_community_tor::TorTransport::bootstrapped().await?;
+//! let mut transport = libp2p_tor::TorTransport::bootstrapped().await?;
 //! // we have achieved tor connection
 //! let _conn = transport.dial(address)?.await?;
 //! # Ok(())

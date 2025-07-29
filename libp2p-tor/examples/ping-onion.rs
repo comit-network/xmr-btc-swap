@@ -52,7 +52,7 @@ use libp2p::{
     swarm::{NetworkBehaviour, SwarmEvent},
     yamux, Multiaddr, PeerId, SwarmBuilder,
 };
-use libp2p_community_tor::{AddressConversion, TorTransport};
+use libp2p_tor::{AddressConversion, TorTransport};
 use std::error::Error;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 

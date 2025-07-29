@@ -42,7 +42,7 @@ fns = "0.0.7"
 futures = { workspace = true }
 hex = { workspace = true }
 libp2p = { workspace = true, features = ["tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa"] }
-libp2p-community-tor = { path = "../libp2p-community-tor", features = ["listen-onion-service"] }
+libp2p-tor = { path = "../libp2p-tor", features = ["listen-onion-service"] }
 moka = { version = "0.12", features = ["sync", "future"] }
 monero = { workspace = true }
 monero-rpc = { path = "../monero-rpc" }

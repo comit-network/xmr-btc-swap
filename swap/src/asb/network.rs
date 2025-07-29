@@ -26,7 +26,7 @@ pub mod transport {
 
     use arti_client::{config::onion_service::OnionServiceConfigBuilder, TorClient};
     use libp2p::{core::transport::OptionalTransport, dns, identity, tcp, Transport};
-    use libp2p_community_tor::AddressConversion;
+    use libp2p_tor::AddressConversion;
     use tor_rtcompat::tokio::TokioRustlsRuntime;
 
     use super::*;
@@ -50,7 +50,7 @@ pub mod transport {
         num_intro_points: u8,
     ) -> Result<OnionTransportWithAddresses> {
         let (maybe_tor_transport, onion_addresses) = if let Some(tor_client) = maybe_tor_client {
-            let mut tor_transport = libp2p_community_tor::TorTransport::from_client(
+            let mut tor_transport = libp2p_tor::TorTransport::from_client(
                 tor_client,
                 AddressConversion::DnsOnly,
             );
