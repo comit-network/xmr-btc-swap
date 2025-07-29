@@ -13,7 +13,7 @@ tauri = ["dep:tauri", "dep:dfx-swiss-sdk"]
 
 [dependencies]
 anyhow = { workspace = true }
-arti-client = { version = "0.25.0", features = ["static-sqlite", "tokio", "rustls", "onion-service-service"], default-features = false }
+arti-client = { workspace = true, features = ["static-sqlite", "tokio", "rustls", "onion-service-service"] }
 async-compression = { version = "0.3", features = ["bzip2", "tokio"] }
 async-trait = "0.1"
 asynchronous-codec = "0.7.0"
@@ -42,7 +42,7 @@ fns = "0.0.7"
 futures = { workspace = true }
 hex = { workspace = true }
 libp2p = { workspace = true, features = ["tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa"] }
-libp2p-community-tor = { git = "https://github.com/umgefahren/libp2p-tor", rev = "e6b913e0f1ac1fc90b3ee4dd31b5511140c4a9af", features = ["listen-onion-service"] }
+libp2p-community-tor = { path = "../libp2p-community-tor", features = ["listen-onion-service"] }
 moka = { version = "0.12", features = ["sync", "future"] }
 monero = { workspace = true }
 monero-rpc = { path = "../monero-rpc" }
@@ -80,7 +80,7 @@ time = "0.3"
 tokio = { workspace = true, features = ["process", "fs", "net", "parking_lot", "rt"] }
 tokio-tungstenite = { version = "0.15", features = ["rustls-tls"] }
 tokio-util = { version = "0.7", features = ["io", "codec", "rt"] }
-tor-rtcompat = { version = "0.25.0", features = ["tokio"] }
+tor-rtcompat = { workspace = true, features = ["tokio"] }
 tower = { version = "0.4.13", features = ["full"] }
 tower-http = { version = "0.3.4", features = ["full"] }
 tracing = { workspace = true }

@@ -1,0 +1,47 @@
+[package]
+name = "libp2p-community-tor"
+version = "0.5.0"
+authors = ["umgefahren <hannes@umgefahren.xyz>"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/umgefahren/libp2p-tor"
+resolver = "2"
+description = "Tor transport for libp2p."
+
+[dependencies]
+anyhow = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+arti-client = { workspace = true, features = ["tokio", "rustls", "onion-service-client", "static-sqlite"] }
+libp2p = { workspace = true, features = ["tokio", "tcp", "tls"] }
+
+data-encoding = { version = "2.6.0" }
+tor-cell = { workspace = true, optional = true }
+tor-hsservice = { workspace = true, optional = true }
+tor-proto = { workspace = true, optional = true }
+tor-rtcompat = { workspace = true, features = ["tokio", "rustls"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+libp2p = { workspace = true, features = ["tokio", "noise", "yamux", "ping", "macros", "tcp", "tls"] }
+tokio = { workspace = true, features = ["macros"] }
+tokio-test = "0.4.4"
+tracing-subscriber = { workspace = true }
+
+[features]
+listen-onion-service = [
+  "arti-client/onion-service-service",
+  "dep:tor-hsservice",
+  "dep:tor-cell",
+  "dep:tor-proto",
+]
+
+[[example]]
+name = "ping-onion"
+required-features = ["listen-onion-service"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

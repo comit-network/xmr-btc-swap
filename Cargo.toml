@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "electrum-pool",
+  "libp2p-community-tor",
   "monero-rpc",
   "monero-rpc-pool",
   "monero-seed",
@@ -35,6 +36,13 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 typeshare = "1.0"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+
+# Tor/Arti crates
+arti-client = { git = "https://github.com/eigenwallet/arti", rev = "5db9ecbd2872d76243dd62be887efd67e4609c87", default-features = false }
+tor-cell = { git = "https://github.com/eigenwallet/arti", rev = "5db9ecbd2872d76243dd62be887efd67e4609c87" }
+tor-hsservice = { git = "https://github.com/eigenwallet/arti", rev = "5db9ecbd2872d76243dd62be887efd67e4609c87" }
+tor-proto = { git = "https://github.com/eigenwallet/arti", rev = "5db9ecbd2872d76243dd62be887efd67e4609c87" }
+tor-rtcompat = { git = "https://github.com/eigenwallet/arti", rev = "5db9ecbd2872d76243dd62be887efd67e4609c87" }
 
 [patch.crates-io]
 # patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51
