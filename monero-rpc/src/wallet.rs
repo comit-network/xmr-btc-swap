@@ -36,6 +36,7 @@ pub trait MoneroWalletRpc {
     async fn refresh(&self) -> Refreshed;
     async fn sweep_all(&self, address: String) -> SweepAll;
     async fn get_version(&self) -> Version;
+    async fn store(&self);
 }
 
 #[jsonrpc_client::implement(MoneroWalletRpc)]
