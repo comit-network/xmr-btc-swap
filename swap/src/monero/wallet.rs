@@ -13,6 +13,8 @@ use tokio::sync::Mutex;
 use tokio::time::Interval;
 use url::Url;
 
+use super::ReserveProof;
+
 #[derive(Debug)]
 pub struct Wallet {
     inner: Mutex<wallet::Client>,
@@ -313,6 +315,38 @@ impl Wallet {
             tokio::time::sleep(RETRY_INTERVAL).await;
         }
         unreachable!("Loop should have returned by now");
+    }
+
+    pub async fn get_reserve_proof(
+        &self,
+        amount: Option<u64>,
+        message: Option<String>,
+    ) -> Result<ReserveProof> {
+        let signature = self
+            .inner
+            .lock()
+            .await
+            .get_reserve_proof(amount.is_none(), amount, message.clone())
+            .await?
+            .signature;
+
+        let address = self.inner.lock().await.get_address(0).await?.address;
+
+        Ok(ReserveProof {
+            address,
+            signature,
+            message,
+        })
+    }
+
+    pub async fn check_reserve_proof(&self, proof: ReserveProof) -> Result<bool> {
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .check_reserve_proof(proof.address, proof.message, proof.signature)
+            .await?
+            .good)
     }
 }
 

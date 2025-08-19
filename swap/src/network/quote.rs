@@ -1,3 +1,4 @@
+use crate::monero::ReserveProof;
 use crate::network::json_pull_codec::JsonPullCodec;
 use crate::{asb, bitcoin, cli};
 use libp2p::core::ProtocolName;
@@ -24,7 +25,7 @@ impl ProtocolName for BidQuoteProtocol {
 }
 
 /// Represents a quote for buying XMR.
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
@@ -35,6 +36,7 @@ pub struct BidQuote {
     /// The maximum quantity the maker is willing to buy.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub max_quantity: bitcoin::Amount,
+    pub reserve_proof: Option<ReserveProof>,
 }
 
 #[derive(Clone, Copy, Debug, thiserror::Error)]
