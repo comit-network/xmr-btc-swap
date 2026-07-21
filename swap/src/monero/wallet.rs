@@ -341,7 +341,10 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
     mut check_interval: Interval,
     wallet_name: String,
 ) -> Result<(), InsufficientFunds> {
+    const FETCH_WARNING_THRESHOLD: u32 = 5;
+
     let mut seen_confirmations = 0u64;
+    let mut consecutive_fetch_failures = 0u32;
 
     while seen_confirmations < conf_target {
         check_interval.tick().await; // tick() at the beginning of the loop so every `continue` tick()s as well
@@ -357,18 +360,32 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
             )
             .await
         {
-            Ok(proof) => proof,
+            Ok(proof) => {
+                consecutive_fetch_failures = 0;
+                proof
+            }
             Err(jsonrpc::Error::JsonRpc(jsonrpc::JsonRpcError {
                 code: -1,
                 message,
                 data,
             })) => {
-                tracing::debug!(message, ?data);
-                tracing::warn!(%txid, message, "`monero-wallet-rpc` failed to fetch transaction, may need to be restarted");
+                consecutive_fetch_failures = consecutive_fetch_failures.saturating_add(1);
+                tracing::debug!(message, ?data, %consecutive_fetch_failures);
+
+                if consecutive_fetch_failures == FETCH_WARNING_THRESHOLD {
+                    tracing::warn!(
+                        %txid,
+                        message,
+                        attempts = %consecutive_fetch_failures,
+                        "`monero-wallet-rpc` repeatedly failed to fetch transaction; monitoring will continue and the process may need to be restarted"
+                    );
+                }
+
                 continue;
             }
             // TODO: Implement this using a generic proxy for each function call once https://github.com/thomaseizinger/rust-jsonrpc-client/issues/47 is fixed.
             Err(jsonrpc::Error::JsonRpc(jsonrpc::JsonRpcError { code: -13, .. })) => {
+                consecutive_fetch_failures = 0;
                 tracing::debug!(
                     "Opening wallet `{}` because no wallet is loaded",
                     wallet_name
@@ -377,6 +394,7 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
                 continue;
             }
             Err(other) => {
+                consecutive_fetch_failures = 0;
                 tracing::debug!(
                     %txid,
                     "Failed to retrieve tx from blockchain: {:#}", other
@@ -553,6 +571,129 @@ DEBUG swap::monero::wallet: Opening wallet `foo-wallet` because no wallet is loa
                 .open_wallet_invocations
                 .load(Ordering::SeqCst),
             1
+        );
+    }
+
+    #[tokio::test]
+    async fn transient_fetch_failure_does_not_warn() {
+        let writer = capture_logs(LevelFilter::WARN);
+        let client = Mutex::new(DummyClient::new(vec![
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Ok(CheckTxKey {
+                confirmations: 1,
+                received: 100,
+            }),
+        ]));
+
+        wait_for_confirmations(
+            &client,
+            TransferProof::new(TxHash("<FOO>".to_owned()), PrivateKey {
+                scalar: crate::monero::Scalar::random(&mut rand::thread_rng())
+            }),
+            "53H3QthYLckeCXh9u38vohb2gZ4QgEG3FMWHNxccR6MqV1LdDVYwF1FKsRJPj4tTupWLf9JtGPBcn2MVN6c9oR7p5Uf7JdJ".parse().unwrap(),
+            Amount::from_piconero(100),
+            1,
+            tokio::time::interval(Duration::from_millis(1)),
+            "foo-wallet".to_owned()
+        )
+        .await
+        .unwrap();
+
+        assert!(writer.captured().is_empty());
+    }
+
+    #[tokio::test]
+    async fn repeated_fetch_failures_warn_once_and_keep_monitoring() {
+        let writer = capture_logs(LevelFilter::WARN);
+        let client = Mutex::new(DummyClient::new(vec![
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Ok(CheckTxKey {
+                confirmations: 1,
+                received: 100,
+            }),
+        ]));
+
+        wait_for_confirmations(
+            &client,
+            TransferProof::new(TxHash("<FOO>".to_owned()), PrivateKey {
+                scalar: crate::monero::Scalar::random(&mut rand::thread_rng())
+            }),
+            "53H3QthYLckeCXh9u38vohb2gZ4QgEG3FMWHNxccR6MqV1LdDVYwF1FKsRJPj4tTupWLf9JtGPBcn2MVN6c9oR7p5Uf7JdJ".parse().unwrap(),
+            Amount::from_piconero(100),
+            1,
+            tokio::time::interval(Duration::from_millis(1)),
+            "foo-wallet".to_owned()
+        )
+        .await
+        .unwrap();
+
+        let captured = writer.captured();
+        assert_eq!(
+            captured
+                .matches("repeatedly failed to fetch transaction")
+                .count(),
+            1
+        );
+        assert!(captured.contains("attempts=5"));
+        assert_eq!(
+            client
+                .lock()
+                .await
+                .check_tx_key_invocations
+                .load(Ordering::SeqCst),
+            7
+        );
+    }
+
+    #[tokio::test]
+    async fn successful_fetch_resets_failure_streak() {
+        let writer = capture_logs(LevelFilter::WARN);
+        let client = Mutex::new(DummyClient::new(vec![
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Ok(CheckTxKey {
+                confirmations: 0,
+                received: 100,
+            }),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Err((-1, "Failed to get transaction from daemon".to_owned())),
+            Ok(CheckTxKey {
+                confirmations: 1,
+                received: 100,
+            }),
+        ]));
+
+        wait_for_confirmations(
+            &client,
+            TransferProof::new(TxHash("<FOO>".to_owned()), PrivateKey {
+                scalar: crate::monero::Scalar::random(&mut rand::thread_rng())
+            }),
+            "53H3QthYLckeCXh9u38vohb2gZ4QgEG3FMWHNxccR6MqV1LdDVYwF1FKsRJPj4tTupWLf9JtGPBcn2MVN6c9oR7p5Uf7JdJ".parse().unwrap(),
+            Amount::from_piconero(100),
+            1,
+            tokio::time::interval(Duration::from_millis(1)),
+            "foo-wallet".to_owned()
+        )
+        .await
+        .unwrap();
+
+        assert!(writer.captured().is_empty());
+        assert_eq!(
+            client
+                .lock()
+                .await
+                .check_tx_key_invocations
+                .load(Ordering::SeqCst),
+            10
         );
     }
 
